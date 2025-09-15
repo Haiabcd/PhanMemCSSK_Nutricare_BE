@@ -2,8 +2,10 @@ package com.hn.nutricarebe.entity;
 
 import com.hn.nutricarebe.enums.ActivityType;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -20,19 +22,28 @@ import java.util.UUID;
 public class ActivityLog {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(updatable = false, nullable = false, unique = true, name = "id")
+    @Column(updatable = false, nullable = false, name = "id")
     UUID id;
+
+
     @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user", nullable = false,
-            foreignKey = @ForeignKey(name = "account"))
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     User user;
-    @Column(name = "time")
-    ZonedDateTime time;
+
+    @Column(name = "logged_at")
+    ZonedDateTime loggedAt;
+
     @Enumerated(EnumType.STRING)
+    @NotNull(message = "Hoat động là bắt buộc")
     ActivityType type;
+
     @Column(name = "minutes")
     Integer minutes;
+
     @Column(name = "kcal_burned")
     Integer kcalBurned;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false, nullable = false)
     Instant createdAt;
 }

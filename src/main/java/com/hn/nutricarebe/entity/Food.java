@@ -23,7 +23,7 @@ public class Food {
     @Column(updatable = false, nullable = false, unique = true, name = "id")
     UUID id;
     @Column(name = "name")
-    String name;
+    String name;  //phở
     @Column(name = "description")
     String description;
     String imageUrl;

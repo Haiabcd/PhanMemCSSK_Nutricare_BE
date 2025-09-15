@@ -24,7 +24,7 @@ public class FoodLog {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, unique = true, name = "id")
     UUID id;
-    @OneToOne(fetch = FetchType.LAZY)
+
     User user;
     @Column(name = "eaten_at")
     ZonedDateTime eatenAt;

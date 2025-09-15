@@ -9,8 +9,11 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -24,28 +27,73 @@ import java.util.UUID;
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(updatable = false, nullable = false, unique = true, name = "id")
+    @Column(updatable = false, nullable = false, name = "id")
      UUID id;
+
     @NotNull(message = "Role là bắt buộc")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, name = "role")
     Role role;
+
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = true)
+    Profile profile;
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = true)
+    WaterLog waterLog;
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = true)
+    ActivityLog activityLog;
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = true)
+    MealPlanDay mealPlanDay;
+
+    @OneToMany(mappedBy = "condition",fetch = FetchType.LAZY)
+    Set<UserCondition> userConditions = new HashSet<>();
+
+    @OneToMany(mappedBy = "createdBy",fetch = FetchType.LAZY)
+    Set<Food> foods = new HashSet<>();
+
+    @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
+    Set<FoodLog> foodLogs = new HashSet<>();
+
+    @OneToMany(mappedBy = "allergy",fetch = FetchType.LAZY)
+    Set<UserAllergy> userAllergies = new HashSet<>();
+
+    @OneToMany(mappedBy = "user",fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = true)
+    Set<SavedFood> savedFoods = new HashSet<>();
+
     @Column(name = "email", unique = true)
     @Email(message = "Email không hợp lệ")
-     String email;
+    String email;
+
     @Enumerated(EnumType.STRING)
     @NotNull(message = "Provider là bắt buộc")
     @Column(name = "provider")
     Provider provider;
+
     @Column(name = "provider_user_id")
      String providerUserId;
-    @Column(name = "device_id")
+
+    @Column(name = "device_id", unique = true)
      String deviceId;
+
     @Enumerated(EnumType.STRING)
+    @NotNull(message = "Trạng thái người dùng là bắt buộc")
     @Column(name = "status")
     UserStatus status;
+
     @CreationTimestamp
+    @Column(name = "created_at", updatable = false, nullable = false)
      Instant createdAt;
-    @Column(name = "last_seen_at")
-     Instant lastSeenAt;
+
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+     Instant updatedAt;
 }
