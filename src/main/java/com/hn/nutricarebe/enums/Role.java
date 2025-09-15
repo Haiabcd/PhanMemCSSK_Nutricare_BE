@@ -1,4 +1,4 @@
-package com.hn.nutricarebe.entity;
+package com.hn.nutricarebe.enums;
 
 public enum Role {
     GUEST,

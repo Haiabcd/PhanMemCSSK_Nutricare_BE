@@ -1,10 +1,11 @@
 package com.hn.nutricarebe.entity;
 
+import com.hn.nutricarebe.enums.MealType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -15,15 +16,26 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "allergies")
-public class Allergy {
+@Table(name = "meal_plan_items")
+public class MealPlanItem {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, unique = true, name = "id")
     UUID id;
-    @Column(nullable = false, unique = true, name = "name")
-    String name;
-    @CreationTimestamp
+    @ManyToOne(fetch = FetchType.LAZY)
+    MealPlanDay day;
+    @Enumerated(EnumType.STRING)
+    MealType mealType;
+    @ManyToOne(fetch = FetchType.LAZY)
+    Food food;
+    @Column(name = "portion")
+    BigDecimal portion;
+    @Column(name = "rank")
+    Integer rank;
+    @Column(name = "note")
+    String note;
+    @Embedded
+    Nutrition nutrition;
     @Column(name = "created_at")
     Instant createdAt;
 }
