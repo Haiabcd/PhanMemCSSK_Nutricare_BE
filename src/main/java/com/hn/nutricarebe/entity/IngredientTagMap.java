@@ -7,21 +7,27 @@ import lombok.experimental.FieldDefaults;
 
 import java.util.UUID;
 
-@Embeddable
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@Entity
 public class IngredientTagMap {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id")
+    @Column(updatable = false, nullable = false, name = "id")
     UUID id;
-    @ManyToOne
-    @JoinColumn(name = "ingredient", referencedColumnName = "id")
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "ingredient_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_ingredient_tags_ing")
+    )
     Ingredient ingredient;
+
     @Enumerated(EnumType.STRING)
+    @Column(name = "tag_code", nullable = false, length = 50)
     IngredientTagCode tagCode;
 }
