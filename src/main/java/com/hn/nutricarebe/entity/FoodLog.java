@@ -31,6 +31,7 @@ public class FoodLog {
             name = "user_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_foods_created_by_users")
     )
+
     User user;
 
     @Column(name = "eaten_at", nullable = false)
