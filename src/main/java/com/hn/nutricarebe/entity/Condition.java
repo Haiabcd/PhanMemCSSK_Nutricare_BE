@@ -20,12 +20,11 @@ import java.util.UUID;
 public class Condition {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(updatable = false, nullable = false, unique = true)
+    @Column(updatable = false, nullable = false, unique = true, name = "id")
     UUID id;
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, name = "name")
     String name;
     @CreationTimestamp
+    @Column(name = "created_at")
     Instant createdAt;
-    @Embedded
-    NutritionRule rule;
 }

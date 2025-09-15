@@ -3,8 +3,8 @@ package com.hn.nutricarebe.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -15,15 +15,21 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "allergies")
-public class Allergy {
+@Table(name = "recipe_ingredients")
+public class RecipeIngredient {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, unique = true, name = "id")
     UUID id;
-    @Column(nullable = false, unique = true, name = "name")
-    String name;
-    @CreationTimestamp
-    @Column(name = "created_at")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "food", nullable = false)
+    Food food;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "ingredient", nullable = false)
+    Ingredient ingredient;
+    @Column(name = "quantity")
+    BigDecimal quantity;
+    BigDecimal amount;
     Instant createdAt;
+    Instant updatedAt;
 }

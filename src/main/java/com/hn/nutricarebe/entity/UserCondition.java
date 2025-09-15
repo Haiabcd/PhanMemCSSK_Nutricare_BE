@@ -3,7 +3,6 @@ package com.hn.nutricarebe.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -15,15 +14,16 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "allergies")
-public class Allergy {
+@Table(name = "user_conditions")
+public class UserCondition {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, unique = true, name = "id")
     UUID id;
-    @Column(nullable = false, unique = true, name = "name")
-    String name;
-    @CreationTimestamp
+    @ManyToOne(fetch = FetchType.LAZY)
+    User user;
+    @ManyToOne(fetch = FetchType.LAZY)
+    Condition condition;
     @Column(name = "created_at")
     Instant createdAt;
 }
