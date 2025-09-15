@@ -52,7 +52,7 @@ public class User {
             cascade = CascadeType.ALL, orphanRemoval = true)
     MealPlanDay mealPlanDay;
 
-    @OneToMany(mappedBy = "condition",fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<UserCondition> userConditions = new HashSet<>();
 
     @OneToMany(mappedBy = "createdBy",fetch = FetchType.LAZY)
@@ -61,7 +61,7 @@ public class User {
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<FoodLog> foodLogs = new HashSet<>();
 
-    @OneToMany(mappedBy = "allergy",fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<UserAllergy> userAllergies = new HashSet<>();
 
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY,

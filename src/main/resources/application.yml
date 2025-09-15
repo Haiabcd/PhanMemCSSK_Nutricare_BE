@@ -2,9 +2,9 @@ spring:
   application:
     name: NutriCareBE
   datasource:
-    url:
-    username:
-    password:
+    url: jdbc:postgresql://db.ewyeishkixdcfhnzxprj.supabase.co:5432/postgres?sslmode=require
+    username: postgres
+    password: "nutricareqdrhd@#$"
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
