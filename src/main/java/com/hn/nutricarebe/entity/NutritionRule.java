@@ -54,7 +54,7 @@ public class NutritionRule {
     @Column(name = "message", nullable = false)
     String message;
 
-    @Column(name = "config_json", length = 16, nullable = false)
+    @Column(name = "config_json", nullable = false)
     String configJson;
 
     @CreationTimestamp

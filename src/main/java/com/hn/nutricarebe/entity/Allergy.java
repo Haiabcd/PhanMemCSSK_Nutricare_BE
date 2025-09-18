@@ -1,7 +1,6 @@
 package com.hn.nutricarebe.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
@@ -26,7 +25,6 @@ public class Allergy {
     UUID id;
 
     @Column(nullable = false, unique = true, name = "name")
-    @NotBlank(message = "Tên dị ứng không được để trống")
     String name;
 
     @OneToMany(mappedBy = "allergy", fetch = FetchType.LAZY)

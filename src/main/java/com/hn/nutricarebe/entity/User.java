@@ -10,7 +10,6 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -23,7 +22,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "accounts")
+@Table(name = "users")
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -48,9 +47,8 @@ public class User {
             cascade = CascadeType.ALL, orphanRemoval = true)
     ActivityLog activityLog;
 
-    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
-            cascade = CascadeType.ALL, orphanRemoval = true)
-    MealPlanDay mealPlanDay;
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    Set<MealPlanDay>  mealPlanDay = new HashSet<>();;
 
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<UserCondition> userConditions = new HashSet<>();
@@ -81,7 +79,7 @@ public class User {
      String providerUserId;
 
     @Column(name = "device_id", unique = true)
-     String deviceId;
+     String deviceId;   //duy nhat
 
     @Enumerated(EnumType.STRING)
     @NotNull(message = "Trạng thái người dùng là bắt buộc")
@@ -91,7 +89,6 @@ public class User {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)
      Instant createdAt;
-
 
     @UpdateTimestamp
     @Column(name = "updated_at")
