@@ -1,23 +1,19 @@
 package com.hn.nutricarebe.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.hn.nutricarebe.entity.Profile;
+import com.hn.nutricarebe.entity.User;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.util.List;
-import java.util.Map;
-
 @Getter
 @Setter
-@Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
+@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ApiResponse <T>{
-    @Builder.Default
-    int code = 1000;
-    String message;
-    T data;
-    Map<String, List<String>> errors;
+public class OnboardingResponse {
+    UserCreationResponse user;
+    ProfileCreationResponse profile;
 }

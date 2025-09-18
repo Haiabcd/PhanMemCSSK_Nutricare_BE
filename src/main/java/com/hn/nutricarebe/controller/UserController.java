@@ -24,17 +24,8 @@ public class UserController {
     UserService userService;
 
     @PostMapping("/save")
-    public ApiResponse<UserCreationResponse> save(@Valid @RequestBody UserCreationRequest request, BindingResult result){
-        LinkedHashMap<String, String> errors = new LinkedHashMap<>();
-        if(result.hasErrors()){
-            result.getFieldErrors().forEach(e ->
-                    errors.put(e.getField(), e.getDefaultMessage()));
-            return ApiResponse.<UserCreationResponse>builder()
-                    .code(1000)
-                    .message("Lỗi dữ liệu đầu vào")
-                    .errors(errors)
-                    .build();
-        }
+    public ApiResponse<UserCreationResponse> save(@Valid @RequestBody UserCreationRequest request){
+
         return ApiResponse.<UserCreationResponse>builder()
                 .message("Tạo người dùng thành công")
                 .data(userService.save(request))
