@@ -2,6 +2,7 @@ package com.hn.nutricarebe.dto.request;
 
 import com.hn.nutricarebe.enums.FoodTag;
 import com.hn.nutricarebe.enums.MealSlot;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -30,6 +31,7 @@ public class FoodCreationRequest {
     @Builder.Default
     @Min(value = 0, message = "Thời gian nấu phải >= 0")
     Integer cookMinutes = 0;
+    @Valid
     @NotNull(message = "Thông tin dinh dưỡng là bắt buộc")
     NutritionRequest nutrition;
     @Builder.Default

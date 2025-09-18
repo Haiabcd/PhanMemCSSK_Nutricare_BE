@@ -1,13 +1,12 @@
 package com.hn.nutricarebe.entity;
 
-
+import com.hn.nutricarebe.enums.IngredientTag;
 import com.hn.nutricarebe.enums.Unit;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
@@ -51,8 +50,22 @@ public class Ingredient {
             name = "ingredient_aliases",
             joinColumns = @JoinColumn(name = "ingredient_id", foreignKey = @ForeignKey(name = "fk_aliases_ingredient"))
     )
-    @Column(name = "alias", length = 255, nullable = false)
+    @Column(name = "alias")
     Set<String> aliases;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "ingredient_tags",
+            joinColumns = @JoinColumn(
+                    name = "ingredient_id",
+                    foreignKey = @ForeignKey(name = "fk_ingredient_tags_ingredients")
+            )
+    )
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tag", nullable = false, length = 50)
+    @Builder.Default
+    Set<IngredientTag> tags = new HashSet<>();
+
 
     @Column(name = "serving_name")
     String servingName;
@@ -63,9 +76,6 @@ public class Ingredient {
     @Enumerated(EnumType.STRING)
     @Column(name = "unit", nullable = false)
     Unit unit;
-
-    @OneToMany(mappedBy = "ingredient", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<IngredientTagMap> tags = new HashSet<>();
 
     @OneToMany(mappedBy = "ingredient", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<RecipeIngredient> recipeIngredients = new HashSet<>();
