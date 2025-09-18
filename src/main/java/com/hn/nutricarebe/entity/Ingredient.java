@@ -1,13 +1,12 @@
 package com.hn.nutricarebe.entity;
 
-
+import com.hn.nutricarebe.enums.IngredientTag;
 import com.hn.nutricarebe.enums.Unit;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
@@ -28,7 +27,7 @@ public class Ingredient {
     @Column(updatable = false, nullable = false, name = "id")
     UUID id;
 
-    @Column(name = "name", nullable = false, length = 255)
+    @Column(name = "name", nullable = false, unique = true)
     String name;
 
     @Embedded
@@ -43,7 +42,7 @@ public class Ingredient {
     })
     Nutrition per100;
 
-    @Column(name = "image_url", length = 1024)
+    @Column(name = "image_url")
     String imageUrl;
 
     @ElementCollection(fetch = FetchType.LAZY)
@@ -51,21 +50,32 @@ public class Ingredient {
             name = "ingredient_aliases",
             joinColumns = @JoinColumn(name = "ingredient_id", foreignKey = @ForeignKey(name = "fk_aliases_ingredient"))
     )
-    @Column(name = "alias", length = 255, nullable = false)
+    @Column(name = "alias")
     Set<String> aliases;
 
-    @Column(name = "serving_name", length = 100)
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "ingredient_tags",
+            joinColumns = @JoinColumn(
+                    name = "ingredient_id",
+                    foreignKey = @ForeignKey(name = "fk_ingredient_tags_ingredients")
+            )
+    )
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tag", nullable = false, length = 50)
+    @Builder.Default
+    Set<IngredientTag> tags = new HashSet<>();
+
+
+    @Column(name = "serving_name")
     String servingName;
 
     @Column(name = "serving_size_gram", precision = 10, scale = 2)
     BigDecimal servingSizeGram;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "unit", nullable = false, length = 30)
+    @Column(name = "unit", nullable = false)
     Unit unit;
-
-    @OneToMany(mappedBy = "ingredient", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<IngredientTagMap> tags = new HashSet<>();
 
     @OneToMany(mappedBy = "ingredient", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<RecipeIngredient> recipeIngredients = new HashSet<>();

@@ -1,12 +1,13 @@
 package com.hn.nutricarebe.entity;
 
+import com.hn.nutricarebe.enums.FoodTag;
+import com.hn.nutricarebe.enums.MealSlot;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
@@ -27,17 +28,18 @@ public class Food {
     @Column(updatable = false, nullable = false, name = "id")
     UUID id;
 
-    @Column(name = "name", nullable = false, length = 255, unique = true)
+    @Column(name = "name", nullable = false, unique = true)
     @NotBlank(message = "Tên không được để trống")
     String name;
 
+    @Lob
     @Column(name = "description")
     String description;
 
-    @Column(name = "image_url", length = 1024)
+    @Column(name = "image_url")
     String imageUrl;
 
-    @Column(name = "serving_name", length = 100)
+    @Column(name = "serving_name", nullable = false)
     String servingName;
 
     @Column(name = "serving_gram", precision = 10, scale = 2)
@@ -58,6 +60,9 @@ public class Food {
     })
     Nutrition nutrition;
 
+    @Column(name = "is_ingredient", nullable = false)
+    boolean isIngredient;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "created_by", nullable = false,
@@ -65,8 +70,33 @@ public class Food {
     )
     User createdBy;
 
-    @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<FoodTagMap> tags = new HashSet<>();
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "food_meal_slots",
+            joinColumns = @JoinColumn(
+                    name = "food_id",
+                    foreignKey = @ForeignKey(name = "fk_food_meal_slots_foods")
+            )
+    )
+    @Enumerated(EnumType.STRING)
+    @Column(name = "meal_slot", nullable = false)
+    @Builder.Default
+    Set<MealSlot> mealSlots = new HashSet<>();
+
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "food_tags",
+            joinColumns = @JoinColumn(
+                    name = "food_id",
+                    foreignKey = @ForeignKey(name = "fk_food_tags_foods")
+            )
+    )
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tag", nullable = false, length = 50)
+    @Builder.Default
+    Set<FoodTag> tags = new HashSet<>();
+
 
     @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<RecipeIngredient> ingredients = new HashSet<>();
