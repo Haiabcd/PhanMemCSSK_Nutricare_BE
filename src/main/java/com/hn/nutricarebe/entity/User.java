@@ -29,7 +29,7 @@ public class User {
     @Column(updatable = false, nullable = false, name = "id")
      UUID id;
 
-    @NotNull(message = "Role là bắt buộc")
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, name = "role")
     Role role;
@@ -67,11 +67,9 @@ public class User {
     Set<SavedFood> savedFoods = new HashSet<>();
 
     @Column(name = "email", unique = true)
-    @Email(message = "Email không hợp lệ")
     String email;
 
     @Enumerated(EnumType.STRING)
-    @NotNull(message = "Provider là bắt buộc")
     @Column(name = "provider")
     Provider provider;
 
@@ -82,7 +80,6 @@ public class User {
      String deviceId;   //duy nhat
 
     @Enumerated(EnumType.STRING)
-    @NotNull(message = "Trạng thái người dùng là bắt buộc")
     @Column(name = "status")
     UserStatus status;
 

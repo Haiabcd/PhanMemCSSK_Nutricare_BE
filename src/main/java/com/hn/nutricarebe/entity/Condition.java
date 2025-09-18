@@ -26,7 +26,6 @@ public class Condition {
     @Column(nullable = false, unique = true, name = "name")
     String name;
 
-
     @OneToMany(mappedBy = "condition",fetch = FetchType.LAZY)
     Set<UserCondition> userConditions = new HashSet<>();
 
