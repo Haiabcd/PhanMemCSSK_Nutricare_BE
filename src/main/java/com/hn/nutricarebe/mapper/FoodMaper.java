@@ -20,7 +20,17 @@ public interface FoodMaper {
     @Mapping(target = "createdBy", ignore = true)
     Food toFood(FoodCreationRequest req, @Context UserResolver userResolver);
 
-    FoodResponse toFoodResponse(Food food);
+
+    @Mapping(target = "imageUrl", expression = "java(cdnHelper.buildUrl(food.getImageKey()))")
+    FoodResponse toFoodResponse(Food food, @Context CdnHelper cdnHelper);
+
+
+    default String buildImageUrl(String key) {
+        if (key == null) return null;
+        String base = "https://dyfgxhmdeg59a.cloudfront.net/";
+        if (!base.endsWith("/")) base += "/";
+        return base + key;
+    }
 
 
     @AfterMapping

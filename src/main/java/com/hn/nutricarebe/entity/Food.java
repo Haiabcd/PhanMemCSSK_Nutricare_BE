@@ -36,8 +36,8 @@ public class Food {
     @Column(name = "description")
     String description;
 
-    @Column(name = "image_url")
-    String imageUrl;
+    @Column(name = "image_key", unique = true)
+    String imageKey;
 
     @Column(name = "serving_name", nullable = false)
     String servingName;

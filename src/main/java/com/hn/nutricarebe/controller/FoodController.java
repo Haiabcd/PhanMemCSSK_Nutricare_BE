@@ -9,10 +9,8 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -21,9 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class FoodController {
     FoodService foodService;
 
-
-    @PostMapping("/save")
-    public ApiResponse<FoodResponse> save(@Valid @RequestBody FoodCreationRequest request){
+    @PostMapping(value = "/save",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<FoodResponse> createFood(@Valid @ModelAttribute FoodCreationRequest request) {
         return ApiResponse.<FoodResponse>builder()
                 .message("Tạo thực phẩm thành công")
                 .data(foodService.saveFood(request))

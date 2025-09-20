@@ -42,8 +42,8 @@ public class GlobalExceptionHandler {
                 ));
 
         ApiResponse<Void> body = ApiResponse.<Void>builder()
-                .code(1001) // gán mã lỗi riêng cho validation
-                .message("Dữ liệu không hợp lệ")
+                .code(ErrorCode.VALIDATION_ERROR.getCode())
+                .message(ErrorCode.VALIDATION_ERROR.getMessage())
                 .errors(errors)
                 .build();
 

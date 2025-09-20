@@ -16,7 +16,7 @@ import java.util.UUID;
 public class UserResolver {
     UserRepository userRepository;
 
-    /** Lấy User theo id; nếu không có thì ném AppException(USER_NOT_FOUND) */
+
     public User mustExist(UUID id) {
         if (id == null) {
             throw new AppException(ErrorCode.VALIDATION_FAILED);

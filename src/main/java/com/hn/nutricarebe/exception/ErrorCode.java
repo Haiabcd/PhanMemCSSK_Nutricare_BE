@@ -16,6 +16,9 @@ public enum ErrorCode {
     DEVICE_ID_EXISTED(1006, "Device ID đã tồn tại", HttpStatus.CONFLICT),
     USERID_EXISTED(1007, "User ID đã tồn tại", HttpStatus.CONFLICT),
     CONDITION_EXISTED(1008, "Bệnh nền đã tồn tại", HttpStatus.CONFLICT),
+    FILE_EMPTY(1009, "File rỗng hoặc không tồn tại", HttpStatus.BAD_REQUEST),
+    FILE_UPLOAD_FAILED(1010, "Tải file lên thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
+    VALIDATION_ERROR(2001, "Dữ liệu không hợp lệ", HttpStatus.BAD_REQUEST),
     INTERNAL_ERROR(1999, "Lỗi hệ thống", HttpStatus.INTERNAL_SERVER_ERROR);
 
     int code;
