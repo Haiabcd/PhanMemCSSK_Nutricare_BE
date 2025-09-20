@@ -16,18 +16,26 @@ import com.hn.nutricarebe.repository.UserRepository;
 import com.hn.nutricarebe.service.AuthService;
 import com.hn.nutricarebe.service.UserAllergyService;
 import com.hn.nutricarebe.service.UserConditionService;
+import com.nimbusds.jose.*;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jwt.JWTClaimsSet;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@Slf4j
 public class AuthServiceImpl implements AuthService {
 
     UserRepository userRepository;
@@ -37,8 +45,12 @@ public class AuthServiceImpl implements AuthService {
     UserAllergyService userAllergyService;
     UserConditionService userConditionService;
 
+    @NonFinal
+    @Value("${jwt.signerKey}")
+    protected String SIGNER_KEY;
 
     @Override
+    @Transactional
     public OnboardingResponse onBoarding(OnboardingRequest request) {
         //Lưu user
         if(userRepository.existsByDeviceId(request.getUser().getDeviceId())){
@@ -79,9 +91,34 @@ public class AuthServiceImpl implements AuthService {
         //Trả về
         return OnboardingResponse.builder()
                 .user(userCreationResponse)
+                .token(generateToken(savedUser))
                 .profile(profileCreationResponse)
                 .conditions(listCondition)
                 .allergies(listAllergy)
                 .build();
+    }
+
+    private String generateToken(User user){
+        JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                .subject(user.getId().toString())
+                .issuer("nutricare.com")
+                .issueTime(new Date())
+                .expirationTime(new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()))
+                .claim("scope", user.getRole().toString())
+                .build();
+
+        Payload payload = new Payload(claimsSet.toJSONObject());
+
+        JWSObject jwsObject = new JWSObject(header, payload);
+
+        try {
+            jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
+            return jwsObject.serialize();
+        } catch (JOSEException e) {
+            log.error("Error while signing the token: {}", e.getMessage());
+            throw new RuntimeException("Error while signing the token: " + e.getMessage());
+        }
     }
 }
