@@ -23,21 +23,21 @@ import java.util.LinkedHashMap;
 public class ProfileController {
     ProfileService profileService;
 
-    @PostMapping("/save")
-    public ApiResponse<ProfileCreationResponse> save(@Valid @RequestBody ProfileCreationRequest request, BindingResult result) {
-        LinkedHashMap<String, String> errors = new LinkedHashMap<>();
-        if (result.hasErrors()) {
-            result.getFieldErrors().forEach(e ->
-                    errors.put(e.getField(), e.getDefaultMessage()));
-            return ApiResponse.<ProfileCreationResponse>builder()
-                    .code(1000)
-                    .message("Lỗi dữ liệu đầu vào")
-                    .errors(errors)
-                    .build();
-        }
-        return ApiResponse.<ProfileCreationResponse>builder()
-                .message("Tạo hồ sơ thành công")
-                .data(profileService.save(request))
-                .build();
-    }
+//    @PostMapping("/save")
+//    public ApiResponse<ProfileCreationResponse> save(@Valid @RequestBody ProfileCreationRequest request, BindingResult result) {
+//        LinkedHashMap<String, String> errors = new LinkedHashMap<>();
+//        if (result.hasErrors()) {
+//            result.getFieldErrors().forEach(e ->
+//                    errors.put(e.getField(), e.getDefaultMessage()));
+//            return ApiResponse.<ProfileCreationResponse>builder()
+//                    .code(1000)
+//                    .message("Lỗi dữ liệu đầu vào")
+//                    .errors(errors)
+//                    .build();
+//        }
+//        return ApiResponse.<ProfileCreationResponse>builder()
+//                .message("Tạo hồ sơ thành công")
+//                .data(profileService.save(request))
+//                .build();
+//    }
 }

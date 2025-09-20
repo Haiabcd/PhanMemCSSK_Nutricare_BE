@@ -23,12 +23,12 @@ import java.util.LinkedHashMap;
 public class UserController {
     UserService userService;
 
-    @PostMapping("/save")
-    public ApiResponse<UserCreationResponse> save(@Valid @RequestBody UserCreationRequest request){
-
-        return ApiResponse.<UserCreationResponse>builder()
-                .message("Tạo người dùng thành công")
-                .data(userService.save(request))
-                .build();
-    }
+//    @PostMapping("/save")
+//    public ApiResponse<UserCreationResponse> save(@Valid @RequestBody UserCreationRequest request){
+//
+//        return ApiResponse.<UserCreationResponse>builder()
+//                .message("Tạo người dùng thành công")
+//                .data(userService.save(request))
+//                .build();
+//    }
 }

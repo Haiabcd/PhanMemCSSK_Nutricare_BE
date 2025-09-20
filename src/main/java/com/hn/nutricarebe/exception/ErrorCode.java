@@ -15,6 +15,7 @@ public enum ErrorCode {
     INGREDIENT_NAME_EXISTED(1005, "Nguyên liệu đã tồn tại", HttpStatus.CONFLICT),
     DEVICE_ID_EXISTED(1006, "Device ID đã tồn tại", HttpStatus.CONFLICT),
     USERID_EXISTED(1007, "User ID đã tồn tại", HttpStatus.CONFLICT),
+    CONDITION_EXISTED(1008, "Bệnh nền đã tồn tại", HttpStatus.CONFLICT),
     INTERNAL_ERROR(1999, "Lỗi hệ thống", HttpStatus.INTERNAL_SERVER_ERROR);
 
     int code;

@@ -2,6 +2,7 @@ package com.hn.nutricarebe.controller;
 
 import com.hn.nutricarebe.dto.request.ConditionCreationRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
+import com.hn.nutricarebe.dto.response.ConditionResponse;
 import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.service.ConditionService;
 import com.hn.nutricarebe.service.impl.ConditionServiceImpl;
@@ -31,19 +32,9 @@ public class ConditionController {
     }
 
     @PostMapping("/save")
-    public ApiResponse<Condition> saveCondition(@Valid @RequestBody ConditionCreationRequest request, BindingResult result){
-        LinkedHashMap<String, String> errors = new LinkedHashMap<>();
-        if (result.hasErrors()) {
-            result.getFieldErrors().forEach(error -> {
-                errors.put(error.getField(), error.getDefaultMessage());
-            });
-            return ApiResponse.<Condition>builder()
-                    .message("Lỗi dữ liệu đầu vào")
-                    .errors(errors)
-                    .build();
-        }
-       return ApiResponse.<Condition>builder()
-                .message("Thêm bệnh nền thành công")
+    public ApiResponse<ConditionResponse> saveCondition(@Valid @RequestBody ConditionCreationRequest request){
+        return ApiResponse.<ConditionResponse>builder()
+                .message("Tạo bệnh nền thành công")
                 .data(conditionService.save(request))
                 .build();
     }

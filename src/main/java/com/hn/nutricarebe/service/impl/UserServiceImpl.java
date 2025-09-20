@@ -24,20 +24,20 @@ public class UserServiceImpl implements UserService {
     UserRepository userRepository;
     UserMapper userMapper;
 
-    @Override
-    public UserCreationResponse save(UserCreationRequest request) {
-       if(userRepository.existsByDeviceId(request.getDeviceId())){
-           throw new RuntimeException("User with deviceId " + request.getDeviceId() + " already exists");
-       }
-
-        User userRequest = userMapper.toUser(request);
-        userRequest.setStatus(UserStatus.ACTIVE);
-        if(request.getProvider().equals(Provider.NONE)){
-            userRequest.setRole(Role.GUEST);
-        }
-        User u = userRepository.save(userRequest);
-        return userMapper.toUserCreationResponse(u);
-    }
+//    @Override
+//    public UserCreationResponse save(UserCreationRequest request) {
+//       if(userRepository.existsByDeviceId(request.getDeviceId())){
+//           throw new RuntimeException("User with deviceId " + request.getDeviceId() + " already exists");
+//       }
+//
+//        User userRequest = userMapper.toUser(request);
+//        userRequest.setStatus(UserStatus.ACTIVE);
+//        if(request.getProvider().equals(Provider.NONE)){
+//            userRequest.setRole(Role.GUEST);
+//        }
+//        User u = userRepository.save(userRequest);
+//        return userMapper.toUserCreationResponse(u);
+//    }
 
     @Override
     public UserCreationResponse getUserById(UUID id) {
