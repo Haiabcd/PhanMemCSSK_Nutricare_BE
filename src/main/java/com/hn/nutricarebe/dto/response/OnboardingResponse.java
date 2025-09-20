@@ -6,6 +6,8 @@ import com.hn.nutricarebe.entity.User;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.List;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -16,4 +18,6 @@ import lombok.experimental.FieldDefaults;
 public class OnboardingResponse {
     UserCreationResponse user;
     ProfileCreationResponse profile;
+    List<UserConditionResponse> conditions;
+    List<UserAllergyResponse> allergies;
 }

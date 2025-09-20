@@ -14,7 +14,13 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "user_allergies")
+@Table(
+        name = "user_allergies",
+        uniqueConstraints = @UniqueConstraint(
+            name = "uk_user_allergy_user_allergy",
+            columnNames = {"user_id", "allergy_id"}
+      )
+)
 public class UserAllergy {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

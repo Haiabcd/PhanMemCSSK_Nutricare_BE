@@ -1,9 +1,9 @@
 package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.OnboardingRequest;
-import com.hn.nutricarebe.dto.response.OnboardingResponse;
-import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
-import com.hn.nutricarebe.dto.response.UserCreationResponse;
+import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
+import com.hn.nutricarebe.dto.request.UserConditionCreationRequest;
+import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.entity.Profile;
 import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.*;
@@ -14,10 +14,16 @@ import com.hn.nutricarebe.mapper.UserMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
 import com.hn.nutricarebe.repository.UserRepository;
 import com.hn.nutricarebe.service.AuthService;
+import com.hn.nutricarebe.service.UserAllergyService;
+import com.hn.nutricarebe.service.UserConditionService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +34,9 @@ public class AuthServiceImpl implements AuthService {
     ProfileRepository profileRepository;
     UserMapper userMapper;
     ProfileMapper profileMapper;
+    UserAllergyService userAllergyService;
+    UserConditionService userConditionService;
+
 
     @Override
     public OnboardingResponse onBoarding(OnboardingRequest request) {
@@ -42,20 +51,37 @@ public class AuthServiceImpl implements AuthService {
         User savedUser = userRepository.save(user);
         UserCreationResponse userCreationResponse = userMapper.toUserCreationResponse(savedUser);
         //Lưu profile
-        if(profileRepository.existsByUserId(savedUser.getId())){
-            throw new AppException(ErrorCode.USERID_EXISTED);
-        }
         Profile profile = profileMapper.toProfile(request.getProfile());
         profile.setUser(savedUser);
         Profile savedProfile = profileRepository.save(profile);
         ProfileCreationResponse profileCreationResponse = profileMapper.toProfileCreationResponse(savedProfile);
+        //Lưu bệnh nền
+        Set<UUID> conditionIds = request.getConditions();
+        List<UserConditionResponse> listCondition = new ArrayList<>();
+        if(conditionIds != null && !conditionIds.isEmpty()){
+            listCondition = userConditionService.saveUserCondition(UserConditionCreationRequest.builder()
+                    .user(savedUser)
+                    .conditionIds(conditionIds)
+                    .build());
+        }
+        //Lưu dị ứng
+        Set<UUID> allergyIds = request.getAllergies();
+        List<UserAllergyResponse> listAllergy = new ArrayList<>();
+        if(allergyIds != null && !allergyIds.isEmpty()){
+             UserAllergyCreationRequest uar = UserAllergyCreationRequest.builder()
+                    .user(savedUser)
+                    .allergyIds(allergyIds)
+                    .build();
+            listAllergy = userAllergyService.saveUserAllergy(uar);
+        }
         //Lập kế hoạch
         //Tạo token
         //Trả về
         return OnboardingResponse.builder()
                 .user(userCreationResponse)
                 .profile(profileCreationResponse)
+                .conditions(listCondition)
+                .allergies(listAllergy)
                 .build();
-
     }
 }

@@ -19,3 +19,4 @@ public class UserConditionCreationRequest {
     @NotEmpty(message = "Danh sách mã bệnh là bắt buộc")
     private Set<@NotNull(message = "Mã bệnh là bắt buộc") UUID> conditionIds;
 }
+
