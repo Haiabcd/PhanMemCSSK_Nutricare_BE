@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -15,7 +14,13 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "user_conditions")
+@Table(
+        name = "user_conditions",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_user_condition_user_condition",
+                columnNames = {"user_id", "condition_id"}
+        )
+)
 public class UserCondition {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
