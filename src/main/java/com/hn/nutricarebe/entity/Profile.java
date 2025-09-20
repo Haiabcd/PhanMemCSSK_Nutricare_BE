@@ -4,8 +4,6 @@ import com.hn.nutricarebe.enums.ActivityLevel;
 import com.hn.nutricarebe.enums.Gender;
 import com.hn.nutricarebe.enums.GoalType;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
@@ -32,15 +30,12 @@ public class Profile {
     User user;
 
     @Column(length = 300, name = "height_cm", nullable = false)
-    @NotNull(message = "Chiều cao là bắt buộc")
     Integer heightCm;
 
     @Column(length = 150, name = "weight_kg", nullable = false)
-    @NotNull(message = "Cân nặng là bắt buộc")
     Integer weightKg;
 
     @Enumerated(EnumType.STRING)
-    @NotNull(message = "Giới tính là bắt buộc")
     @Column(name = "gender", nullable = false)
     Gender gender;
 
@@ -48,7 +43,6 @@ public class Profile {
     Integer birthYear;
 
     @Enumerated(EnumType.STRING)
-    @NotNull(message = "Mục tiêu là bắt buộc")
     @Column(name = "goal", nullable = false)
     GoalType goal;
 
@@ -56,12 +50,11 @@ public class Profile {
     @Column(name = "activity_level")
     ActivityLevel activityLevel;
 
-    @NotBlank(message = "Tên là bắt buộc")
     @Column(name = "name")
     String name;
 
     @CreationTimestamp
-    @Column(name = "created_at")
+    @Column(name = "created_at", updatable = false)
     Instant createdAt;
 
     @UpdateTimestamp
