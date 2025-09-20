@@ -31,17 +31,7 @@ public class AllergyController {
     }
 
     @PostMapping("/save")
-    public ApiResponse<AllergyResponse> saveAllergy(@Valid @RequestBody AllergyCreationRequest request, BindingResult bindingResult) {
-        LinkedHashMap<String, String> errors = new LinkedHashMap<>();
-        if (bindingResult.hasErrors()) {
-            bindingResult.getFieldErrors().forEach(fieldError -> {
-                errors.put(fieldError.getField(), fieldError.getDefaultMessage());
-            });
-            return ApiResponse.<AllergyResponse>builder()
-                    .message("Dữ liệu không hợp lệ")
-                    .errors(errors)
-                    .build();
-        }
+    public ApiResponse<AllergyResponse> saveAllergy(@Valid @RequestBody AllergyCreationRequest request) {
         return ApiResponse.<AllergyResponse>builder()
                 .message("Tạo dị ứng thành công")
                 .data(allergyService.save(request))

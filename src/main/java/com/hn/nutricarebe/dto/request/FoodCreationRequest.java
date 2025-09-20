@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
@@ -22,9 +24,9 @@ public class FoodCreationRequest {
     @NotBlank(message = "Tên không được để trống")
     String name;
     String description;
-    String imageUrl;
     @NotBlank(message = "Tên khẩu phần không được để trống")
     String servingName;
+
     @Digits(integer=8, fraction=2)
     @PositiveOrZero(message ="Khối lượng phục vụ phải là số dương hoặc bằng 0")
     BigDecimal servingGram;
@@ -41,4 +43,6 @@ public class FoodCreationRequest {
     Set<MealSlot> mealSlots = new HashSet<>();
     @Builder.Default
     Set<FoodTag> tags= new HashSet<>();
+
+    MultipartFile image;
 }

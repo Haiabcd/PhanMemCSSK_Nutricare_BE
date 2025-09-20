@@ -9,5 +9,5 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface  AllergyMapper {
     Allergy toAllergy(AllergyCreationRequest request);
-    AllergyResponse toAllergyRespone(Allergy allergy);
+    AllergyResponse toAllergyResponse(Allergy allergy);
 }

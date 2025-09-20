@@ -16,3 +16,20 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc.lob.non_contextual_creation: true
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+aws:
+  region: ap-southeast-1
+  s3:
+    bucket:
+      public: nutricare-public
+
+  cloudfront:
+    domain: dyfgxhmdeg59a.cloudfront.net
+    signing:
+      enabled: false
+cdn:
+  base-url: https://dyfgxhmdeg59a.cloudfront.net/

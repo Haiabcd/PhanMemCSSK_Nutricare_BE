@@ -12,7 +12,6 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 
 @Service
@@ -35,7 +34,7 @@ public class AllergyServiceImpl implements AllergyService {
         }
 
         Allergy savedAllergy = allergyRepository.save(allergyMapper.toAllergy(request));
-        return allergyMapper.toAllergyRespone(savedAllergy);
+        return allergyMapper.toAllergyResponse(savedAllergy);
     }
 }
 
