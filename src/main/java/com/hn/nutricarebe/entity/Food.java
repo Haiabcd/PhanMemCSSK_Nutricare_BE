@@ -32,8 +32,7 @@ public class Food {
     @NotBlank(message = "Tên không được để trống")
     String name;
 
-    @Lob
-    @Column(name = "description")
+    @Column(name = "description",columnDefinition = "text")
     String description;
 
     @Column(name = "image_key", unique = true)

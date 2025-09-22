@@ -22,7 +22,7 @@ public class FoodController {
     @PostMapping(value = "/save",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<FoodResponse> createFood(@Valid @ModelAttribute FoodCreationRequest request) {
         return ApiResponse.<FoodResponse>builder()
-                .message("Tạo thực phẩm thành công")
+                .message("Tạo món ăn thành công")
                 .data(foodService.saveFood(request))
                 .build();
     }

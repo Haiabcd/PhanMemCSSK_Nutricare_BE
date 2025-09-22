@@ -14,7 +14,6 @@ import com.hn.nutricarebe.service.S3Service;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,8 +37,9 @@ public class FoodServiceImpl implements FoodService {
         if (foodRepository.existsByNameIgnoreCase(normalizedName)) {
             throw new AppException(ErrorCode.FOOD_NAME_EXISTED);
         }
-        Food food = foodMapper.toFood(request, userResolver);
+        Food food = foodMapper.toFood(request);
         food.setName(normalizedName);
+        food.setCreatedBy(userResolver.getUserByToken());
 
         if (request.getImage() != null && !request.getImage().isEmpty()) {
             try {
@@ -49,14 +49,15 @@ public class FoodServiceImpl implements FoodService {
                 throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
             }
         }
-
         try {
             Food saved = foodRepository.save(food);
-            return foodMapper.toFoodResponse(saved, cdnHelper);
+            return foodMapper.toFoodResponse(saved,cdnHelper);
         } catch (DataIntegrityViolationException e) {
             throw new AppException(ErrorCode.FOOD_NAME_EXISTED);
         }
     }
+
+
 
     private String normalizeName(String input) {
         if (input == null) return null;
