@@ -29,6 +29,7 @@ public class AllergyServiceImpl implements AllergyService {
 
     @Override
     public AllergyResponse save(AllergyCreationRequest request) {
+
         if (allergyRepository.existsByName(request.getName())) {
             throw new AppException(ErrorCode.ALLERGY_EXISTED);
         }
@@ -36,6 +37,8 @@ public class AllergyServiceImpl implements AllergyService {
         Allergy savedAllergy = allergyRepository.save(allergyMapper.toAllergy(request));
         return allergyMapper.toAllergyResponse(savedAllergy);
     }
+
+
 }
 
 

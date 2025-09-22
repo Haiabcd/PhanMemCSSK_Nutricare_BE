@@ -9,10 +9,7 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,7 +21,7 @@ public class IngredientController {
 
 
     @PostMapping("/save")
-    public ApiResponse<IngredientResponse> saveIngredient(@Valid @RequestBody IngredientCreationRequest request) {
+    public ApiResponse<IngredientResponse> saveIngredient(@Valid @ModelAttribute IngredientCreationRequest request) {
         return ApiResponse.<IngredientResponse>builder()
                 .message("Tạo nguyên liệu thành công")
                 .data(ingredientService.saveIngredient(request))

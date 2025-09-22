@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -41,6 +42,24 @@ public class S3ServiceImpl implements S3Service {
 
         s3Client.putObject(putReq, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
         return objectKey;
+    }
+
+
+    @Override
+    public void deleteObject(String objectKey) {
+        if (objectKey == null || objectKey.trim().isEmpty()) {
+            return;
+        }
+        try {
+            DeleteObjectRequest deleteReq = DeleteObjectRequest.builder()
+                    .bucket(publicBucket)
+                    .key(objectKey)
+                    .build();
+
+            s3Client.deleteObject(deleteReq);
+        } catch (Exception e) {
+            throw new AppException(ErrorCode.DELETE_OBJECT_FAILED);
+        }
     }
 
     private static String buildKey(String keyPrefix, String ext) {

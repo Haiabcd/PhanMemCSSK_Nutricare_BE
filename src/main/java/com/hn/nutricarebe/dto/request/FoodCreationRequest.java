@@ -26,6 +26,11 @@ public class FoodCreationRequest {
 
     String description;
 
+    @NotNull(message = "Số khẩu phần mặc định là bắt buộc")
+    @Min(value = 1, message = "Số khẩu phần mặc định phải >= 1")
+    @Builder.Default
+    Integer defaultServing = 0 ;
+
     @NotBlank(message = "Tên khẩu phần không được để trống")
     String servingName;
 

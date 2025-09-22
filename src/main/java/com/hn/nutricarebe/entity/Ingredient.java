@@ -42,8 +42,8 @@ public class Ingredient {
     })
     Nutrition per100;
 
-    @Column(name = "image_url")
-    String imageUrl;
+    @Column(name = "image_key", unique = true)
+    String imageKey;
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
@@ -65,7 +65,6 @@ public class Ingredient {
     @Column(name = "tag", nullable = false, length = 50)
     @Builder.Default
     Set<IngredientTag> tags = new HashSet<>();
-
 
     @Column(name = "serving_name")
     String servingName;

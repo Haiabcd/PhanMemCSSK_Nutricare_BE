@@ -38,6 +38,9 @@ public class Food {
     @Column(name = "image_key", unique = true)
     String imageKey;
 
+    @Column(name = "default_servings", nullable = false)
+    Integer defaultServing;
+
     @Column(name = "serving_name", nullable = false)
     String servingName;
 
