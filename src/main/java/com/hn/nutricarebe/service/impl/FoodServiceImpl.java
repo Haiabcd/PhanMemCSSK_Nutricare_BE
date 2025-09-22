@@ -14,7 +14,6 @@ import com.hn.nutricarebe.service.S3Service;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,25 +37,31 @@ public class FoodServiceImpl implements FoodService {
         if (foodRepository.existsByNameIgnoreCase(normalizedName)) {
             throw new AppException(ErrorCode.FOOD_NAME_EXISTED);
         }
-        Food food = foodMapper.toFood(request, userResolver);
+        Food food = foodMapper.toFood(request);
         food.setName(normalizedName);
+        food.setCreatedBy(userResolver.getUserByToken());
 
-        if (request.getImage() != null && !request.getImage().isEmpty()) {
-            try {
-                String objectKey = s3Service.uploadObject(request.getImage(), "images/foods");
-                food.setImageKey(objectKey);
-            } catch (IOException e) {
-                throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
-            }
-        }
-
+        String objectKey = null;
         try {
+            if (request.getImage() != null && !request.getImage().isEmpty()) {
+                objectKey = s3Service.uploadObject(request.getImage(), "images/foods");
+                food.setImageKey(objectKey);
+            }
             Food saved = foodRepository.save(food);
             return foodMapper.toFoodResponse(saved, cdnHelper);
         } catch (DataIntegrityViolationException e) {
-            throw new AppException(ErrorCode.FOOD_NAME_EXISTED);
+            if (objectKey != null) s3Service.deleteObject(objectKey);
+            throw e;
+        } catch (IOException e) {
+            throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
+        } catch (RuntimeException e) {
+            if (objectKey != null) s3Service.deleteObject(objectKey);
+            throw e;
         }
     }
+
+
+
 
     private String normalizeName(String input) {
         if (input == null) return null;

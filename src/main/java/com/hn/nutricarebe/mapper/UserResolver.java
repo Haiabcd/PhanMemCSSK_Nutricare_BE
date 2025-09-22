@@ -17,11 +17,9 @@ public class UserResolver {
     UserRepository userRepository;
 
 
-    public User mustExist(UUID id) {
-        if (id == null) {
-            throw new AppException(ErrorCode.VALIDATION_FAILED);
-        }
-        return userRepository.findById(id)
+    public User getUserByToken() {
+        UUID uuid = UUID.fromString("fb2427fd-c1a4-46f9-b75e-cff226c14d5c");
+        return userRepository.findById(uuid)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 }

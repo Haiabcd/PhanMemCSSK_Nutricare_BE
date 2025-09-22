@@ -9,7 +9,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
+import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
@@ -28,7 +28,8 @@ public class IngredientCreationRequest {
     @NotNull(message = "Thông tin dinh dưỡng trên 100g là bắt buộc")
     NutritionRequest per100;
 
-    String imageUrl;
+    @NotNull(message = "Ảnh nguyên liệu là bắt buộc")
+    MultipartFile image;
 
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
@@ -38,10 +39,12 @@ public class IngredientCreationRequest {
 
     @PositiveOrZero(message = "servingSizeGram phải là số dương hoặc bằng 0")
     @Digits(integer = 8, fraction = 2, message = "servingSizeGram tối đa 8 số nguyên và 2 số thập phân")
-    BigDecimal servingSizeGram;
+    @Builder.Default
+    BigDecimal servingSizeGram = BigDecimal.ZERO;
 
     @NotNull(message = "Đơn vị là bắt buộc")
-    Unit unit;
+    @Builder.Default
+    Unit unit = Unit.G;
 
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)

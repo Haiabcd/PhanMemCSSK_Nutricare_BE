@@ -23,26 +23,39 @@ import java.util.UUID;
 public class FoodCreationRequest {
     @NotBlank(message = "Tên không được để trống")
     String name;
+
     String description;
+
+    @NotNull(message = "Số khẩu phần mặc định là bắt buộc")
+    @Min(value = 1, message = "Số khẩu phần mặc định phải >= 1")
+    @Builder.Default
+    Integer defaultServing = 0 ;
+
     @NotBlank(message = "Tên khẩu phần không được để trống")
     String servingName;
 
     @Digits(integer=8, fraction=2)
     @PositiveOrZero(message ="Khối lượng phục vụ phải là số dương hoặc bằng 0")
-    BigDecimal servingGram;
+    @Builder.Default
+    BigDecimal servingGram = BigDecimal.ZERO;
+
     @Builder.Default
     @Min(value = 0, message = "Thời gian nấu phải >= 0")
     Integer cookMinutes = 0;
+
     @Valid
     @NotNull(message = "Thông tin dinh dưỡng là bắt buộc")
     NutritionRequest nutrition;
+
     @Builder.Default
     boolean isIngredient = false;
-    UUID createdBy;
+
     @Builder.Default
     Set<MealSlot> mealSlots = new HashSet<>();
+
     @Builder.Default
     Set<FoodTag> tags= new HashSet<>();
 
+    @NotNull(message = "Ảnh món ăn là bắt buộc")
     MultipartFile image;
 }

@@ -3,6 +3,7 @@ package com.hn.nutricarebe.mapper;
 import com.hn.nutricarebe.dto.request.IngredientCreationRequest;
 import com.hn.nutricarebe.dto.response.IngredientResponse;
 import com.hn.nutricarebe.entity.Ingredient;
+import org.mapstruct.Context;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -15,7 +16,8 @@ public interface IngredientMapper {
     Ingredient toIngredient(IngredientCreationRequest req);
 
 
-    IngredientResponse toIngredientResponse(Ingredient entity);
+    @Mapping(target = "imageUrl", expression = "java(cdnHelper.buildUrl(ingredient.getImageKey()))")
+    IngredientResponse toIngredientResponse(Ingredient ingredient, @Context CdnHelper cdnHelper);
 
 
 }

@@ -11,4 +11,5 @@ public interface S3Service {
      * @return objectKey đã lưu trên S3
      */
     String uploadObject(MultipartFile file, String keyPrefix) throws IOException;
+    void deleteObject(String objectKey);
 }

@@ -32,12 +32,14 @@ public class Food {
     @NotBlank(message = "Tên không được để trống")
     String name;
 
-    @Lob
-    @Column(name = "description")
+    @Column(name = "description",columnDefinition = "text")
     String description;
 
     @Column(name = "image_key", unique = true)
     String imageKey;
+
+    @Column(name = "default_servings", nullable = false)
+    Integer defaultServing;
 
     @Column(name = "serving_name", nullable = false)
     String servingName;

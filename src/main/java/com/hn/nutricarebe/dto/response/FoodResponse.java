@@ -5,7 +5,6 @@ import com.hn.nutricarebe.enums.FoodTag;
 import com.hn.nutricarebe.enums.MealSlot;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Set;
