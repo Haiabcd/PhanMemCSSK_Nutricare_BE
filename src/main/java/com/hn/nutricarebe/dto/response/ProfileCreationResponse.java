@@ -23,7 +23,6 @@ import java.util.UUID;
 @Builder
 public class ProfileCreationResponse {
     UUID id;
-    User user;
     Integer heightCm;
     Integer weightKg;
     Gender gender;
