@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.FoodCreationRequest;
+import com.hn.nutricarebe.dto.response.FoodSliceResponse;
 import com.hn.nutricarebe.dto.response.FoodResponse;
 import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.exception.AppException;
@@ -15,10 +16,14 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -61,6 +66,39 @@ public class FoodServiceImpl implements FoodService {
     }
 
 
+
+    @Override
+    @Transactional(readOnly = true)
+    public FoodSliceResponse getFoodList(Integer size, UUID cursorId, Instant cursorCreatedAt) {
+        //Mặc định trả về 20, tối đa 50
+        int limit = (size == null || size <= 0 || size > 50) ? 20 : size;
+
+        List<Food> foods;
+        if (cursorId == null || cursorCreatedAt == null) {
+            // Trang đầu
+            foods = foodRepository.findFirstPage(PageRequest.of(0, limit + 1));
+        } else {
+            // Trang tiếp
+            foods = foodRepository.findNextPage(cursorCreatedAt, cursorId, PageRequest.of(0, limit + 1));
+        }
+        boolean hasNext = foods.size() > limit;
+        if (hasNext) {
+            foods = foods.subList(0, limit);
+        }
+        List<FoodResponse> items = foods.stream()
+                .map(f -> foodMapper.toFoodResponse(f, cdnHelper))
+                .toList();
+
+        UUID nextCursorId = hasNext ? foods.get(foods.size() - 1).getId() : null;
+        Instant nextCursorCreatedAt = hasNext ? foods.get(foods.size() - 1).getCreatedAt() : null;
+
+        return FoodSliceResponse.builder()
+                .items(items)
+                .nextCursorId(nextCursorId)
+                .nextCursorCreatedAt(nextCursorCreatedAt)
+                .hasNext(hasNext)
+                .build();
+    }
 
 
     private String normalizeName(String input) {

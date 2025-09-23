@@ -2,6 +2,7 @@ package com.hn.nutricarebe.controller;
 
 
 import com.hn.nutricarebe.dto.request.FoodCreationRequest;
+import com.hn.nutricarebe.dto.response.FoodSliceResponse;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.FoodResponse;
 import com.hn.nutricarebe.service.FoodService;
@@ -11,6 +12,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Instant;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -26,5 +30,18 @@ public class FoodController {
                 .data(foodService.saveFood(request))
                 .build();
     }
+
+    @GetMapping
+    public ApiResponse<FoodSliceResponse> listFoods(
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) UUID cursorId,
+            @RequestParam(required = false) Instant cursorCreatedAt
+    ) {
+        return ApiResponse.<FoodSliceResponse>builder()
+                .message("Lấy danh sách món ăn thành công")
+                .data(foodService.getFoodList(size, cursorId, cursorCreatedAt))
+                .build();
+    }
+
 
 }
