@@ -16,6 +16,8 @@ import com.hn.nutricarebe.repository.UserRepository;
 import com.hn.nutricarebe.service.AuthService;
 import com.hn.nutricarebe.service.UserAllergyService;
 import com.hn.nutricarebe.service.UserConditionService;
+import com.hn.nutricarebe.utils.PkceStore;
+import com.hn.nutricarebe.utils.PkceUtil;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -25,9 +27,15 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -37,17 +45,30 @@ import java.util.*;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class AuthServiceImpl implements AuthService {
-
     UserRepository userRepository;
     ProfileRepository profileRepository;
     UserMapper userMapper;
     ProfileMapper profileMapper;
     UserAllergyService userAllergyService;
     UserConditionService userConditionService;
+    PkceStore pkceStore;
+    WebClient webClient;;
+
+    @NonFinal
+    @Value("${supabase.host}")
+    String SUPABASE_HOST;
+
+    @NonFinal
+    @Value("${oauth.callback-url}")
+    String CALLBACK_URL;
 
     @NonFinal
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
+
+    @NonFinal
+    @Value("${supabase.anon-key}")
+    String SUPABASE_ANON_KEY;
 
     @Override
     @Transactional
@@ -97,6 +118,113 @@ public class AuthServiceImpl implements AuthService {
                 .allergies(listAllergy)
                 .build();
     }
+
+    @Override
+    public Map<String, String> startGoogleOAuth() {
+        String myState = UUID.randomUUID().toString();
+        //BKCE
+        String verifier = PkceUtil.generateCodeVerifier();
+        String challenge = PkceUtil.codeChallengeS256(verifier);
+
+        pkceStore.save(myState, verifier);
+
+        String redirectToWithAppState = UriComponentsBuilder
+                .fromHttpUrl(CALLBACK_URL)
+                .queryParam("app_state", myState)
+                .build(true)
+                .toUriString();
+
+
+        URI authorize = UriComponentsBuilder
+                .fromHttpUrl(SUPABASE_HOST + "/auth/v1/authorize")
+                .queryParam("provider", "google")
+                .queryParam("redirect_to", redirectToWithAppState)
+                .queryParam("code_challenge", challenge)
+                .queryParam("code_challenge_method", "S256")
+                .queryParam("scope", "openid profile email")
+                .build()
+                .encode()
+                .toUri();
+
+        return Map.of(
+                "authorizeUrl", authorize.toString(),
+                "state", myState
+        );
+    }
+
+
+    public SupabaseTokenResponse exchangeCodeForToken(String code, String codeVerifier, String redirectUri) {
+        String url = SUPABASE_HOST + "/auth/v1/token?grant_type=pkce";
+        Map<String, Object> body = Map.of(
+                "auth_code", code,
+                "code_verifier", codeVerifier,
+                "redirect_to", redirectUri
+        );
+
+        try {
+            return webClient.post()
+                    .uri(url)
+                    .header("apikey", SUPABASE_ANON_KEY)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + SUPABASE_ANON_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, resp -> resp.bodyToMono(String.class)
+                            .map(msg -> {
+                                log.error("Supabase error response: {}", msg);
+                                return new RuntimeException("Supabase token exchange failed: " + msg);
+                            }))
+                    .bodyToMono(SupabaseTokenResponse.class)
+                    .block();
+        } catch (Exception e) {
+            log.error("Error during token exchange: ", e);
+            throw new RuntimeException("Token exchange failed", e);
+        }
+    }
+
+    @Override
+    public LoginResponse googleCallback(String code, String state) {
+        String verifier = pkceStore.consume(state);
+        if (verifier == null) {
+            throw new AppException(ErrorCode.INVALID_OR_EXPIRED_STATE);
+        }
+
+        SupabaseTokenResponse tokenRes;
+        try {
+            tokenRes = exchangeCodeForToken(code, verifier, CALLBACK_URL);
+        } catch (Exception e) {
+            throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
+        }
+
+        SupabaseUser u = tokenRes.getUser();
+
+        Map<String,Object> meta = u!= null && u.getUser_metadata()!=null ? u.getUser_metadata() : Map.of();
+        String name = (String) meta.getOrDefault("full_name", meta.getOrDefault("name", ""));
+        String avatar = (String) meta.getOrDefault("avatar_url", meta.getOrDefault("picture",""));
+
+        LoginUserView userView = LoginUserView.builder()
+                .id(u!=null?u.getId():null)
+                .email(u!=null?u.getEmail():null)
+                .name(name)
+                .avatarUrl(avatar)
+                .provider("google")
+                .build();
+
+        // (Tuỳ chọn) tìm/ghi user vào DB, phát hành JWT riêng của app
+
+        LoginResponse data = LoginResponse.builder()
+                .user(userView)
+                .supabaseAccessToken(tokenRes.getAccess_token())
+                .supabaseRefreshToken(tokenRes.getRefresh_token())
+                .expiresIn(tokenRes.getExpires_in())
+                .build();
+        log.info("data: {}" , data);
+        return data;
+
+    }
+
+
 
     private String generateToken(User user){
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
