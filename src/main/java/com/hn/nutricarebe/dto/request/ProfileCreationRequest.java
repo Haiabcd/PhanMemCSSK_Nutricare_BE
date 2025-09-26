@@ -5,6 +5,7 @@ import com.hn.nutricarebe.enums.Gender;
 import com.hn.nutricarebe.enums.GoalType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.validator.constraints.Range;
@@ -23,6 +24,15 @@ public class ProfileCreationRequest {
     @NotNull(message = "Cân nặng là bắt buộc")
     @Range(min = 30, max = 200, message = "Cân nặng phải từ 30kg đến 200kg")
     Integer weightKg;
+
+    @NotNull(message = "Cân nặng mục tiêu là bắt buộc")
+    @Builder.Default
+    Integer targetWeightDeltaKg = 0;
+
+    @NotNull(message = "Số tuần mục tiêu là bắt buộc")
+    @PositiveOrZero(message = "Số tuần mục tiêu phải là số nguyên dương hoặc bằng 0")
+    @Builder.Default
+    Integer targetDurationWeeks = 0;
 
     @NotNull(message = "Giới tính là bắt buộc")
     Gender gender;

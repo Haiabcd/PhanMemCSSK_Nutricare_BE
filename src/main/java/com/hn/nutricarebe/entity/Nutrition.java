@@ -20,6 +20,6 @@ public class Nutrition {
     BigDecimal carbG;
     BigDecimal fatG;
     BigDecimal fiberG;
-    Integer sodiumMg;
-    BigDecimal sugarMg;
+    Integer sodiumMg;  // bỏ
+    BigDecimal sugarMg;  // bỏ
 }

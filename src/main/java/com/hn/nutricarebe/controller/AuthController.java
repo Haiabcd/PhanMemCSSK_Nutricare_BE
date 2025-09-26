@@ -22,6 +22,7 @@ public class AuthController {
     AuthService authService;
 
 
+
     @PostMapping("/onboarding")
     public ApiResponse<OnboardingResponse> onboarding(@Valid  @RequestBody OnboardingRequest request){
         return ApiResponse.<OnboardingResponse>builder()
@@ -30,6 +31,8 @@ public class AuthController {
                 .build();
     }
 
+
+    // ===========================Google OAuth2================================= //
     @PostMapping("/google/start")
     public ApiResponse<Map<String, String>> googleStart() {
         return ApiResponse.<Map<String, String>>builder()
@@ -57,6 +60,6 @@ public class AuthController {
                 .data(authService.googleCallback(code, appState))
                 .build();
     }
-
+    // ===========================Google OAuth2================================= //
 
 }

@@ -29,11 +29,17 @@ public class Profile {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     User user;
 
-    @Column(length = 300, name = "height_cm", nullable = false)
+    @Column(name = "height_cm", nullable = false)
     Integer heightCm;
 
-    @Column(length = 150, name = "weight_kg", nullable = false)
+    @Column(name = "weight_kg", nullable = false)
     Integer weightKg;
+
+    @Column(name = "target_weight_delta_kg", nullable = false)
+    Integer targetWeightDeltaKg;
+
+    @Column(name = "target_duration_week", nullable = false)
+    Integer targetDurationWeeks;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "gender", nullable = false)

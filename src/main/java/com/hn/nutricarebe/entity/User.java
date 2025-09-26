@@ -34,10 +34,36 @@ public class User {
     @Column(nullable = false, name = "role")
     Role role;
 
+    @Column(name = "email", unique = true)
+    String email;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider")
+    Provider provider;
+
+    @Column(name = "provider_user_id")
+    String providerUserId;
+
+    @Column(name = "device_id", unique = true)
+    String deviceId;   //duy nhat
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    UserStatus status;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false, nullable = false)
+    Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    Instant updatedAt;
+
 
     @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
             cascade = CascadeType.ALL, orphanRemoval = true)
     Profile profile;
+
 
     @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
             cascade = CascadeType.ALL, orphanRemoval = true)
@@ -66,28 +92,5 @@ public class User {
             cascade = CascadeType.ALL, orphanRemoval = true)
     Set<SavedFood> savedFoods = new HashSet<>();
 
-    @Column(name = "email", unique = true)
-    String email;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "provider")
-    Provider provider;
-
-    @Column(name = "provider_user_id")
-     String providerUserId;
-
-    @Column(name = "device_id", unique = true)
-     String deviceId;   //duy nhat
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status")
-    UserStatus status;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false, nullable = false)
-     Instant createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-     Instant updatedAt;
 }

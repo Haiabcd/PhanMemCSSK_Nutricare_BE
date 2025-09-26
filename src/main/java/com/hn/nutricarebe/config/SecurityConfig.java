@@ -19,7 +19,12 @@ import javax.crypto.spec.SecretKeySpec;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-    private final String[] PUBLIC_POST_ENDPOINTS = {"/auths/onboarding","/auths/google/start","/auths/google/callback"};
+    private final String[] PUBLIC_POST_ENDPOINTS = {
+            "/auths/onboarding",
+            "/auths/google/start",
+            "/auths/google/callback",
+            "/ai/plan",
+    };
 
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
