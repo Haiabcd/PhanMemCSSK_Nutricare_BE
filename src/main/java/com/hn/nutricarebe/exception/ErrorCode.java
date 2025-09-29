@@ -14,6 +14,7 @@ public enum ErrorCode {
 
     FOOD_NAME_EXISTED(1004, "Món ăn đã tồn tại", HttpStatus.CONFLICT),
     FOOD_NOT_FOUND(1012, "Món ăn không tồn tại", HttpStatus.NOT_FOUND),
+    DELETE_CONFLICT(1014, "Không thể xóa món ăn", HttpStatus.CONFLICT),
 
     INGREDIENT_NAME_EXISTED(1005, "Nguyên liệu đã tồn tại", HttpStatus.CONFLICT),
     INGREDIENT_NOT_FOUND(1013, "Nguyên liệu không tồn tại", HttpStatus.NOT_FOUND),

@@ -68,6 +68,28 @@ public class FoodServiceImpl implements FoodService {
         return foodMapper.toFoodResponse(food, cdnHelper);
     }
 
+    @Override
+    @Transactional
+    public void deleteById(UUID id) {
+        Food food = foodRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
+        String key = food.getImageKey();
+        if (key != null && !key.isBlank()) {
+            try {
+                s3Service.deleteObject(key);
+            } catch (RuntimeException e) {
+                throw new AppException(ErrorCode.DELETE_OBJECT_FAILED);
+            }
+        }
+
+        try {
+            foodRepository.delete(food);
+        } catch (DataIntegrityViolationException ex) {
+            throw new AppException(ErrorCode.DELETE_CONFLICT);
+        }
+    }
+
+
 
     private String normalizeName(String input) {
         if (input == null) return null;

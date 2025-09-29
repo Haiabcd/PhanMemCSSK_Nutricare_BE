@@ -10,6 +10,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
@@ -36,4 +37,11 @@ public class FoodController {
                 .build();
     }
 
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteFood(@PathVariable UUID id) {
+        foodService.deleteById(id);
+        return ApiResponse.<Void>builder()
+                .message("Xoá món ăn thành công")
+                .build();
+    }
 }
