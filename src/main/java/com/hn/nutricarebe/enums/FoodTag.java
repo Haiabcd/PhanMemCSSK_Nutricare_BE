@@ -6,4 +6,5 @@ public enum FoodTag {
     DIABETIC_FRIENDLY,
     HIGH_FIBER,
     HIGH_PROTEIN,
+    VEGETARIAN,
 }

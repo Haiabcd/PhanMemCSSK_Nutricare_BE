@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -60,9 +61,36 @@ public class IngredientServiceImpl implements IngredientService {
         }
     }
 
+    @Override
+    public IngredientResponse getById(UUID id) {
+        Ingredient ingredient = ingredientRepository.findWithCollectionsById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
+        return ingredientMapper.toIngredientResponse(ingredient, cdnHelper);
+    }
+
 
     private String normalizeName(String input) {
         if (input == null) return null;
         return input.trim().replaceAll("\\s+", " ");
+    }
+
+    @Override
+    @Transactional
+    public void deleteById(UUID id) {
+        Ingredient ing = ingredientRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
+        String key = ing.getImageKey();
+        if (key != null && !key.isBlank()) {
+            try {
+                s3Service.deleteObject(key);
+            } catch (RuntimeException e) {
+                throw new AppException(ErrorCode.DELETE_OBJECT_FAILED);
+            }
+        }
+        try {
+            ingredientRepository.deleteById(ing.getId());
+        } catch (DataIntegrityViolationException ex) {
+            throw new AppException(ErrorCode.DELETE_INGREDIENT_CONFLICT);
+        }
     }
 }

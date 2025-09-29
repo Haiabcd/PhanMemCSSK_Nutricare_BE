@@ -19,7 +19,28 @@ import javax.crypto.spec.SecretKeySpec;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-    private final String[] PUBLIC_ENDPOINTS = {"/auths/onboarding","/auths/google/start","/auths/google/callback"};
+
+    private final String[] PUBLIC_POST_ENDPOINTS = {
+            "/auths/onboarding",
+            "/auths/google/start",
+            "/auths/google/callback",
+            "/ai/plan",
+            "/foods/save",
+            "/ingredients/save",
+    };
+
+
+    private final String[] PUBLIC_GET_ENDPOINTS = {
+            "/auths/google/callback",
+            "/foods/**",
+            "/foods/search/**",
+            "/ingredients/**",
+    };
+
+    private final String[] PUBLIC_DELETE_ENDPOINTS = {
+            "/foods/**",
+            "/ingredients/**",
+    };
 
 
     @Value("${jwt.signerKey}")
@@ -28,8 +49,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity.authorizeHttpRequests(request ->
-                request.requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/auths/google/callback").permitAll()
+                request.requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
+                        .requestMatchers(HttpMethod.DELETE, PUBLIC_DELETE_ENDPOINTS).permitAll()
                         .anyRequest().authenticated());
 
         httpSecurity.oauth2ResourceServer(oauth2 ->
