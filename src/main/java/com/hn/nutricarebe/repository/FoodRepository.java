@@ -13,6 +13,7 @@ import java.util.UUID;
 public interface FoodRepository extends JpaRepository<Food, UUID> {
     @Query("select count(f) > 0 from Food f where lower(f.name) = lower(:name)")
     boolean existsByNameIgnoreCase(String name);
+
     @EntityGraph(attributePaths = {"mealSlots", "tags"})
     Optional<Food> findWithCollectionsById(UUID id);
 }

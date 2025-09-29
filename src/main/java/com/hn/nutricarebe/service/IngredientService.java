@@ -8,5 +8,6 @@ import java.util.UUID;
 
 public interface IngredientService {
     public IngredientResponse saveIngredient(IngredientCreationRequest request);
-    IngredientResponse getById(UUID id);
+    public IngredientResponse getById(UUID id);
+    public void deleteById(UUID id);
 }

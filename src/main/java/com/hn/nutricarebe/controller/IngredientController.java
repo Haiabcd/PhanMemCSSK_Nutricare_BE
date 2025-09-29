@@ -38,4 +38,12 @@ public class IngredientController {
                 .data(ingredientService.getById(id))
                 .build();
     }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteIngredient(@PathVariable UUID id) {
+        ingredientService.deleteById(id);
+        return ApiResponse.<Void>builder()
+                .message("Xoá nguyên liệu thành công")
+                .build();
+    }
 }

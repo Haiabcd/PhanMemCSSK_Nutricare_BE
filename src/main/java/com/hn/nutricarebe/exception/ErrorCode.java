@@ -18,6 +18,7 @@ public enum ErrorCode {
 
     INGREDIENT_NAME_EXISTED(1005, "Nguyên liệu đã tồn tại", HttpStatus.CONFLICT),
     INGREDIENT_NOT_FOUND(1013, "Nguyên liệu không tồn tại", HttpStatus.NOT_FOUND),
+    DELETE_INGREDIENT_CONFLICT(1015, "Không thể xóa nguyên liệu", HttpStatus.CONFLICT),
 
     DEVICE_ID_EXISTED(1006, "Device ID đã tồn tại", HttpStatus.CONFLICT),
     USERID_EXISTED(1007, "User ID đã tồn tại", HttpStatus.CONFLICT),

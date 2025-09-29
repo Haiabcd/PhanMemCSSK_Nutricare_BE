@@ -73,4 +73,24 @@ public class IngredientServiceImpl implements IngredientService {
         if (input == null) return null;
         return input.trim().replaceAll("\\s+", " ");
     }
+
+    @Override
+    @Transactional
+    public void deleteById(UUID id) {
+        Ingredient ing = ingredientRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
+        String key = ing.getImageKey();
+        if (key != null && !key.isBlank()) {
+            try {
+                s3Service.deleteObject(key);
+            } catch (RuntimeException e) {
+                throw new AppException(ErrorCode.DELETE_OBJECT_FAILED);
+            }
+        }
+        try {
+            ingredientRepository.deleteById(ing.getId());
+        } catch (DataIntegrityViolationException ex) {
+            throw new AppException(ErrorCode.DELETE_INGREDIENT_CONFLICT);
+        }
+    }
 }
