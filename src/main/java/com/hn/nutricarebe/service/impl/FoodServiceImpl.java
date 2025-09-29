@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -60,7 +61,12 @@ public class FoodServiceImpl implements FoodService {
         }
     }
 
-
+    @Override
+    public FoodResponse getById(UUID id) {
+        Food food = foodRepository.findWithCollectionsById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
+        return foodMapper.toFoodResponse(food, cdnHelper);
+    }
 
 
     private String normalizeName(String input) {

@@ -4,5 +4,5 @@ public enum MealSlot {
     BREAKFAST,
     LUNCH,
     DINNER,
-    SNACK
+    SNACK,
 }

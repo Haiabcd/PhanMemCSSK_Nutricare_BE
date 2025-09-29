@@ -13,6 +13,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(1003, "Người dùng không tồn tại", HttpStatus.NOT_FOUND),
 
     FOOD_NAME_EXISTED(1004, "Món ăn đã tồn tại", HttpStatus.CONFLICT),
+    FOOD_NOT_FOUND(1012, "Món ăn không tồn tại", HttpStatus.NOT_FOUND),
 
     INGREDIENT_NAME_EXISTED(1005, "Nguyên liệu đã tồn tại", HttpStatus.CONFLICT),
 
