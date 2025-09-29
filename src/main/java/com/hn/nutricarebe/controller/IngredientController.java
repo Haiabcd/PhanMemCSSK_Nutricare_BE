@@ -9,7 +9,10 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -25,6 +28,14 @@ public class IngredientController {
         return ApiResponse.<IngredientResponse>builder()
                 .message("Tạo nguyên liệu thành công")
                 .data(ingredientService.saveIngredient(request))
+                .build();
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<IngredientResponse> getIngredientById(@PathVariable UUID id) {
+        return ApiResponse.<IngredientResponse>builder()
+                .message("Lấy thông tin nguyên liệu thành công")
+                .data(ingredientService.getById(id))
                 .build();
     }
 }

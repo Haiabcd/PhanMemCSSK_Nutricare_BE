@@ -16,6 +16,7 @@ public enum ErrorCode {
     FOOD_NOT_FOUND(1012, "Món ăn không tồn tại", HttpStatus.NOT_FOUND),
 
     INGREDIENT_NAME_EXISTED(1005, "Nguyên liệu đã tồn tại", HttpStatus.CONFLICT),
+    INGREDIENT_NOT_FOUND(1013, "Nguyên liệu không tồn tại", HttpStatus.NOT_FOUND),
 
     DEVICE_ID_EXISTED(1006, "Device ID đã tồn tại", HttpStatus.CONFLICT),
     USERID_EXISTED(1007, "User ID đã tồn tại", HttpStatus.CONFLICT),

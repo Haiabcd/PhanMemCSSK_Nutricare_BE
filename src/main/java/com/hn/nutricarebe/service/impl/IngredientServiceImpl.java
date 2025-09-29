@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -58,6 +59,13 @@ public class IngredientServiceImpl implements IngredientService {
             if (objectKey != null) s3Service.deleteObject(objectKey);
             throw e;
         }
+    }
+
+    @Override
+    public IngredientResponse getById(UUID id) {
+        Ingredient ingredient = ingredientRepository.findWithCollectionsById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
+        return ingredientMapper.toIngredientResponse(ingredient, cdnHelper);
     }
 
 
