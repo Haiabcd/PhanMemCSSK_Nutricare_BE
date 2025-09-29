@@ -1,15 +1,13 @@
 package com.hn.nutricarebe.entity;
 
 import com.hn.nutricarebe.enums.LogSource;
-import com.hn.nutricarebe.enums.MealType;
+import com.hn.nutricarebe.enums.MealSlot;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -38,8 +36,8 @@ public class FoodLog {
     Instant eatenAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "meal_type", nullable = false, length = 20)
-    MealType mealType;
+    @Column(name = "meal_slot", nullable = false, length = 20)
+    MealSlot mealSlot;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)                                 // 1 món (Food) có thể xuất hiện ở nhiều log
     @JoinColumn(

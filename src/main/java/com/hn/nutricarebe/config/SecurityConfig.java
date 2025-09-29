@@ -33,12 +33,13 @@ public class SecurityConfig {
     private final String[] PUBLIC_GET_ENDPOINTS = {
             "/auths/google/callback",
             "/foods/**",
-            "ingredients/**",
+            "/foods/search/**",
+            "/ingredients/**",
     };
 
     private final String[] PUBLIC_DELETE_ENDPOINTS = {
             "/foods/**",
-            "ingredients/**",
+            "/ingredients/**",
     };
 
 

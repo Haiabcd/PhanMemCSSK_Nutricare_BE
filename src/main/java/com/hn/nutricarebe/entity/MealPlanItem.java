@@ -1,6 +1,6 @@
 package com.hn.nutricarebe.entity;
 
-import com.hn.nutricarebe.enums.MealType;
+import com.hn.nutricarebe.enums.MealSlot;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -32,8 +32,8 @@ public class MealPlanItem {
     MealPlanDay day;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "meal_type", nullable = false, length = 20)
-    MealType mealType;
+    @Column(name = "meal_slot", nullable = false, length = 20)
+    MealSlot mealSlot;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
