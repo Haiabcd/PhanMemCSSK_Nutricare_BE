@@ -129,6 +129,19 @@ public class FoodServiceImpl implements FoodService {
         );
     }
 
+    // Lấy tất cả món ăn với phân trang
+    @Override
+    public Slice<FoodResponse> getAll(Pageable pageable) {
+        Slice<Food> slice = foodRepository.findAllBy(pageable);
+        return new SliceImpl<>(
+                slice.getContent().stream()
+                        .map(food -> foodMapper.toFoodResponse(food, cdnHelper))
+                        .toList(),
+                pageable,
+                slice.hasNext()
+        );
+    }
+
     // Chuẩn hoá tên: loại bỏ khoảng trắng thừa
     private String normalizeName(String input) {
         if (input == null) return null;

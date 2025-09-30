@@ -26,6 +26,7 @@ import java.util.UUID;
 public class FoodController {
     FoodService foodService;
 
+    // Tạo món ăn mới
     @PostMapping(value = "/save",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<FoodResponse> createFood(@Valid @ModelAttribute FoodCreationRequest request) {
         return ApiResponse.<FoodResponse>builder()
@@ -34,6 +35,7 @@ public class FoodController {
                 .build();
     }
 
+    // Lấy thông tin món ăn theo ID
     @GetMapping("/{id}")
     public ApiResponse<FoodResponse> getFoodById(@PathVariable("id") UUID id) {
         return ApiResponse.<FoodResponse>builder()
@@ -42,6 +44,7 @@ public class FoodController {
                 .build();
     }
 
+    // Xoá món ăn theo ID
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteFood(@PathVariable UUID id) {
         foodService.deleteById(id);
@@ -50,6 +53,7 @@ public class FoodController {
                 .build();
     }
 
+    // Lấy danh sách món ăn theo khung bữa ăn với phân trang
     @GetMapping
     public ApiResponse<Slice<FoodResponse>> listByMealSlot(
             @RequestParam("mealSlot") MealSlot mealSlot,
@@ -62,6 +66,7 @@ public class FoodController {
                 .build();
     }
 
+    // Tìm kiếm món ăn theo tên với phân trang
     @GetMapping("/search")
     public ApiResponse<Slice<FoodResponse>> searchByName(
             @RequestParam("name") String name,
@@ -71,6 +76,18 @@ public class FoodController {
         return ApiResponse.<Slice<FoodResponse>>builder()
                 .message("Tìm kiếm món ăn thành công")
                 .data(foods)
+                .build();
+    }
+
+    // Lấy tất cả món ăn với phân trang
+    @GetMapping("/all")
+    public ApiResponse<Slice<FoodResponse>> getAll(
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable
+    ) {
+        return ApiResponse.<Slice<FoodResponse>>builder()
+                .message("Lấy tất cả món ăn thành công")
+                .data(foodService.getAll(pageable))
                 .build();
     }
 }

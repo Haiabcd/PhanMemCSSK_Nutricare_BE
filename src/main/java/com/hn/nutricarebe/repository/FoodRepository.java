@@ -15,16 +15,24 @@ import java.util.UUID;
 
 @Repository
 public interface FoodRepository extends JpaRepository<Food, UUID> {
+    // Kiểm tra sự tồn tại của món ăn theo tên (không phân biệt chữ hoa chữ thường)
     @Query("select count(f) > 0 from Food f where lower(f.name) = lower(:name)")
     boolean existsByNameIgnoreCase(String name);
 
+    // Lấy món ăn theo ID
     @EntityGraph(attributePaths = {"mealSlots", "tags"})
     Optional<Food> findWithCollectionsById(UUID id);
 
+    // Tìm món ăn theo slot
     @EntityGraph(attributePaths = {"mealSlots", "tags"})
     @Query("select distinct f from Food f join f.mealSlots ms where ms = :slot")
     Slice<Food> findByMealSlot(@Param("slot") MealSlot slot, Pageable pageable);
 
+    // Tìm món ăn theo tên gần đúng
     @EntityGraph(attributePaths = {"mealSlots", "tags"})
     Slice<Food> findByNameContainingIgnoreCase(String q, Pageable pageable);
+
+    // Lấy tất cả món ăn
+    @EntityGraph(attributePaths = {"mealSlots", "tags"})
+    Slice<Food> findAllBy(Pageable pageable);
 }
