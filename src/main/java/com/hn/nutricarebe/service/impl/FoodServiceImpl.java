@@ -100,7 +100,6 @@ public class FoodServiceImpl implements FoodService {
     @Override
     public Slice<FoodResponse> findByMealSlot(MealSlot mealSlot, Pageable pageable) {
         Slice<Food> slice = foodRepository.findByMealSlot(mealSlot, pageable);
-        // map entity → dto, giữ nguyên hasNext
         return new SliceImpl<>(
                 slice.getContent().stream()
                         .map(food -> foodMapper.toFoodResponse(food, cdnHelper))
@@ -110,7 +109,7 @@ public class FoodServiceImpl implements FoodService {
         );
     }
 
-    // Tìm món ăn theo tên với phân trang (Tìm gần đúng)
+    // Tìm món ăn theo tên 
     @Override
     public Slice<FoodResponse> searchByName(String name, Pageable pageable) {
         String keyword = (name == null) ? "" : name.trim();

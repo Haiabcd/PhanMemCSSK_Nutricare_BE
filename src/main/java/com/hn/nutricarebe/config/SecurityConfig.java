@@ -36,6 +36,7 @@ public class SecurityConfig {
             "/foods/search/**",
             "/ingredients/**",
             "/foods/all/**",
+            "/ingredients/all/**",
     };
 
     private final String[] PUBLIC_DELETE_ENDPOINTS = {
