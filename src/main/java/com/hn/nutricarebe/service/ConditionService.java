@@ -2,7 +2,6 @@ package com.hn.nutricarebe.service;
 
 import com.hn.nutricarebe.dto.request.ConditionCreationRequest;
 import com.hn.nutricarebe.dto.response.ConditionResponse;
-import com.hn.nutricarebe.entity.Condition;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 

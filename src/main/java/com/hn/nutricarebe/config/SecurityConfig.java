@@ -41,6 +41,7 @@ public class SecurityConfig {
             "/conditions/all/**",
             "/conditions/**",
             "/conditions/search/**",
+            "/allergies/all/**"
     };
 
     private final String[] PUBLIC_DELETE_ENDPOINTS = {

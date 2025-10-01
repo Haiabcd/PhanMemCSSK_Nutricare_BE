@@ -31,6 +31,7 @@ public class ConditionServiceImpl implements ConditionService {
     ConditionRepository conditionRepository;
     ConditionMapper conditionMapper;
 
+    // Tạo mới một bệnh nền
     @Override
     public ConditionResponse save(ConditionCreationRequest request) {
        if(conditionRepository.existsByName(request.getName())) {
@@ -40,6 +41,7 @@ public class ConditionServiceImpl implements ConditionService {
        return conditionMapper.toConditionResponse(saveCondition);
     }
 
+    // Xóa một bệnh nền theo id
     @Override
     @Transactional
     public void deleteById(UUID id) {
@@ -48,12 +50,14 @@ public class ConditionServiceImpl implements ConditionService {
         conditionRepository.delete(con);
     }
 
+    // Lấy danh sách tất cả bệnh nền
     @Override
     public Slice<ConditionResponse> getAll(Pageable pageable) {
         Slice<Condition> conditions = conditionRepository.findAllBy(pageable);
         return conditions.map(conditionMapper::toConditionResponse);
     }
 
+    // Lấy thông tin một bệnh nền theo id
     @Override
     public ConditionResponse getById(UUID id) {
         Condition c = conditionRepository.findById(id)
@@ -61,6 +65,7 @@ public class ConditionServiceImpl implements ConditionService {
         return conditionMapper.toConditionResponse(c);
     }
 
+    // Tìm kiếm bệnh nền theo tên
     @Override
     public Slice<ConditionResponse> searchByName(String name, Pageable pageable) {
         String q = name == null ? "" : name.trim();

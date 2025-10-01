@@ -3,17 +3,16 @@ package com.hn.nutricarebe.controller;
 import com.hn.nutricarebe.dto.request.AllergyCreationRequest;
 import com.hn.nutricarebe.dto.response.AllergyResponse;
 import com.hn.nutricarebe.dto.response.ApiResponse;
-import com.hn.nutricarebe.entity.Allergy;
 import com.hn.nutricarebe.service.AllergyService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.validation.BindingResult;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.LinkedHashMap;
-import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -22,14 +21,7 @@ import java.util.List;
 public class AllergyController {
     AllergyService allergyService;
 
-    @GetMapping()
-    public ApiResponse<List<Allergy>> getAllAllergy() {
-        return ApiResponse.<List<Allergy>>builder()
-                .message("Lấy danh sách dị ứng thành công")
-                .data(allergyService.findAll())
-                .build();
-    }
-
+    // Tạo dị ứng
     @PostMapping("/save")
     public ApiResponse<AllergyResponse> saveAllergy(@Valid @RequestBody AllergyCreationRequest request) {
         return ApiResponse.<AllergyResponse>builder()
@@ -39,4 +31,15 @@ public class AllergyController {
 
     }
 
+    // Lấy danh sách dị ứng
+    @GetMapping("/all")
+    public ApiResponse<Slice<AllergyResponse>> getAll(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable
+    ) {
+        return ApiResponse.<Slice<AllergyResponse>>builder()
+                .message("Lấy danh sách dị ứng thành công")
+                .data(allergyService.getAll(pageable))
+                .build();
+    }
 }
