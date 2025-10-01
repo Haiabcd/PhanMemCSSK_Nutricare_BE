@@ -67,4 +67,13 @@ public class AllergyController {
                 .data(allergyService.getById(id))
                 .build();
     }
+
+    // Xoá dị ứng theo ID
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteAllergy(@PathVariable UUID id) {
+        allergyService.deleteById(id);
+        return ApiResponse.<Void>builder()
+                .message("Xoá dị ứng thành công")
+                .build();
+    }
 }

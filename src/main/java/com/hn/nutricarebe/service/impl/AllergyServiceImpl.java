@@ -40,7 +40,9 @@ public class AllergyServiceImpl implements AllergyService {
 
     @Override
     public void deleteById(UUID id) {
-
+        Allergy allergy = allergyRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.DELETE_ALLERGY_CONFLICT));
+        allergyRepository.delete(allergy);
     }
 
     // Lấy danh sách tất cả dị ứng

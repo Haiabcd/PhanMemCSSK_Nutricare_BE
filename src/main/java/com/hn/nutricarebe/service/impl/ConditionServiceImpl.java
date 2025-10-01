@@ -46,7 +46,7 @@ public class ConditionServiceImpl implements ConditionService {
     @Transactional
     public void deleteById(UUID id) {
         Condition con = conditionRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ErrorCode.DELETE_CONDITION_CONFLICT));
         conditionRepository.delete(con);
     }
 
