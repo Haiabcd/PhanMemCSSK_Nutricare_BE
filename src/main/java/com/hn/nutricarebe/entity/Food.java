@@ -52,12 +52,12 @@ public class Food {
 
     @Embedded
     @AttributeOverrides({
-            @AttributeOverride(name = "kcal", column = @Column(name = "kcal")),
+            @AttributeOverride(name = "kcal", column = @Column(name = "kcal", precision = 10, scale = 2)),
             @AttributeOverride(name = "proteinG",  column = @Column(name = "proteinG", precision = 10, scale = 2)),
             @AttributeOverride(name = "carbG",    column = @Column(name = "carbG", precision = 10, scale = 2)),
             @AttributeOverride(name = "fatG",      column = @Column(name = "fatG", precision = 10, scale = 2)),
             @AttributeOverride(name = "fiberG",  column = @Column(name = "fiberG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "sodiumMg",    column = @Column(name = "sodiumMg")),
+            @AttributeOverride(name = "sodiumMg",    column = @Column(name = "sodiumMg", precision = 10, scale = 2)),
             @AttributeOverride(name = "sugarMg",      column = @Column(name = "sugarMg", precision = 10, scale = 2))
     })
     Nutrition nutrition;

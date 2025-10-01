@@ -1,10 +1,9 @@
 package com.hn.nutricarebe.entity;
 
-import jakarta.persistence.Column;
+
 import jakarta.persistence.Embeddable;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
 import java.math.BigDecimal;
 
 @Embeddable
@@ -15,11 +14,11 @@ import java.math.BigDecimal;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Nutrition {
-    Integer kcal;
+    BigDecimal kcal;
     BigDecimal proteinG;
     BigDecimal carbG;
     BigDecimal fatG;
     BigDecimal fiberG;
-    Integer sodiumMg;  // bỏ
-    BigDecimal sugarMg;  // bỏ
+    BigDecimal sodiumMg;
+    BigDecimal sugarMg;
 }

@@ -66,41 +66,6 @@ public class FoodServiceImpl implements FoodService {
     }
 
 
-
-    @Override
-    @Transactional(readOnly = true)
-    public FoodSliceResponse getFoodList(Integer size, UUID cursorId, Instant cursorCreatedAt) {
-        //Mặc định trả về 20, tối đa 50
-        int limit = (size == null || size <= 0 || size > 50) ? 20 : size;
-
-        List<Food> foods;
-        if (cursorId == null || cursorCreatedAt == null) {
-            // Trang đầu
-            foods = foodRepository.findFirstPage(PageRequest.of(0, limit + 1));
-        } else {
-            // Trang tiếp
-            foods = foodRepository.findNextPage(cursorCreatedAt, cursorId, PageRequest.of(0, limit + 1));
-        }
-        boolean hasNext = foods.size() > limit;
-        if (hasNext) {
-            foods = foods.subList(0, limit);
-        }
-        List<FoodResponse> items = foods.stream()
-                .map(f -> foodMapper.toFoodResponse(f, cdnHelper))
-                .toList();
-
-        UUID nextCursorId = hasNext ? foods.get(foods.size() - 1).getId() : null;
-        Instant nextCursorCreatedAt = hasNext ? foods.get(foods.size() - 1).getCreatedAt() : null;
-
-        return FoodSliceResponse.builder()
-                .items(items)
-                .nextCursorId(nextCursorId)
-                .nextCursorCreatedAt(nextCursorCreatedAt)
-                .hasNext(hasNext)
-                .build();
-    }
-
-
     private String normalizeName(String input) {
         if (input == null) return null;
         return input.trim().replaceAll("\\s+", " ");

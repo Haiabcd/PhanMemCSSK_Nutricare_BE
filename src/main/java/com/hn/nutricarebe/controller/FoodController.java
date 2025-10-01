@@ -31,17 +31,4 @@ public class FoodController {
                 .build();
     }
 
-    @GetMapping
-    public ApiResponse<FoodSliceResponse> listFoods(
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) UUID cursorId,
-            @RequestParam(required = false) Instant cursorCreatedAt
-    ) {
-        return ApiResponse.<FoodSliceResponse>builder()
-                .message("Lấy danh sách món ăn thành công")
-                .data(foodService.getFoodList(size, cursorId, cursorCreatedAt))
-                .build();
-    }
-
-
 }

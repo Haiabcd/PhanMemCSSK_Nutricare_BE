@@ -1,11 +1,10 @@
 package com.hn.nutricarebe.entity;
 
-import com.hn.nutricarebe.enums.MealType;
+import com.hn.nutricarebe.enums.MealSlot;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -32,8 +31,8 @@ public class MealPlanItem {
     MealPlanDay day;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "meal_type", nullable = false, length = 20)
-    MealType mealType;
+    @Column(name = "meal_slot", nullable = false, length = 20)
+    MealSlot mealSlot;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
@@ -53,12 +52,12 @@ public class MealPlanItem {
 
     @Embedded
     @AttributeOverrides({
-            @AttributeOverride(name = "kcal", column = @Column(name = "snap_kcal")),
+            @AttributeOverride(name = "kcal", column = @Column(name = "snap_kcal", precision = 10, scale = 2)),
             @AttributeOverride(name = "proteinG",  column = @Column(name = "snap_proteinG", precision = 10, scale = 2)),
             @AttributeOverride(name = "carbG",    column = @Column(name = "snap_carbG", precision = 10, scale = 2)),
             @AttributeOverride(name = "fatG",      column = @Column(name = "snap_fatG", precision = 10, scale = 2)),
             @AttributeOverride(name = "fiberG",  column = @Column(name = "snap_fiberG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "sodiumMg",    column = @Column(name = "snap_sodiumMg")),
+            @AttributeOverride(name = "sodiumMg",    column = @Column(name = "snap_sodiumMg", precision = 10, scale = 2)),
             @AttributeOverride(name = "sugarMg",      column = @Column(name = "snap_sugarMg", precision = 10, scale = 2))
     })
     Nutrition nutrition;

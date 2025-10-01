@@ -14,7 +14,6 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 
 @Slf4j
 @Service
@@ -25,10 +24,6 @@ public class ConditionServiceImpl implements ConditionService {
     ConditionRepository conditionRepository;
     ConditionMapper conditionMapper;
 
-    @Override
-    public List<Condition> findAll() {
-        return conditionRepository.findAll();
-    }
 
     @Override
     public ConditionResponse save(ConditionCreationRequest request) {
@@ -37,15 +32,5 @@ public class ConditionServiceImpl implements ConditionService {
        }
        Condition saveCondition = conditionRepository.save(conditionMapper.toCondition(request));
        return conditionMapper.toConditionResponse(saveCondition);
-    }
-
-    @Override
-    public Boolean deleteById(String id) {
-        return null;
-    }
-
-    @Override
-    public Condition findById(String id) {
-        return null;
     }
 }

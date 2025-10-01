@@ -1,13 +1,10 @@
 package com.hn.nutricarebe.dto.response;
 
-
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.hn.nutricarebe.entity.User;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.UUID;
+
+import java.util.List;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -16,10 +13,11 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class MealPlanResponse {
-    UUID id;
-    User user;
-    LocalDate date;
-    NutritionResponse targetNutrition;
-    Integer waterTargetMl;
+public class MealEvaluationDto {
+     Double kcal;
+     Double protein;
+     Double carbs;
+     Double fat;
+     Double fiber;     // nếu bạn có
+     List<String> warnings; // vi phạm rule/allergy/condition
 }

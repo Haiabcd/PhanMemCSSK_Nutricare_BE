@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.ai.memory.MemoryStore;
 import com.hn.nutricarebe.ai.planner.Plan;
 import com.hn.nutricarebe.ai.planner.Planner;
 import com.hn.nutricarebe.ai.tools.ToolRegistry;
@@ -14,8 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.UUID;
 
 
 @Service
@@ -26,6 +26,7 @@ public class AgentServiceImpl implements AgentService {
     Planner planner;
 //    MealPlannerService mealPlannerService;
     ProfileService profileService;
+    MemoryStore memoryStore;
 
 
 
@@ -38,16 +39,35 @@ public class AgentServiceImpl implements AgentService {
 
     @Override
     public AgentResponse chat(AgentRequest req) {
-        //Truyền message vào planner để tạo kế hoạch
-        Plan p = planner.plan(req.getMessage());
+        UUID userId = req.getUserId();
+
+        // 1) nạp facts
+        var facts = memoryStore.loadFacts(userId);
+
+        // 2) planner dùng facts làm mặc định
+        Plan p = planner.plan(req.getMessage(), facts);
 
         Object lastData = null;
         for (var step : p.getSteps()) {
             if ("generate_meal_plan".equals(step.name)) {
-                Map<String,Object> args = new HashMap<>(step.args);
-                args.put("userId", req.getUserId());
+                var args = new java.util.HashMap<String,Object>(step.args);
+                args.put("userId", userId);
                 var result = toolRegistry.invoke("generate_meal_plan", args);
-                lastData = result; // chứa {"plan": MealPlanDto}
+                lastData = result;
+
+                // 3) lưu lại default “học” được
+                Object mpd = step.args.get("mealsPerDay");
+                if (mpd != null) memoryStore.upsertFact(userId, "mealsPerDay", mpd);
+                if (step.args.get("focusTags") != null)
+                    memoryStore.upsertFact(userId, "focusTags", step.args.get("focusTags"));
+                if (step.args.get("avoidTags") != null)
+                    memoryStore.upsertFact(userId, "avoidTags", step.args.get("avoidTags"));
+            }
+            if ("evaluate_meal".equals(step.name)) {
+                var args = new java.util.HashMap<String,Object>(step.args);
+                args.put("userId", req.getUserId());
+                var result = toolRegistry.invoke("evaluate_meal", args);
+                lastData = result; // {"evaluation": MealEvaluationDto}
             }
         }
 
