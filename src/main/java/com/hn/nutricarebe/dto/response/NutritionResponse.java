@@ -14,11 +14,11 @@ import java.math.BigDecimal;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class NutritionResponse {
-    Integer kcal;
+    BigDecimal kcal;
     BigDecimal proteinG;
     BigDecimal carbG;
     BigDecimal fatG;
     BigDecimal fiberG;
-    Integer sodiumMg;
+    BigDecimal sodiumMg;
     BigDecimal sugarMg;
 }

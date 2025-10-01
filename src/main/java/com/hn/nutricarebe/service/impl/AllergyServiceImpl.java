@@ -53,9 +53,12 @@ public class AllergyServiceImpl implements AllergyService {
         return null;
     }
 
+    // Tìm kiếm dị ứng theo tên
     @Override
     public Slice<AllergyResponse> searchByName(String name, Pageable pageable) {
-        return null;
+        String q = name == null ? "" : name.trim();
+        Slice<Allergy> slice = allergyRepository.findByNameContainingIgnoreCase(q, pageable);
+        return slice.map(allergyMapper::toAllergyResponse);
     }
 
 

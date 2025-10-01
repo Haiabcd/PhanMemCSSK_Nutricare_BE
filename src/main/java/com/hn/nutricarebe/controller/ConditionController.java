@@ -59,6 +59,7 @@ public class ConditionController {
                 .build();
     }
 
+    // Tìm kiếm bệnh nền theo tên
     @GetMapping("/search")
     public ApiResponse<Slice<ConditionResponse>> searchByName(
             @RequestParam("name") String name,
@@ -66,7 +67,7 @@ public class ConditionController {
             Pageable pageable
     ) {
         return ApiResponse.<Slice<ConditionResponse>>builder()
-                .message("Tìm condition theo tên thành công")
+                .message("Tìm bệnh nền theo tên thành công")
                 .data(conditionService.searchByName(name, pageable))
                 .build();
     }

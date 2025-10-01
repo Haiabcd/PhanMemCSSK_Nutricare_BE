@@ -15,11 +15,11 @@ import java.math.BigDecimal;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Nutrition {
-    Integer kcal;
+    BigDecimal kcal;
     BigDecimal proteinG;
     BigDecimal carbG;
     BigDecimal fatG;
     BigDecimal fiberG;
-    Integer sodiumMg;
+    BigDecimal sodiumMg;
     BigDecimal sugarMg;
 }

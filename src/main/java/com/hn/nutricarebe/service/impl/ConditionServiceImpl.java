@@ -57,7 +57,7 @@ public class ConditionServiceImpl implements ConditionService {
         return conditions.map(conditionMapper::toConditionResponse);
     }
 
-    // Lấy thông tin một bệnh nền theo id
+    // Tìm một bệnh nền theo id
     @Override
     public ConditionResponse getById(UUID id) {
         Condition c = conditionRepository.findById(id)
@@ -72,6 +72,4 @@ public class ConditionServiceImpl implements ConditionService {
         Slice<Condition> slice = conditionRepository.findByNameContainingIgnoreCase(q, pageable);
         return slice.map(conditionMapper::toConditionResponse);
     }
-
-
 }

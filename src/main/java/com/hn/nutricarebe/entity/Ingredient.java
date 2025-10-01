@@ -32,12 +32,12 @@ public class Ingredient {
 
     @Embedded
     @AttributeOverrides({
-            @AttributeOverride(name = "kcal", column = @Column(name = "per100_kcal")),
+            @AttributeOverride(name = "kcal", column = @Column(name = "per100_kcal", precision = 10, scale = 2)),
             @AttributeOverride(name = "proteinG",  column = @Column(name = "per100_proteinG", precision = 10, scale = 2)),
             @AttributeOverride(name = "carbG",    column = @Column(name = "per100_carbG", precision = 10, scale = 2)),
             @AttributeOverride(name = "fatG",      column = @Column(name = "per100_fatG", precision = 10, scale = 2)),
             @AttributeOverride(name = "fiberG",  column = @Column(name = "per100_fiberG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "sodiumMg",    column = @Column(name = "per100_sodiumMg")),
+            @AttributeOverride(name = "sodiumMg",    column = @Column(name = "per100_sodiumMg", precision = 10, scale = 2)),
             @AttributeOverride(name = "sugarMg",      column = @Column(name = "per100_sugarMg", precision = 10, scale = 2))
     })
     Nutrition per100;

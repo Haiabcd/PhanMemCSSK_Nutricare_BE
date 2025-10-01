@@ -3,6 +3,7 @@ package com.hn.nutricarebe.controller;
 import com.hn.nutricarebe.dto.request.AllergyCreationRequest;
 import com.hn.nutricarebe.dto.response.AllergyResponse;
 import com.hn.nutricarebe.dto.response.ApiResponse;
+import com.hn.nutricarebe.dto.response.ConditionResponse;
 import com.hn.nutricarebe.service.AllergyService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -40,6 +41,19 @@ public class AllergyController {
         return ApiResponse.<Slice<AllergyResponse>>builder()
                 .message("Lấy danh sách dị ứng thành công")
                 .data(allergyService.getAll(pageable))
+                .build();
+    }
+
+    // Tìm kiếm dị ứng theo tên
+    @GetMapping("/search")
+    public ApiResponse<Slice<AllergyResponse>> searchByName(
+            @RequestParam("name") String name,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable
+    ) {
+        return ApiResponse.<Slice<AllergyResponse>>builder()
+                .message("Tìm dị ứng theo tên thành công")
+                .data(allergyService.searchByName(name, pageable))
                 .build();
     }
 }
