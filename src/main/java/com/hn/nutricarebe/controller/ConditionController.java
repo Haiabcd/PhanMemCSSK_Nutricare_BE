@@ -58,4 +58,17 @@ public class ConditionController {
                 .data(conditionService.getById(id))
                 .build();
     }
+
+    @GetMapping("/search")
+    public ApiResponse<Slice<ConditionResponse>> searchByName(
+            @RequestParam("name") String name,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable
+    ) {
+        return ApiResponse.<Slice<ConditionResponse>>builder()
+                .message("Tìm condition theo tên thành công")
+                .data(conditionService.searchByName(name, pageable))
+                .build();
+    }
+
 }

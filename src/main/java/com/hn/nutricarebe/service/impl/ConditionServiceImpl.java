@@ -43,11 +43,6 @@ public class ConditionServiceImpl implements ConditionService {
     }
 
     @Override
-    public Condition findById(String id) {
-        return null;
-    }
-
-    @Override
     public Slice<ConditionResponse> getAll(Pageable pageable) {
         Slice<Condition> conditions = conditionRepository.findAllBy(pageable);
         return conditions.map(conditionMapper::toConditionResponse);
@@ -59,4 +54,13 @@ public class ConditionServiceImpl implements ConditionService {
                 .orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
         return conditionMapper.toConditionResponse(c);
     }
+
+    @Override
+    public Slice<ConditionResponse> searchByName(String name, Pageable pageable) {
+        String q = name == null ? "" : name.trim();
+        Slice<Condition> slice = conditionRepository.findByNameContainingIgnoreCase(q, pageable);
+        return slice.map(conditionMapper::toConditionResponse);
+    }
+
+
 }

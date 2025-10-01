@@ -12,7 +12,7 @@ import java.util.UUID;
 public interface ConditionService {
     public ConditionResponse save(ConditionCreationRequest request);
     public Boolean deleteById(String id);
-    public Condition findById(String id);
     public Slice<ConditionResponse> getAll(Pageable pageable);
     public ConditionResponse getById(UUID id);
+    public Slice<ConditionResponse> searchByName(String name, Pageable pageable);
 }
