@@ -12,9 +12,12 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -24,11 +27,6 @@ public class ConditionServiceImpl implements ConditionService {
 
     ConditionRepository conditionRepository;
     ConditionMapper conditionMapper;
-
-    @Override
-    public List<Condition> findAll() {
-        return conditionRepository.findAll();
-    }
 
     @Override
     public ConditionResponse save(ConditionCreationRequest request) {
@@ -47,5 +45,18 @@ public class ConditionServiceImpl implements ConditionService {
     @Override
     public Condition findById(String id) {
         return null;
+    }
+
+    @Override
+    public Slice<ConditionResponse> getAll(Pageable pageable) {
+        Slice<Condition> conditions = conditionRepository.findAllBy(pageable);
+        return conditions.map(conditionMapper::toConditionResponse);
+    }
+
+    @Override
+    public ConditionResponse getById(UUID id) {
+        Condition c = conditionRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
+        return conditionMapper.toConditionResponse(c);
     }
 }

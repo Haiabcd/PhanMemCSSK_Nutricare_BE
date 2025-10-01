@@ -25,6 +25,7 @@ public enum ErrorCode {
     USERID_EXISTED(1007, "User ID đã tồn tại", HttpStatus.CONFLICT),
 
     CONDITION_EXISTED(1008, "Bệnh nền đã tồn tại", HttpStatus.CONFLICT),
+    CONDITION_NOT_FOUND(1017, "Bệnh nền không tồn tại", HttpStatus.NOT_FOUND),
 
     FILE_EMPTY(1009, "File rỗng hoặc không tồn tại", HttpStatus.BAD_REQUEST),
     FILE_UPLOAD_FAILED(1010, "Tải file lên thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
