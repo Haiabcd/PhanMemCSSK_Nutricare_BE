@@ -3,6 +3,7 @@ package com.hn.nutricarebe.service.impl;
 import com.hn.nutricarebe.dto.request.ConditionCreationRequest;
 import com.hn.nutricarebe.dto.response.ConditionResponse;
 import com.hn.nutricarebe.entity.Condition;
+import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ConditionMapper;
@@ -12,9 +13,11 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -38,8 +41,11 @@ public class ConditionServiceImpl implements ConditionService {
     }
 
     @Override
-    public Boolean deleteById(String id) {
-        return null;
+    @Transactional
+    public void deleteById(UUID id) {
+        Condition con = conditionRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
+        conditionRepository.delete(con);
     }
 
     @Override

@@ -27,6 +27,7 @@ public class SecurityConfig {
             "/ai/plan",
             "/foods/save",
             "/ingredients/save",
+            "/conditions/save",
     };
 
 
@@ -45,6 +46,7 @@ public class SecurityConfig {
     private final String[] PUBLIC_DELETE_ENDPOINTS = {
             "/foods/**",
             "/ingredients/**",
+            "/conditions/**",
     };
 
 

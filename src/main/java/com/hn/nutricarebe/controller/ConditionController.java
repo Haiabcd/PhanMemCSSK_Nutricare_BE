@@ -71,4 +71,11 @@ public class ConditionController {
                 .build();
     }
 
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteCondition(@PathVariable UUID id) {
+        conditionService.deleteById(id);
+        return ApiResponse.<Void>builder()
+                .message("Xoá bệnh nền thành công")
+                .build();
+    }
 }
