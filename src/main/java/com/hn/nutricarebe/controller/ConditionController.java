@@ -72,6 +72,7 @@ public class ConditionController {
                 .build();
     }
 
+    // Xoá bệnh nền theo ID
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteCondition(@PathVariable UUID id) {
         conditionService.deleteById(id);

@@ -15,6 +15,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -54,6 +56,15 @@ public class AllergyController {
         return ApiResponse.<Slice<AllergyResponse>>builder()
                 .message("Tìm dị ứng theo tên thành công")
                 .data(allergyService.searchByName(name, pageable))
+                .build();
+    }
+
+    // Lấy dị ứng theo ID
+    @GetMapping("/{id}")
+    public ApiResponse<AllergyResponse> getById(@PathVariable UUID id) {
+        return ApiResponse.<AllergyResponse>builder()
+                .message("Lấy dị ứng thành công")
+                .data(allergyService.getById(id))
                 .build();
     }
 }

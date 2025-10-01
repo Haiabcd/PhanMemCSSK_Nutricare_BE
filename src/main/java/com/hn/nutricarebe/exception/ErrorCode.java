@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public enum ErrorCode {
     ALLERGY_EXISTED(1001, "Dị ứng đã tồn tại", HttpStatus.CONFLICT),
+    ALLERGY_NOT_FOUND(1018, "Dị ứng không tồn tại", HttpStatus.NOT_FOUND),
     VALIDATION_FAILED(1002, "Dữ liệu không hợp lệ", HttpStatus.BAD_REQUEST),
     USER_NOT_FOUND(1003, "Người dùng không tồn tại", HttpStatus.NOT_FOUND),
 

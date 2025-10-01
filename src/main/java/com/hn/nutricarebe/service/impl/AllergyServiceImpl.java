@@ -2,6 +2,7 @@ package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.AllergyCreationRequest;
 import com.hn.nutricarebe.dto.response.AllergyResponse;
+import com.hn.nutricarebe.dto.response.ConditionResponse;
 import com.hn.nutricarebe.entity.Allergy;
 import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.exception.AppException;
@@ -25,6 +26,7 @@ public class AllergyServiceImpl implements AllergyService {
     AllergyRepository allergyRepository;
     AllergyMapper allergyMapper;
 
+    // Tạo mới một dị ứng
     @Override
     public AllergyResponse save(AllergyCreationRequest request) {
 
@@ -48,9 +50,12 @@ public class AllergyServiceImpl implements AllergyService {
         return allergy.map(allergyMapper::toAllergyResponse);
     }
 
+    // Tìm một dị ứng theo id
     @Override
     public AllergyResponse getById(UUID id) {
-        return null;
+        Allergy allergy = allergyRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
+        return allergyMapper.toAllergyResponse(allergy);
     }
 
     // Tìm kiếm dị ứng theo tên
@@ -60,7 +65,6 @@ public class AllergyServiceImpl implements AllergyService {
         Slice<Allergy> slice = allergyRepository.findByNameContainingIgnoreCase(q, pageable);
         return slice.map(allergyMapper::toAllergyResponse);
     }
-
 
 }
 
