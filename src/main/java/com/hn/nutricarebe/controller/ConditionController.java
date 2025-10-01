@@ -49,4 +49,13 @@ public class ConditionController {
                 .data(conditionService.getAll(pageable))
                 .build();
     }
+
+    // Lấy bệnh nền theo ID
+    @GetMapping("/{id}")
+    public ApiResponse<ConditionResponse> getById(@PathVariable UUID id) {
+        return ApiResponse.<ConditionResponse>builder()
+                .message("Lấy bệnh nền thành công")
+                .data(conditionService.getById(id))
+                .build();
+    }
 }
