@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
 import com.hn.nutricarebe.dto.request.OnboardingRequest;
 import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
 import com.hn.nutricarebe.dto.request.UserConditionCreationRequest;
@@ -50,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
     UserMapper userMapper;
     ProfileMapper profileMapper;
     UserAllergyService userAllergyService;
+    MealPlanDayServiceImpl mealPlanDayServiceImpl;
     UserConditionService userConditionService;
     PkceStore pkceStore;
     WebClient webClient;;
@@ -73,7 +75,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public OnboardingResponse onBoarding(OnboardingRequest request) {
-        //Lưu user
+        //B1: Lưu user
         if(userRepository.existsByDeviceId(request.getUser().getDeviceId())){
             throw new AppException(ErrorCode.DEVICE_ID_EXISTED);
         }
@@ -83,12 +85,12 @@ public class AuthServiceImpl implements AuthService {
         user.setStatus(UserStatus.ACTIVE);
         User savedUser = userRepository.save(user);
         UserCreationResponse userCreationResponse = userMapper.toUserCreationResponse(savedUser);
-        //Lưu profile
+        //B2: Lưu profile
         Profile profile = profileMapper.toProfile(request.getProfile());
         profile.setUser(savedUser);
         Profile savedProfile = profileRepository.save(profile);
         ProfileCreationResponse profileCreationResponse = profileMapper.toProfileCreationResponse(savedProfile);
-        //Lưu bệnh nền
+        //B3: Lưu bệnh nền
         Set<UUID> conditionIds = request.getConditions();
         List<UserConditionResponse> listCondition = new ArrayList<>();
         if(conditionIds != null && !conditionIds.isEmpty()){
@@ -97,7 +99,7 @@ public class AuthServiceImpl implements AuthService {
                     .conditionIds(conditionIds)
                     .build());
         }
-        //Lưu dị ứng
+        //B4: Lưu dị ứng
         Set<UUID> allergyIds = request.getAllergies();
         List<UserAllergyResponse> listAllergy = new ArrayList<>();
         if(allergyIds != null && !allergyIds.isEmpty()){
@@ -107,8 +109,18 @@ public class AuthServiceImpl implements AuthService {
                     .build();
             listAllergy = userAllergyService.saveUserAllergy(uar);
         }
-        //Lập kế hoạch
-        //Tạo token
+        //B5: Lập kế hoạch tuần (MealPlanDay - 7 ngày)
+        MealPlanResponse mealPlanResponse = mealPlanDayServiceImpl.createPlan(
+                MealPlanCreationRequest.builder()
+                        .userId(savedUser.getId())
+                        .profile(request.getProfile())
+                        .build()
+        );
+        //B6: Lập kế hoạch chi tiết (MealPlanItem)
+
+
+
+        //Tạo token (xong)
         //Trả về
         return OnboardingResponse.builder()
                 .user(userCreationResponse)
@@ -116,6 +128,7 @@ public class AuthServiceImpl implements AuthService {
                 .profile(profileCreationResponse)
                 .conditions(listCondition)
                 .allergies(listAllergy)
+                .mealPlan(mealPlanResponse)
                 .build();
     }
 

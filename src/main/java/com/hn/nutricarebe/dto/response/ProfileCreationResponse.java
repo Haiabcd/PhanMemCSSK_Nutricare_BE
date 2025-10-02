@@ -1,16 +1,10 @@
 package com.hn.nutricarebe.dto.response;
 
-import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.ActivityLevel;
 import com.hn.nutricarebe.enums.Gender;
 import com.hn.nutricarebe.enums.GoalType;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -30,6 +24,9 @@ public class ProfileCreationResponse {
     GoalType goal;
     ActivityLevel activityLevel;
     String name;
+    Integer targetWeightDeltaKg;
+    Integer targetDurationWeeks;
     Instant createdAt;
     Instant updatedAt;
+
 }

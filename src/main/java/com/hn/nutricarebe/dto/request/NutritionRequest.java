@@ -17,32 +17,32 @@ public class NutritionRequest {
     @PositiveOrZero(message = "kcal phải >= 0")
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
-    @Digits(integer = 8, fraction = 2,message = "kcal tối đa 8 số nguyên và 2 số thập phân")
+    @Digits(integer = 8, fraction = 2, message = "kcal tối đa 8 số nguyên và 2 số thập phân")
     BigDecimal kcal = BigDecimal.ZERO;
 
     @PositiveOrZero(message = "proteinG phải >= 0")
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
     @Digits(integer = 8, fraction = 2, message = "proteinG tối đa 8 số nguyên và 2 số thập phân")
-    BigDecimal proteinG = BigDecimal.ZERO; //đạm
+    BigDecimal proteinG = BigDecimal.ZERO;
 
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
     @PositiveOrZero(message = "carbG phải >= 0")
     @Digits(integer = 8, fraction = 2, message = "carbG tối đa 8 số nguyên và 2 số thập phân")
-    BigDecimal carbG = BigDecimal.ZERO;  //đường hoặc glucid
+    BigDecimal carbG = BigDecimal.ZERO;
 
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
     @PositiveOrZero(message = "fatG phải >= 0")
     @Digits(integer = 8, fraction = 2, message = "fatG tối đa 8 số nguyên và 2 số thập phân")
-    BigDecimal fatG = BigDecimal.ZERO;  //chất béo
+    BigDecimal fatG = BigDecimal.ZERO;
 
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
     @PositiveOrZero(message = "fiberG phải >= 0")
     @Digits(integer = 8, fraction = 2,message = "fiberG tối đa 8 số nguyên và 2 số thập phân")
-    BigDecimal fiberG= BigDecimal.ZERO;  //xơ
+    BigDecimal fiberG= BigDecimal.ZERO;
 
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
@@ -50,7 +50,7 @@ public class NutritionRequest {
     @Digits(integer = 8, fraction = 2,message = "sodiumMg tối đa 8 số nguyên và 2 số thập phân")
     BigDecimal sodiumMg= BigDecimal.ZERO;
 
-    @Builder.Default   //bỏ
+    @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
     @PositiveOrZero(message = "sugarMg phải >= 0")
     @Digits(integer = 8, fraction = 2, message = "sugarMg tối đa 8 số nguyên và 2 số thập phân")

@@ -21,4 +21,5 @@ public class OnboardingResponse {
     ProfileCreationResponse profile;
     List<UserConditionResponse> conditions;
     List<UserAllergyResponse> allergies;
+    MealPlanResponse mealPlan;
 }

@@ -6,5 +6,18 @@ public enum FoodTag {
     DIABETIC_FRIENDLY,
     HIGH_FIBER,
     HIGH_PROTEIN,
-    VEGETARIAN,
+
+    LEAN_PROTEIN,
+    FRIED,
+    SUGARY,
+    PROCESSED,
+
+
+    MAIN_DISH,      // Món chính (cơm, phở, bún)
+    SIDE_DISH,      // Món phụ (canh, salad)
+    PROTEIN,        // Thịt, cá, trứng
+    VEGETABLE,      // Rau củ
+    FRUIT,          // Trái cây
+    DRINK,          // Đồ uống
+    SNACK          // Ăn vặt
 }
