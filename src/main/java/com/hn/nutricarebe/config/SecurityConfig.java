@@ -27,6 +27,8 @@ public class SecurityConfig {
             "/ai/plan",
             "/foods/save",
             "/ingredients/save",
+            "/conditions/save",
+            "/allergies/save"
     };
 
 
@@ -35,11 +37,25 @@ public class SecurityConfig {
             "/foods/**",
             "/foods/search/**",
             "/ingredients/**",
+            "/foods/all/**",
+            "/ingredients/all/**",
+            "/conditions/all/**",
+            "/conditions/**",
+            "/conditions/search/**",
+            "/allergies/all/**",
+            "/allergies/search/**",
+            "/allergies/**",
     };
 
     private final String[] PUBLIC_DELETE_ENDPOINTS = {
             "/foods/**",
             "/ingredients/**",
+            "/conditions/**",
+            "/allergies/**"
+    };
+
+    private final String[] PUBLIC_PATCH_ENDPOINTS = {
+            "/foods/**",
     };
 
 
@@ -52,6 +68,7 @@ public class SecurityConfig {
                 request.requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.DELETE, PUBLIC_DELETE_ENDPOINTS).permitAll()
+                        .requestMatchers(HttpMethod.PATCH, PUBLIC_PATCH_ENDPOINTS).permitAll()
                         .anyRequest().authenticated());
 
         httpSecurity.oauth2ResourceServer(oauth2 ->

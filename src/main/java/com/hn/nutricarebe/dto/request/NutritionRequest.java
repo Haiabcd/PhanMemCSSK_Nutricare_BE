@@ -17,7 +17,8 @@ public class NutritionRequest {
     @PositiveOrZero(message = "kcal phải >= 0")
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
-    Integer kcal = 0;
+    @Digits(integer = 8, fraction = 2,message = "kcal tối đa 8 số nguyên và 2 số thập phân")
+    BigDecimal kcal = BigDecimal.ZERO;
 
     @PositiveOrZero(message = "proteinG phải >= 0")
     @Builder.Default
@@ -46,7 +47,8 @@ public class NutritionRequest {
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
     @PositiveOrZero(message = "sodiumMg phải >= 0")
-    Integer sodiumMg= 0;
+    @Digits(integer = 8, fraction = 2,message = "sodiumMg tối đa 8 số nguyên và 2 số thập phân")
+    BigDecimal sodiumMg= BigDecimal.ZERO;
 
     @Builder.Default   //bỏ
     @JsonSetter(nulls = Nulls.SKIP)

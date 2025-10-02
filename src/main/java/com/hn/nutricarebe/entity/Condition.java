@@ -3,7 +3,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -28,9 +27,6 @@ public class Condition {
 
     @OneToMany(mappedBy = "condition",fetch = FetchType.LAZY)
     Set<UserCondition> userConditions = new HashSet<>();
-
-    @OneToMany(mappedBy = "condition", fetch = FetchType.LAZY)
-    Set<NutritionRule> nutritionRules = new HashSet<>();
 
     @CreationTimestamp
     @Column(name = "created_at")

@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.mapper;
 
 import com.hn.nutricarebe.dto.request.FoodCreationRequest;
+import com.hn.nutricarebe.dto.request.FoodPatchRequest;
 import com.hn.nutricarebe.dto.response.FoodResponse;
 import com.hn.nutricarebe.entity.Food;
 import org.mapstruct.*;
@@ -18,6 +19,24 @@ public interface FoodMaper {
     @Mapping(target = "inMealPlanItems", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     Food toFood(FoodCreationRequest req);
+
+
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    void patch(@MappingTarget Food entity, FoodPatchRequest req);
+
+    // Sau khi patch, (null = giữ nguyên; [] = clear)
+    @AfterMapping
+    default void afterPatch(@MappingTarget Food entity, FoodPatchRequest req) {
+        if (req.getMealSlots() != null) {
+            entity.getMealSlots().clear();
+            entity.getMealSlots().addAll(req.getMealSlots());
+        }
+        if (req.getTags() != null) {
+            entity.getTags().clear();
+            entity.getTags().addAll(req.getTags());
+        }
+    }
+
 
     @Mapping(target = "imageUrl", expression = "java(cdnHelper.buildUrl(food.getImageKey()))")
     @Mapping(target = "createdById", expression = "java(food.getCreatedBy() != null ? food.getCreatedBy().getId() : null)")

@@ -2,6 +2,7 @@ package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.IngredientCreationRequest;
 import com.hn.nutricarebe.dto.response.IngredientResponse;
+import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.entity.Ingredient;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
@@ -15,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +35,7 @@ public class IngredientServiceImpl implements IngredientService {
     S3Service s3Service;
     CdnHelper cdnHelper;
 
-
+    // Tạo mới nguyên liệu
     @Override
     @Transactional
     public IngredientResponse saveIngredient(IngredientCreationRequest request) {
@@ -61,6 +65,7 @@ public class IngredientServiceImpl implements IngredientService {
         }
     }
 
+    // Lấy nguyên liệu theo ID
     @Override
     public IngredientResponse getById(UUID id) {
         Ingredient ingredient = ingredientRepository.findWithCollectionsById(id)
@@ -68,12 +73,13 @@ public class IngredientServiceImpl implements IngredientService {
         return ingredientMapper.toIngredientResponse(ingredient, cdnHelper);
     }
 
-
+    // Lấy tất cả nguyên liệu
     private String normalizeName(String input) {
         if (input == null) return null;
         return input.trim().replaceAll("\\s+", " ");
     }
 
+    // Xóa nguyên liệu theo ID
     @Override
     @Transactional
     public void deleteById(UUID id) {
@@ -93,4 +99,36 @@ public class IngredientServiceImpl implements IngredientService {
             throw new AppException(ErrorCode.DELETE_INGREDIENT_CONFLICT);
         }
     }
-}
+
+    // Lấy tất cả nguyên liệu
+    @Override
+    public Slice<IngredientResponse> getAll(Pageable pageable) {
+        Slice<Ingredient> slice = ingredientRepository.findAllBy(pageable);
+        return new SliceImpl<>(
+                slice.getContent().stream()
+                        .map(ingredient -> ingredientMapper.toIngredientResponse(ingredient, cdnHelper))
+                        .toList(),
+                pageable,
+                slice.hasNext()
+        );
+    }
+
+    // Tìm kiếm nguyên liệu theo tên gần đúng
+    @Override
+    public Slice<IngredientResponse> searchByName(String q, Pageable pageable) {
+        String keyword = q == null ? "" : q.trim();
+        if (keyword.length() < 2) {
+            throw new AppException(ErrorCode.NAME_EMPTY);
+        }
+
+        Slice<Ingredient> slice = ingredientRepository.findByNameContainingIgnoreCase(keyword, pageable);
+        return new SliceImpl<>(
+                slice.getContent().stream()
+                        .map(ingredient -> ingredientMapper.toIngredientResponse(ingredient, cdnHelper))
+                        .toList(),
+                pageable,
+                slice.hasNext()
+        );
+    }
+    }
+
