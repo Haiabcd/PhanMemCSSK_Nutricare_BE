@@ -54,6 +54,10 @@ public class SecurityConfig {
             "/allergies/**"
     };
 
+    private final String[] PUBLIC_PATCH_ENDPOINTS = {
+            "/foods/**",
+    };
+
 
     @Value("${jwt.signerKey}")
     private String signerKey;
@@ -64,6 +68,7 @@ public class SecurityConfig {
                 request.requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.DELETE, PUBLIC_DELETE_ENDPOINTS).permitAll()
+                        .requestMatchers(HttpMethod.PATCH, PUBLIC_PATCH_ENDPOINTS).permitAll()
                         .anyRequest().authenticated());
 
         httpSecurity.oauth2ResourceServer(oauth2 ->

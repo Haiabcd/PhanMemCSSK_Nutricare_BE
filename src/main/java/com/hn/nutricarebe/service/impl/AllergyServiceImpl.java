@@ -68,6 +68,11 @@ public class AllergyServiceImpl implements AllergyService {
         return slice.map(allergyMapper::toAllergyResponse);
     }
 
+    @Override
+    public AllergyResponse update(UUID id, Allergy allergy) {
+        return null;
+    }
+
 }
 
 

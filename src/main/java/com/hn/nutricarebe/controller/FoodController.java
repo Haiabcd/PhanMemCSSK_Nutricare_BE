@@ -2,6 +2,7 @@ package com.hn.nutricarebe.controller;
 
 
 import com.hn.nutricarebe.dto.request.FoodCreationRequest;
+import com.hn.nutricarebe.dto.request.FoodPatchRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.FoodResponse;
 import com.hn.nutricarebe.enums.MealSlot;
@@ -88,6 +89,19 @@ public class FoodController {
         return ApiResponse.<Slice<FoodResponse>>builder()
                 .message("Lấy tất cả món ăn thành công")
                 .data(foodService.getAll(pageable))
+                .build();
+    }
+
+    // Cập nhật một phần thông tin món ăn
+    @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<FoodResponse> patchUpdate(
+            @PathVariable UUID id,
+            @Valid @ModelAttribute FoodPatchRequest req
+    ) {
+        FoodResponse data = foodService.patchUpdate(id, req);
+        return ApiResponse.<FoodResponse>builder()
+                .message("Cập nhật món ăn thành công")
+                .data(data)
                 .build();
     }
 }

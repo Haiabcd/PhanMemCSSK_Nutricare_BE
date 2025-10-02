@@ -15,7 +15,7 @@ import java.util.UUID;
 
 @Repository
 public interface FoodRepository extends JpaRepository<Food, UUID> {
-    // Kiểm tra sự tồn tại của món ăn theo tên (không phân biệt chữ hoa chữ thường)
+    // Kiểm tra sự tồn tại của món ăn
     @Query("select count(f) > 0 from Food f where lower(f.name) = lower(:name)")
     boolean existsByNameIgnoreCase(String name);
 
@@ -35,4 +35,5 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
     // Lấy tất cả món ăn
     @EntityGraph(attributePaths = {"mealSlots", "tags"})
     Slice<Food> findAllBy(Pageable pageable);
+
 }
