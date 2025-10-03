@@ -19,5 +19,15 @@ public enum FoodTag {
     VEGETABLE,      // Rau củ
     FRUIT,          // Trái cây
     DRINK,          // Đồ uống
-    SNACK          // Ăn vặt
+    SNACK,    // Ăn vặt
+
+
+
+    HIGH_PURINE,
+    ORGAN_MEAT,
+    RED_MEAT,
+    SARDINE,
+    ANCHOVY,
+    SHELLFISH,
+    ALCOHOL
 }

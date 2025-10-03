@@ -4,7 +4,7 @@ import com.hn.nutricarebe.enums.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.tool.schema.TargetType;
+
 
 import java.math.BigDecimal;
 import java.util.HashSet;
@@ -112,14 +112,6 @@ public class NutritionRuleCreationRequest {
             default -> {
                 return true; }
         }
-    }
-
-    /** Nếu targetType=NUTRIENT → cần unit, basis, aggregation. */
-    @AssertTrue(message = "TargetType=NUTRIENT yêu cầu khai báo unit, basis và aggregation")
-    public boolean isNutrientFieldsPresent() {
-        if (targetType == null) return true;
-        if (targetType != TargetType.NUTRIENT) return true;
-        return unit != null && basis != null && aggregation != null;
     }
 
     /** perKg = true → cần perKgFactor > 0. */

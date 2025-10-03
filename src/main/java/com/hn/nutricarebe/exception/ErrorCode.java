@@ -40,8 +40,11 @@ public enum ErrorCode {
     TOKEN_EXCHANGE_FAILED(2002, "Lấy token thất bại", HttpStatus.BAD_REQUEST),
 
     VALIDATION_ERROR(2001, "Dữ liệu không hợp lệ", HttpStatus.BAD_REQUEST),
-    INTERNAL_ERROR(1999, "Lỗi hệ thống", HttpStatus.INTERNAL_SERVER_ERROR);
+    INTERNAL_ERROR(1999, "Lỗi hệ thống", HttpStatus.INTERNAL_SERVER_ERROR),
 
+    UNAUTHENTICATED(1006, "Vui lòng đăng nhập", HttpStatus.UNAUTHORIZED),
+    UNAUTHORIZED(1007, "Bạn không có quyền thực hiện hành động này", HttpStatus.FORBIDDEN),
+    ;
     int code;
     String message;
     HttpStatus httpStatus;

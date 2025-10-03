@@ -28,7 +28,8 @@ public class SecurityConfig {
             "/foods/save",
             "/ingredients/save",
             "/conditions/save",
-            "/allergies/save"
+            "/allergies/save",
+            "/nutrition-rules/save"
     };
 
 
@@ -75,6 +76,7 @@ public class SecurityConfig {
                 oauth2.jwt(jwtConfigurer ->
                         jwtConfigurer.decoder(jwtDecoder())
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                        .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
         );
         httpSecurity.csrf(AbstractHttpConfigurer::disable);
 

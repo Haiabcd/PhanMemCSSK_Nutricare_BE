@@ -32,11 +32,11 @@ public class AIController {
         return ResponseEntity.ok(agentService.createPlan(req));
     }
 
-    @PostMapping("/chat")
-    public ResponseEntity<AgentResponse> chat(@RequestBody AgentRequest req) {
-        if (req.getUserId()==null || req.getUserId().isBlank() || req.getMessage()==null) {
-            return ResponseEntity.badRequest().build();
-        }
-        return ResponseEntity.ok(agentService.chat(req));
-    }
+//    @PostMapping("/chat")
+//    public ResponseEntity<AgentResponse> chat(@RequestBody AgentRequest req) {
+//        if (req.getUserId()==null || req.getUserId().isBlank() || req.getMessage()==null) {
+//            return ResponseEntity.badRequest().build();
+//        }
+//        return ResponseEntity.ok(agentService.chat(req));
+//    }
 }
