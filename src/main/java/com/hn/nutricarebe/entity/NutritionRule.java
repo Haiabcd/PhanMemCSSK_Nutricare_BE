@@ -13,8 +13,11 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @Entity
 @Table(
         name = "nutrition_rule",
@@ -22,7 +25,7 @@ import java.util.UUID;
                 @Index(name = "idx_rule_condition", columnList = "condition_id"),
                 @Index(name = "idx_rule_target", columnList = "target_type,target_code"),
                 @Index(name = "idx_rule_scope", columnList = "scope"),
-                @Index(name = "idx_rule_active_priority", columnList = "active,priority")
+                @Index(name = "idx_rule_active", columnList = "active")
         }
 )
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -33,30 +36,32 @@ public class NutritionRule {
     @Column(updatable = false, nullable = false, name = "id")
     UUID id;
 
+    // Liên kết bệnh lý (gout, T2D, CKD...)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "condition_id", foreignKey = @ForeignKey(name = "fk_nutrition_rule_condition"))
     Condition condition;
 
+    // Dị ứng (nếu có)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "allergy_id", foreignKey = @ForeignKey(name = "fk_nutrition_rule_allergy"))
     Allergy allergy;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "rule_type", nullable = false)
-    RuleType ruleType;
 
+    // Phạm vi áp dụng: ITEM, MEAL, DAY
     @Enumerated(EnumType.STRING)
     @Column(name = "scope", nullable = false)
     RuleScope scope;
 
+    // Đối tượng: NUTRIENT, FOOD_TAG
     @Enumerated(EnumType.STRING)
     @Column(name = "target_type", nullable = false)
     TargetType targetType;
 
+    // Mã đích: ví dụ "NA" (natri) nếu NUTRIENT; "HIGH_PURINE" nếu FOOD_TAG
     @Column(name = "target_code", nullable = false, length = 128)
     String targetCode;
 
-    // ====== So sánh & ngưỡng ======
+    // ===== So sánh & ngưỡng =====
     @Enumerated(EnumType.STRING)
     @Column(name = "comparator", nullable = false, length = 16)
     Comparator comparator;
@@ -67,35 +72,21 @@ public class NutritionRule {
     @Column(name = "threshold_max", precision = 12, scale = 4)
     BigDecimal thresholdMax;
 
-    // Đơn vị & cơ sở dữ liệu dinh dưỡng
-    @Enumerated(EnumType.STRING)
-    @Column(name = "unit", length = 24)
-    Unit unit;
-
-
+    // Tính theo kg thể trọng (ví dụ: PROTEIN ≥ 1.0 g/kg/day)
     @Builder.Default
     @Column(name = "per_kg", nullable = false)
     Boolean perKg = Boolean.FALSE;
 
-    @Column(name = "per_kg_factor", precision = 6, scale = 3)
-    BigDecimal perKgFactor;
-
+    // Tần suất trong phạm vi scope (nếu có)
     @Column(name = "frequency_per_scope")
     Integer frequencyPerScope;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "severity", length = 24)
-    RuleSeverity severity;
-
-    @Builder.Default
-    @Column(name = "priority", nullable = false)
-    Integer priority = 0;
-
+    // Trạng thái
     @Builder.Default
     @Column(name = "active", nullable = false)
     Boolean active = Boolean.TRUE;
 
-
+    // Điều kiện áp dụng theo nhân khẩu học (tối giản)
     @Enumerated(EnumType.STRING)
     @Column(name = "applicable_sex", length = 16)
     Gender applicableSex;
@@ -106,7 +97,7 @@ public class NutritionRule {
     @Column(name = "age_max")
     Integer ageMax;
 
-
+    // Tag món ăn dùng cho comparator IN_SET/NOT_IN_SET khi targetType = FOOD_TAG
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "nutrition_rule_food_tags",
@@ -120,26 +111,14 @@ public class NutritionRule {
     @Builder.Default
     Set<FoodTag> foodTags = new HashSet<>();
 
-
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(
-            name = "nutrition_rule_ingredient_tags",
-            joinColumns = @JoinColumn(
-                    name = "rule_id",
-                    foreignKey = @ForeignKey(name = "fk_rule_ingredient_tags_rule")
-            )
-    )
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tag_code", nullable = false, length = 128)
-    @Builder.Default
-    Set<IngredientTag> ingredientTags = new HashSet<>();
-
+    // Thông điệp & nguồn
     @Column(name = "message", nullable = false, length = 1000)
     String message;
 
     @Column(name = "source", length = 512)
     String source;
 
+    // Audit
     @CreationTimestamp
     @Column(name = "create_at", updatable = false, nullable = false)
     Instant createAt;

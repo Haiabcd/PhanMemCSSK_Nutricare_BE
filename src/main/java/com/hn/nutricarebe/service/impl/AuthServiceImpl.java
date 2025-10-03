@@ -114,7 +114,7 @@ public class AuthServiceImpl implements AuthService {
                 MealPlanCreationRequest.builder()
                         .userId(savedUser.getId())
                         .profile(request.getProfile())
-                        .build()
+                        .build(), 7
         );
         //B6: Lập kế hoạch chi tiết (MealPlanItem)
 

@@ -4,8 +4,10 @@ import com.hn.nutricarebe.entity.UserAllergy;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface UserAllergyRepository extends JpaRepository<UserAllergy, UUID> {
+    List<UserAllergy> findByUser_Id(UUID userId);
 }
