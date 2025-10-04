@@ -21,6 +21,9 @@ public class NutritionRuleCreationRequest {
     UUID conditionId;
     UUID allergyId;
 
+    @NotNull(message = "ruleType là bắt buộc")
+    RuleType ruleType;
+
     @NotNull(message = "scope là bắt buộc")
     RuleScope scope;
 

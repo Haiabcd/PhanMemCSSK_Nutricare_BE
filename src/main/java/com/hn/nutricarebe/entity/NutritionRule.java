@@ -6,7 +6,6 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
@@ -46,6 +45,9 @@ public class NutritionRule {
     @JoinColumn(name = "allergy_id", foreignKey = @ForeignKey(name = "fk_nutrition_rule_allergy"))
     Allergy allergy;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rule_type", nullable = false)
+    RuleType ruleType;
 
     // Phạm vi áp dụng: ITEM, MEAL, DAY
     @Enumerated(EnumType.STRING)

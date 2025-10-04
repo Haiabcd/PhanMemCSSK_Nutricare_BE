@@ -18,6 +18,8 @@ import java.time.LocalDate;
 import java.time.Year;
 import java.util.*;
 import java.util.Comparator;
+
+
 import static java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR;
 
 @Service
@@ -167,7 +169,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             waterMl = Math.max(waterMl, agg.dayWaterMin.doubleValue());
         }
 
-        target = applyAggregateConstraintsToDayTarget(target, agg, weight);
+        target = applyAggregateConstraintsToDayTarget(target, agg);
         /* ===================== LẬP KẾ HOẠCH CHO NUMBER NGÀY ===================== */
         LocalDate startDate = LocalDate.now();
         List<MealPlanDay> days = new ArrayList<>(number);
@@ -215,28 +217,53 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             int itemCount   = slotItemCounts.get(slot);               //Số món mỗi bữa
             int perItem     = (int)Math.round(slotKcal / Math.max(1, itemCount));  //Kcal mục tiêu mỗi món
 
-            int minKcal = (int)Math.max(50, Math.round(perItem * 0.5));
-            int maxKcal = (int)Math.round(perItem * 2.0);
+            List<Food> pool = Collections.emptyList();
+            double lowMul  = 0.5, highMul = 2.0;
 
-            List<Food> pool = foodRepository.selectCandidatesBySlotAndKcalWindow(
-                    slot.name(), minKcal, maxKcal, perItem, CANDIDATE_LIMIT
-            );
+            for (int attempt = 0; attempt < 5; attempt++) {
+                int minKcal = Math.max(20, (int)Math.round(perItem * lowMul));
+                int maxKcal = Math.max(minKcal + 10, (int)Math.round(perItem * highMul));
 
-            if (pool.size() < itemCount) {
                 pool = foodRepository.selectCandidatesBySlotAndKcalWindow(
-                        slot.name(), Math.max(30,(int)(perItem*0.3)), (int)(perItem*2.5), perItem, CANDIDATE_LIMIT
+                        slot.name(), minKcal, maxKcal, perItem, CANDIDATE_LIMIT
                 );
+                if (pool != null && pool.size() >= itemCount) break;
+
+                lowMul  = Math.max(0.10, lowMul * 0.70);
+                highMul = Math.min(4.00, highMul * 1.30);
             }
 
+            if (pool == null) pool = Collections.emptyList();
+
+            // Lọc món bị cấm
+            TagDirectives tagDir = buildTagDirectives(rules, request);
+            pool = pool.stream()
+                    .filter(f -> Collections.disjoint(tagsOf(f), tagDir.avoid))
+                    .toList();
+
             // Tính target nutriton bữa
-            Nutrition slotTarget = approxMacroTargetForSlot(target, slotKcalPct.get(slot));
+            Nutrition slotTarget = approxMacroTargetForMeal(target, slotKcalPct.get(slot), rules, weight, request);
 
             Map<UUID, Double> score = new HashMap<>();  //Mảng điểm của từng món
+            final double PREFER_BONUS_PER_TAG = 0.8;  // + điểm cho mỗi tag PREFER trùng
+            final double LIMIT_PENALTY_PER_TAG = 0.7; // - điểm cho mỗi tag LIMIT trùng
+
             for (Food f : pool) {
-                // Tính điểm món bằng heuristic
                 double s = scoreFoodHeuristic(f, slotTarget);
-                // Cộng thêm điểm từ LLM (nếu có)
                 s += scoreFoodByLLMIfAny(f, slot, slotTarget);
+
+                Set<FoodTag> ft = tagsOf(f);
+
+                // PREFER: cộng mềm theo số tag khớp
+                if (!tagDir.preferBonus.isEmpty()) {
+                    long cnt = ft.stream().filter(tagDir.preferBonus::containsKey).count();  //Đếm số tag trùng
+                    if (cnt > 0) s += cnt * PREFER_BONUS_PER_TAG;
+                }
+                // LIMIT: trừ mềm theo số tag khớp
+                if (!tagDir.limitPenalty.isEmpty()) {
+                    long cnt = ft.stream().filter(tagDir.limitPenalty::containsKey).count();
+                    if (cnt > 0) s -= cnt * LIMIT_PENALTY_PER_TAG;
+                }
                 score.put(f.getId(), s);
             }
 
@@ -266,7 +293,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             for (MealSlot slot : MealSlot.values()) {
                 double slotKcal = safeDouble(dayTarget.getKcal()) * slotKcalPct.get(slot);  // Tính sô kcal mục tiêu mỗi bữa
                 int itemCount   = slotItemCounts.get(slot);               // Số món mỗi bữa
-                Nutrition slotTarget = approxMacroTargetForSlot(dayTarget, slotKcalPct.get(slot));  //Tính dinh dưỡng mục tiêu bữa
+                Nutrition slotTarget = approxMacroTargetForMeal(dayTarget, slotKcalPct.get(slot),rules, weight, request);  //Tính dinh dưỡng mục tiêu bữa
 
                 SlotPool sp = pools.get(slot);
                 List<Food> pool = sp.foods();
@@ -302,46 +329,43 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                     }
 
                     // Dựa vào số kcal còn lại của bữa để tính khẩu phần món
-                    double portion = clamp(kcalRemain / safeDouble(nut.getKcal()), 0.6, 1.6);
+                    double foodKcal = safeDouble(nut.getKcal());
+                    double portion = pickPortionStep(kcalRemain, foodKcal);
+
+                    if (portion <= 0.5 && scan < pool.size() && picked < itemCount - 1) {
+                        continue;
+                    }
                     // Tính dinh dưỡng món theo khẩu phần
                     Nutrition snap = scaleNutrition(nut, portion);
 
-                    // Kiểm tra dinh dưỡng món theo target từng món
-                    boolean exceedNa = snap.getSodiumMg()!=null && slotTarget.getSodiumMg()!=null
-                            && snap.getSodiumMg().compareTo(slotTarget.getSodiumMg()) > 0;
-                    boolean exceedSu = snap.getSugarMg()!=null && slotTarget.getSugarMg()!=null
-                            && snap.getSugarMg().compareTo(slotTarget.getSugarMg()) > 0;
-
-
-                    if (exceedNa || exceedSu) {
-                        // thử giảm 15% portion
-                        double tryPortion = clamp(portion*0.85, 0.5, portion);
-                        // tính lại dinh dưỡng
-                        Nutrition trySnap = scaleNutrition(nut, tryPortion);
-                        if (exceedNa && trySnap.getSodiumMg()!=null
-                                     && slotTarget.getSodiumMg()!=null
-                                     && trySnap.getSodiumMg().compareTo(slotTarget.getSodiumMg()) > 0)
-                            continue; // vẫn vượt natri → bỏ món
-                        if (exceedSu && trySnap.getSugarMg()!=null
-                                     && slotTarget.getSugarMg()!=null
-                                     && trySnap.getSugarMg().compareTo(slotTarget.getSugarMg()) > 0)
-                            continue; // vẫn vượt đường → bỏ món
-                        portion = tryPortion;
-                        snap = trySnap;
-                    }
 
                     if (!passesItemRules(rules, cand, snap, request)) {
-                        // thử giảm 15% portion
-                        double tryPortion2 = clamp(portion * 0.85, 0.5, portion);
-                        // tính lại dinh dưỡng
-                        Nutrition trySnap2 = scaleNutrition(nut, tryPortion2);
-
-                        if (!passesItemRules(rules, cand, trySnap2, request)) {
-                            continue; // bỏ món này
+                        OptionalDouble nextStep = stepDown(portion);
+                        if (nextStep.isEmpty()) {
+                            continue;
                         }
-
+                        double tryPortion2 = nextStep.getAsDouble();
+                        Nutrition trySnap2 = scaleNutrition(nut, tryPortion2);
+                        if (!passesItemRules(rules, cand, trySnap2, request)) {
+                            boolean fixed = false;
+                            OptionalDouble step = stepDown(tryPortion2);
+                            while (step.isPresent()) {
+                                double p2 = step.getAsDouble();
+                                Nutrition s2 = scaleNutrition(nut, p2);
+                                if (passesItemRules(rules, cand, s2, request)) {
+                                    tryPortion2 = p2;
+                                    trySnap2 = s2;
+                                    fixed = true;
+                                    break;
+                                }
+                                step = stepDown(p2);
+                            }
+                            if (!fixed) continue;
+                        }
                         portion = tryPortion2;
                         snap = trySnap2;
+
+
                     }
                     // Save món đã pass
                     mealPlanItemRepository.save(MealPlanItem.builder()
@@ -353,7 +377,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                             .nutrition(snap)
                             .build());
 
-                    // cập nhật trạng thái no-repeat
+                    // cập nhật trạng thái
                     Deque<UUID> dq = recentBySlot.get(slot);
                     dq.addLast(cand.getId());
                     while (dq.size() > noRepeatWindow * slotItemCounts.get(slot))
@@ -364,7 +388,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                     picked++;
                 }
 
-                // nếu vẫn thiếu món -> lấp món kcal thấp (CHƯA XEM)
+                // nếu vẫn thiếu món -> lấp món kcal thấp
                 if (picked < itemCount) {
                     for (Food f : pool.stream().sorted(Comparator.comparingDouble(ff -> safeDouble(ff.getNutrition().getKcal()))).toList()) {
                         if (picked >= itemCount) break;
@@ -373,7 +397,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                         if (nut == null || nut.getKcal()==null || safeDouble(nut.getKcal())<=0) continue;
                         Nutrition snap = scaleNutrition(nut, 1.0);
 
-                        // Kiểm tra rule ITEM khi lấp
+                        // Kiểm tra lại dinh dưỡng
                         if (!passesItemRules(rules, f, snap, request)) continue;
 
                         mealPlanItemRepository.save(MealPlanItem.builder()
@@ -404,105 +428,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     }
 
 
-    /* ===== CHẤM ĐIỂM TỪNG MÓN===== */
-    private double scoreFoodHeuristic(Food f, Nutrition slotTarget) {
-        Nutrition n = f.getNutrition();
-        if (n == null) return -1e9;
-
-        double kcal = safeDouble(n.getKcal());
-
-        double p = safeDouble(n.getProteinG());
-        double c = safeDouble(n.getCarbG());
-        double fat = safeDouble(n.getFatG());
-        double sum = p + c + fat + 1e-6;
-
-        double fiber = safeDouble(n.getFiberG());
-
-        double sodium = safeDouble(n.getSodiumMg());
-        double sugarMg = safeDouble(n.getSugarMg());
-
-        double tp = safeDouble(slotTarget.getProteinG());
-        double tc = safeDouble(slotTarget.getCarbG());
-        double tf = safeDouble(slotTarget.getFatG());
-        double sumT = tp + tc + tf + 1e-6;
-
-        double rp = p / sum;
-        double rc = c / sum;
-        double rf = fat / sum;
-
-        double rtp = (tp / sumT);
-        double rtc = (tc / sumT);
-        double rtf = (tf / sumT);
-
-        double ratioPenalty = Math.abs(rp - rtp) + Math.abs(rc - rtc) + Math.abs(rf - rtf);
-
-        double kcalDensityScore = -Math.abs(kcal - (safeDouble(slotTarget.getKcal()) / 2.5));
-
-        double fiberBonus = Math.min(fiber, 8.0);
-
-        double sodiumPenalty = 0.0;
-        if (safeDouble(slotTarget.getSodiumMg()) > 0) sodiumPenalty = sodium / (safeDouble(slotTarget.getSodiumMg()) + 1e-6) * 2.0;
-
-        double sugarPenalty = 0.0;
-        if (slotTarget.getSugarMg() != null && slotTarget.getSugarMg().doubleValue() > 0) {
-            sugarPenalty = sugarMg / (slotTarget.getSugarMg().doubleValue() + 1e-6) * 1.5;
-        }
-
-        double tagAdj = 0.0;
-        if (f.getTags() != null) {
-            if (f.getTags().contains(FoodTag.HIGH_FIBER)) tagAdj += 1.0;
-            if (f.getTags().contains(FoodTag.LEAN_PROTEIN)) tagAdj += 1.0;
-            if (f.getTags().contains(FoodTag.FRIED)) tagAdj -= 1.0;
-            if (f.getTags().contains(FoodTag.SUGARY)) tagAdj -= 1.0;
-            if (f.getTags().contains(FoodTag.PROCESSED)) tagAdj -= 0.6;
-        }
-
-        return -ratioPenalty + (kcalDensityScore / 300.0) + (fiberBonus * 0.2) + tagAdj - sodiumPenalty - sugarPenalty;
-    }
-
-    private double scoreFoodByLLMIfAny(Food food, MealSlot slot, Nutrition slotTarget) {
-        // Placeholder để tích hợp LLM scorer nếu cần
-        return 0.0;
-    }
-    /* ===== CHẤM ĐIỂM TỪNG MÓN===== */
-
-
-
-    /* ===== TÍNH DINH DƯỠNG MÓN ===== */
-    private double clamp(double v, double lo, double hi) {
-        return Math.max(lo, Math.min(hi, v));
-    }
-    private Nutrition scaleNutrition(Nutrition base, double portion) {
-        return Nutrition.builder()
-                .kcal(bd(safeDouble(base.getKcal()) * portion, 2))
-                .proteinG(bd(safeDouble(base.getProteinG()) * portion, 2))
-                .carbG(bd(safeDouble(base.getCarbG()) * portion, 2))
-                .fatG(bd(safeDouble(base.getFatG()) * portion, 2))
-                .fiberG(bd(safeDouble(base.getFiberG()) * portion, 2))
-                .sodiumMg(bd(safeDouble(base.getSodiumMg()) * portion, 2))
-                .sugarMg(bd(safeDouble(base.getSugarMg()) * portion, 2))
-                .build();
-    }
-    /* ===== TÍNH DINH DƯỠNG MÓN ===== */
-
-    /* ===== TÍNH DINH DƯỠNG BỮA ===== */
-    private Nutrition approxMacroTargetForSlot(Nutrition dayTarget, double pctKcal) {
-        // Tính calorie cho bữa ăn = lấy tổng calorie ngày *  với tỷ lệ phần trăm bữa.
-        double kcal = safeDouble(dayTarget.getKcal()) * pctKcal;
-        // Tính tỷ lệ phân bổ dinh dưỡng bằng cách chia calorie bữa cho calorie ngày.
-        double ratio = kcal / Math.max(1, safeDouble(dayTarget.getKcal()));
-        return Nutrition.builder()
-                .kcal(bd(kcal, 2))
-                .proteinG(bd(safeDouble(dayTarget.getProteinG()) * ratio, 2))
-                .carbG(bd(safeDouble(dayTarget.getCarbG()) * ratio, 2))
-                .fatG(bd(safeDouble(dayTarget.getFatG()) * ratio, 2))
-                .fiberG(bd(Math.max(6.0, safeDouble(dayTarget.getFiberG()) * ratio), 2))
-                .sodiumMg(bd(Math.min(700, 2000 * pctKcal), 2))
-                .sugarMg(bd(Math.max(0, safeDouble(dayTarget.getSugarMg()) * ratio), 2))
-                .build();
-    }
-    /* ===== TÍNH DINH DƯỠNG BỮA ===== */
-
     /* ===== TÍNH DINH DƯỠNG NGÀY ===== */
     private AggregateConstraints deriveAggregateConstraintsFromRules(List<NutritionRule> rules, int weightKg) {
         AggregateConstraints a = new AggregateConstraints();
@@ -516,7 +441,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             BigDecimal min = r.getThresholdMin();
             BigDecimal max = r.getThresholdMax();
 
-            // Quy đổi perKg → gram/day cho PROTEIN (các chất khác thường không dùng perKg)
+            // Quy đổi perKg → gram/day
             if (Boolean.TRUE.equals(r.getPerKg())) {
                 if (min != null) min = min.multiply(BigDecimal.valueOf(weightKg));
                 if (max != null) max = max.multiply(BigDecimal.valueOf(weightKg));
@@ -582,8 +507,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         }
     }
 
-
-    private Nutrition applyAggregateConstraintsToDayTarget(Nutrition target, AggregateConstraints a, int weightKg) {
+    private Nutrition applyAggregateConstraintsToDayTarget(Nutrition target, AggregateConstraints a) {
         BigDecimal protein = target.getProteinG();
         BigDecimal carb    = target.getCarbG();
         BigDecimal fat     = target.getFatG();
@@ -624,16 +548,248 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 .sugarMg(sugar)
                 .build();
     }
-    /* ===== TÍNH DINH DƯỠNG NGÀY (XEM LẠI) ===== */
+    /* ===== TÍNH DINH DƯỠNG NGÀY ===== */
 
 
+    /* ===== TÍNH DINH DƯỠNG BỮA ===== */
+    private Nutrition approxMacroTargetForMeal(
+            Nutrition dayTarget,
+            double pctKcal,
+            List<NutritionRule> rules,
+            int weightKg,
+            MealPlanCreationRequest request
+    ) {
+        double kcal  = safeDouble(dayTarget.getKcal()) * pctKcal;
+        double ratio = kcal / Math.max(1, safeDouble(dayTarget.getKcal()));
+
+        BigDecimal p = bd(safeDouble(dayTarget.getProteinG()) * ratio, 2);
+        BigDecimal c = bd(safeDouble(dayTarget.getCarbG())    * ratio, 2);
+        BigDecimal f = bd(safeDouble(dayTarget.getFatG())     * ratio, 2);
+        BigDecimal fi= bd(Math.max(6.0, safeDouble(dayTarget.getFiberG()) * ratio), 2);
+        BigDecimal na= bd(Math.min(700, 2000 * pctKcal), 2);
+        BigDecimal su= bd(Math.max(0, safeDouble(dayTarget.getSugarMg()) * ratio), 2);
+
+        Nutrition targetMeal = Nutrition.builder()
+                .kcal(bd(kcal,2))
+                .proteinG(p)
+                .carbG(c)
+                .fatG(f)
+                .fiberG(fi)
+                .sodiumMg(na)
+                .sugarMg(su)
+                .build();
+
+        AggregateConstraints a = new AggregateConstraints();
+        if (rules != null && !rules.isEmpty()) {
+            for (NutritionRule r : rules) {
+                if (r.getScope() != RuleScope.MEAL) continue;
+                if (r.getTargetType() != TargetType.NUTRIENT) continue;
+                if (r.getComparator() == null) continue;
+                if (!appliesToDemographics(r, request)) continue;
+
+                String code = safeStr(r.getTargetCode()).toUpperCase();
+                BigDecimal min = r.getThresholdMin();
+                BigDecimal max = r.getThresholdMax();
+
+                // Quy đổi perKg → gram/day
+                if (Boolean.TRUE.equals(r.getPerKg())) {
+                    if (min != null) min = min.multiply(BigDecimal.valueOf(weightKg));
+                    if (max != null) max = max.multiply(BigDecimal.valueOf(weightKg));
+                }
+
+                switch (code) {
+                    case "PROTEIN" -> applyBoundsToPair(a, r.getComparator(), min, max,
+                            v -> a.dayProteinMin = maxOf(a.dayProteinMin, v),
+                            v -> a.dayProteinMax = minOf(a.dayProteinMax, v));
+
+                    case "CARB" -> applyBoundsToPair(a, r.getComparator(), min, max,
+                            v -> a.dayCarbMin = maxOf(a.dayCarbMin, v),
+                            v -> a.dayCarbMax = minOf(a.dayCarbMax, v));
+
+                    case "FAT" -> applyBoundsToPair(a, r.getComparator(), min, max,
+                            v -> a.dayFatMin = maxOf(a.dayFatMin, v),
+                            v -> a.dayFatMax = minOf(a.dayFatMax, v));
+
+                    case "FIBER" -> applyBoundsToPair(a, r.getComparator(), min, max,
+                            v -> a.dayFiberMin = maxOf(a.dayFiberMin, v),
+                            v -> a.dayFiberMax = minOf(a.dayFiberMax, v));
+
+                    case "SODIUM" -> applyBoundsToPair(a, r.getComparator(), min, max,
+                            v -> {},
+                            v -> a.daySodiumMax = minOf(a.daySodiumMax, v));
+
+                    case "SUGAR" -> applyBoundsToPair(a, r.getComparator(), min, max,
+                            v -> {},
+                            v -> a.daySugarMax = minOf(a.daySugarMax, v));
+
+                    case "WATER" -> {
+                        applyBoundsToPair(a, r.getComparator(), min, max,
+                                v -> a.dayWaterMin = maxOf(a.dayWaterMin, v),
+                                v -> { /* thường không giới hạn trên với nước */ });
+                    }
+
+                    default -> { /* bỏ qua nutrient không hỗ trợ */ }
+                }
+            }
 
 
+        }
 
-    // True nếu món + khẩu phần "snap" pass tất cả rule scope=ITEM
+        return applyAggregateConstraintsToDayTarget(targetMeal,a);
+    }
+    /* ===== TÍNH DINH DƯỠNG BỮA ===== */
+
+
+    /* ===== TÍNH DINH DƯỠNG MÓN ===== */
+    private Nutrition scaleNutrition(Nutrition base, double portion) {
+        return Nutrition.builder()
+                .kcal(bd(safeDouble(base.getKcal()) * portion, 2))
+                .proteinG(bd(safeDouble(base.getProteinG()) * portion, 2))
+                .carbG(bd(safeDouble(base.getCarbG()) * portion, 2))
+                .fatG(bd(safeDouble(base.getFatG()) * portion, 2))
+                .fiberG(bd(safeDouble(base.getFiberG()) * portion, 2))
+                .sodiumMg(bd(safeDouble(base.getSodiumMg()) * portion, 2))
+                .sugarMg(bd(safeDouble(base.getSugarMg()) * portion, 2))
+                .build();
+    }
+    /* ===== TÍNH DINH DƯỠNG MÓN ===== */
+
+    /* ===== LỌC MÓN + TÍNH ĐIỂM ===== */
+    static class TagDirectives {
+        Set<FoodTag> avoid = new HashSet<>();
+        Map<FoodTag, Double> preferBonus = new HashMap<>();
+        Map<FoodTag, Double> limitPenalty = new HashMap<>();
+    }
+
+    private TagDirectives buildTagDirectives(List<NutritionRule> rules, MealPlanCreationRequest request) {
+        TagDirectives d = new TagDirectives();
+        if (rules == null || rules.isEmpty()) return d;
+
+        for (NutritionRule r : rules) {
+            if (r.getTargetType() != TargetType.FOOD_TAG) continue;
+            if (r.getScope() != RuleScope.ITEM) continue;
+            if (!appliesToDemographics(r, request)) continue;
+
+            Set<FoodTag> tags = r.getFoodTags();
+            if (tags == null || tags.isEmpty()) continue;
+
+            RuleType rt = r.getRuleType();
+            if (rt == null) continue;
+
+            switch (rt) {
+                case AVOID -> d.avoid.addAll(tags);
+                case PREFER -> tags.forEach(t -> d.preferBonus.merge(t, 1.0, Double::sum));
+                case LIMIT  -> tags.forEach(t -> d.limitPenalty.merge(t, 1.0, Double::sum));
+                default -> { /* bỏ qua các loại khác nếu có */ }
+            }
+        }
+        return d;
+    }
+
+    private static Set<FoodTag> tagsOf(Food f) {
+        return f.getTags() == null ? Collections.emptySet() : f.getTags();
+    }
+
+    private double scoreFoodHeuristic(Food f, Nutrition slotTarget) {
+        Nutrition n = f.getNutrition();
+        if (n == null) return -1e9;
+
+        double kcal = safeDouble(n.getKcal());
+
+        double p = safeDouble(n.getProteinG());
+        double c = safeDouble(n.getCarbG());
+        double fat = safeDouble(n.getFatG());
+        double sum = p + c + fat + 1e-6;
+
+        double fiber = safeDouble(n.getFiberG());
+
+        double sodium = safeDouble(n.getSodiumMg());
+        double sugarMg = safeDouble(n.getSugarMg());
+
+        double tp = safeDouble(slotTarget.getProteinG());
+        double tc = safeDouble(slotTarget.getCarbG());
+        double tf = safeDouble(slotTarget.getFatG());
+        double sumT = tp + tc + tf + 1e-6;
+
+        double rp = p / sum;
+        double rc = c / sum;
+        double rf = fat / sum;
+
+        double rtp = (tp / sumT);
+        double rtc = (tc / sumT);
+        double rtf = (tf / sumT);
+
+        double ratioPenalty = Math.abs(rp - rtp) + Math.abs(rc - rtc) + Math.abs(rf - rtf);
+
+        double kcalDensityScore = -Math.abs(kcal - (safeDouble(slotTarget.getKcal()) / 2.5));
+
+        double fiberBonus = Math.min(fiber, 8.0);
+
+        double sodiumPenalty = 0.0;
+        if (safeDouble(slotTarget.getSodiumMg()) > 0) sodiumPenalty = sodium / (safeDouble(slotTarget.getSodiumMg()) + 1e-6) * 2.0;
+
+        double sugarPenalty = 0.0;
+        if (slotTarget.getSugarMg() != null && slotTarget.getSugarMg().doubleValue() > 0) {
+            sugarPenalty = sugarMg / (slotTarget.getSugarMg().doubleValue() + 1e-6) * 1.5;
+        }
+
+        double tagAdj = 0.0;
+        if (f.getTags() != null) {
+            if (f.getTags().contains(FoodTag.HIGH_FIBER)) tagAdj += 1.0;
+            if (f.getTags().contains(FoodTag.LEAN_PROTEIN)) tagAdj += 1.0;
+            if (f.getTags().contains(FoodTag.FRIED)) tagAdj -= 1.0;
+            if (f.getTags().contains(FoodTag.SUGARY)) tagAdj -= 1.0;
+            if (f.getTags().contains(FoodTag.PROCESSED)) tagAdj -= 0.6;
+        }
+
+        return -ratioPenalty + (kcalDensityScore / 300.0) + (fiberBonus * 0.2) + tagAdj - sodiumPenalty - sugarPenalty;
+    }
+
+    private double scoreFoodByLLMIfAny(Food food, MealSlot slot, Nutrition slotTarget) {
+        // Placeholder để tích hợp LLM scorer nếu cần
+        return 0.0;
+    }
+    /* ===== LỌC MÓN + TÍNH ĐIỂM ===== */
+
+    /* ===== CHỌN KHẨU PHẦN ===== */
+    static final double[] PORTION_STEPS = {1.5, 1.0, 0.5};
+    private static double pickPortionStep(double kcalRemain, double foodKcal) {
+        if (foodKcal <= 0) return 1.0;
+        double best = PORTION_STEPS[0];
+        double bestDiff = Math.abs(kcalRemain - best * foodKcal);  //Độ lệch ||
+
+        for (double step : PORTION_STEPS) {
+            double diff = Math.abs(kcalRemain - step * foodKcal);  //Độ lệch từng bậc ||
+
+            boolean overBest = best * foodKcal > kcalRemain;   //Kiểm tra bậc hiện tại  (true --> vượt)
+            boolean overCur  = step * foodKcal > kcalRemain;   //Kiểm tra bậc đang xét
+
+            if (diff < bestDiff || (Math.abs(diff - bestDiff) < 1e-6 && !overCur && overBest)) {
+                best = step;
+                bestDiff = diff;
+            }
+        }
+        return best;
+    }
+    private static OptionalDouble stepDown(double current) {
+        for (int i = 0; i < PORTION_STEPS.length; i++) {
+            if (Math.abs(PORTION_STEPS[i] - current) < 1e-9) {
+                // Tìm bậc kế tiếp nhỏ hơn
+                for (int j = i + 1; j < PORTION_STEPS.length; j++) {
+                    if (PORTION_STEPS[j] < PORTION_STEPS[i]) {
+                        return OptionalDouble.of(PORTION_STEPS[j]);
+                    }
+                }
+                break;
+            }
+        }
+        return OptionalDouble.empty();
+    }
+    /* ===== CHỌN KHẨU PHẦN ===== */
+
+    /* ===== KIỂM TRA LẠI MÓN ĐƯỢC CHỌN ===== */
     private boolean passesItemRules(List<NutritionRule> rules, Food food, Nutrition snap, MealPlanCreationRequest request) {
         if (rules == null || rules.isEmpty()) return true;
-
         for (NutritionRule r : rules) {
             // Bỏ qua nếu rule không phải là từng món
             if (r.getScope() != RuleScope.ITEM) continue;
@@ -643,12 +799,8 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 case FOOD_TAG -> {
                     Set<FoodTag> ruleTags = r.getFoodTags();
                     if (ruleTags == null || ruleTags.isEmpty()) break;
-
                     Set<FoodTag> foodTags = food.getTags();
-                    boolean hasOverlap = foodTags != null && !Collections.disjoint(foodTags, ruleTags);
-                    //Không có tag trùng --> false
-                    // Có tag trùng --> true
-
+                    boolean hasOverlap = foodTags != null && !Collections.disjoint(foodTags, ruleTags);  //Có tag trùng --> true, Không có tag trùng --> false
                     //Nếu rule bắt món PHẢI CÓ các tags này, mà món KHÔNG CÓ → LOẠI BỎ
                     if (r.getComparator() == com.hn.nutricarebe.enums.Comparator.IN_SET && !hasOverlap) return false;
                     //Nếu rule bắt món KHÔNG ĐƯỢC CÓ các tags này, mà món CÓ → LOẠI BỎ
@@ -656,25 +808,45 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 }
                 case NUTRIENT -> {
                     String code = safeStr(r.getTargetCode());
-                    BigDecimal value = getNutrientValueByCode(snap, code);
+                    //Lấy chất dinh dưỡng theo mã code
+                    BigDecimal value = switch (code){
+                        case "KCAL" -> snap.getKcal();
+                        case "PROTEIN"        -> snap.getProteinG();
+                        case "CARB"           -> snap.getCarbG();
+                        case "FAT"            -> snap.getFatG();
+                        case "FIBER"          -> snap.getFiberG();
+                        case "SODIUM"         -> snap.getSodiumMg();
+                        case "SUGAR"          -> snap.getSugarMg();
+                        default               -> null;
+                    };
                     if (value == null) break;
 
                     BigDecimal min = r.getThresholdMin();
                     BigDecimal max = r.getThresholdMax();
+
                     if (Boolean.TRUE.equals(r.getPerKg())) {
                         int weight = Math.max(1, request.getProfile().getWeightKg());
                         if (min != null) min = min.multiply(BigDecimal.valueOf(weight));
                         if (max != null) max = max.multiply(BigDecimal.valueOf(weight));
                     }
 
-                    if (!compare(value, min, max, r.getComparator()))
-                        return false;
+                    switch (r.getComparator()) {
+                        case LT:      return max != null && value.compareTo(max) < 0;
+                        case LTE:     return max != null && value.compareTo(max) <= 0;
+                        case GT:      return min != null && value.compareTo(min) > 0;
+                        case GTE:     return min != null && value.compareTo(min) >= 0;
+                        case EQ:      return (min != null) && value.compareTo(min) == 0;
+                        case BETWEEN: return (min != null && max != null) && value.compareTo(min) >= 0 && value.compareTo(max) <= 0;
+                        default: return true;
+                    }
                 }
             }
         }
         return true;
     }
+    /* ===== KIỂM TRA LẠI MÓN ĐƯỢC CHỌN ===== */
 
+    // Kiểm tra rule về độ tuổi, giới tính
     private boolean appliesToDemographics(NutritionRule r, MealPlanCreationRequest request) {
         var p = request.getProfile();
         // Giới tính
@@ -689,46 +861,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         if (r.getAgeMax() != null && age > r.getAgeMax()) return false;
         return true;
     }
-    private boolean compare(BigDecimal value, BigDecimal min, BigDecimal max, com.hn.nutricarebe.enums.Comparator op) {
-        if (value == null) return true;
-        switch (op) {
-            case LT:      return max != null && value.compareTo(max) < 0;
-            case LTE:     return max != null && value.compareTo(max) <= 0;
-            case GT:      return min != null && value.compareTo(min) > 0;
-            case GTE:     return min != null && value.compareTo(min) >= 0;
-            case EQ:      return (min != null) && value.compareTo(min) == 0;
-            case BETWEEN: return (min != null && max != null) && value.compareTo(min) >= 0 && value.compareTo(max) <= 0;
-            default: return true;
-        }
-    }
-    private BigDecimal minBD(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.min(b); }
 
-    // Lấy giá trị dinh dưỡng theo mã code
-    private BigDecimal getNutrientValueByCode(Nutrition n, String code) {
-        if (n == null || code == null) return null;
-        switch (code.toUpperCase()) {
-            case "KCAL":
-            case "ENERGY":      return n.getKcal();
-            case "PROTEIN":     return n.getProteinG();
-            case "CARB":
-            case "CARBOHYDRATE":return n.getCarbG();
-            case "FAT":         return n.getFatG();
-            case "FIBER":       return n.getFiberG();
-            case "NA":
-            case "SODIUM":      return n.getSodiumMg();
-            case "SUGAR":       return n.getSugarMg();
-            default:            return null;
-        }
-    }
-
-    //kiểm tra so sánh "nhỏ hơn" (≤ hoặc <) để áp dụng ngưỡng lớn nhất.
-    private boolean isLTE(com.hn.nutricarebe.enums.Comparator c) {
-        return c == com.hn.nutricarebe.enums.Comparator.LTE || c == com.hn.nutricarebe.enums.Comparator.LT;
-    }
-    //kiểm tra so sánh "lớn hơn" (≥ hoặc > hoặc =) để áp dụng ngưỡng nhỏ nhất.
-    private boolean isGTE(com.hn.nutricarebe.enums.Comparator c) {
-        return c == com.hn.nutricarebe.enums.Comparator.GTE || c == com.hn.nutricarebe.enums.Comparator.GT || c == com.hn.nutricarebe.enums.Comparator.EQ;
-    }
 
     //trả về giá trị nhỏ hơn (ưu tiên an toàn cho chất cần hạn chế)
     private BigDecimal minOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.min(b); }
