@@ -59,6 +59,9 @@ public class Profile {
     @Column(name = "name")
     String name;
 
+    @Column(name = "avata_url")
+    String avataUrl;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     Instant createdAt;

@@ -15,6 +15,8 @@ public enum ErrorCode {
     VALIDATION_FAILED(1002, "Dữ liệu không hợp lệ", HttpStatus.BAD_REQUEST),
     USER_NOT_FOUND(1003, "Người dùng không tồn tại", HttpStatus.NOT_FOUND),
 
+    PROFILE_NOT_FOUND(1020, "Hồ sơ không tồn tại", HttpStatus.NOT_FOUND),
+
     FOOD_NAME_EXISTED(1004, "Món ăn đã tồn tại", HttpStatus.CONFLICT),
     FOOD_NOT_FOUND(1012, "Món ăn không tồn tại", HttpStatus.NOT_FOUND),
     DELETE_CONFLICT(1014, "Không thể xóa món ăn", HttpStatus.CONFLICT),

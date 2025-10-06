@@ -10,6 +10,7 @@ import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.*;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
+import com.hn.nutricarebe.helper.GoogleLoginHelper;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.mapper.UserMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
@@ -133,7 +134,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Map<String, String> startGoogleOAuth() {
+    public Map<String, String> startGoogleOAuth(String device) {
         String myState = UUID.randomUUID().toString();
         //BKCE
         String verifier = PkceUtil.generateCodeVerifier();
@@ -141,9 +142,11 @@ public class AuthServiceImpl implements AuthService {
 
         pkceStore.save(myState, verifier);
 
+        // Tạo url callback
         String redirectToWithAppState = UriComponentsBuilder
                 .fromHttpUrl(CALLBACK_URL)
                 .queryParam("app_state", myState)
+                .queryParam("device", device)
                 .build(true)
                 .toUriString();
 
@@ -152,7 +155,7 @@ public class AuthServiceImpl implements AuthService {
                 .fromHttpUrl(SUPABASE_HOST + "/auth/v1/authorize")
                 .queryParam("provider", "google")
                 .queryParam("redirect_to", redirectToWithAppState)
-                .queryParam("code_challenge", challenge)
+                .queryParam("code_challenge", challenge)  // Mã bảo mật (khóa công khai)
                 .queryParam("code_challenge_method", "S256")
                 .queryParam("scope", "openid profile email")
                 .build()
@@ -197,7 +200,9 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public LoginResponse googleCallback(String code, String state) {
+//    public LoginProviderResponse googleCallback(String code, String state,String device) {
+    public SupabaseUser googleCallback(String code, String state,String device) {
+
         String verifier = pkceStore.consume(state);
         if (verifier == null) {
             throw new AppException(ErrorCode.INVALID_OR_EXPIRED_STATE);
@@ -205,39 +210,75 @@ public class AuthServiceImpl implements AuthService {
 
         SupabaseTokenResponse tokenRes;
         try {
+            // Đổi code lấy token
             tokenRes = exchangeCodeForToken(code, verifier, CALLBACK_URL);
         } catch (Exception e) {
             throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
         }
 
-        SupabaseUser u = tokenRes.getUser();
+        SupabaseUser su = tokenRes.getUser();
+        LoginProfile gp = GoogleLoginHelper.parse(su);
 
-        Map<String,Object> meta = u!= null && u.getUser_metadata()!=null ? u.getUser_metadata() : Map.of();
-        String name = (String) meta.getOrDefault("full_name", meta.getOrDefault("name", ""));
-        String avatar = (String) meta.getOrDefault("avatar_url", meta.getOrDefault("picture",""));
+        if (gp.getProviderUserId().isBlank()) {
+            throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
+        }
 
-        LoginUserView userView = LoginUserView.builder()
-                .id(u!=null?u.getId():null)
-                .email(u!=null?u.getEmail():null)
-                .name(name)
-                .avatarUrl(avatar)
-                .provider("google")
-                .build();
+//        boolean isNewUser = false;
+//
+//        // 1) Kiểm tra đã liên kết gg chưa
+//        User user = userRepository.findByProviderUserId(providerUserId).orElse(null);
+//
+//        // 2) Nếu vẫn chưa, thử theo device
+//        if (user == null && device != null && !device.isBlank()) {
+//            user = userRepository.findByDeviceId(device).orElse(null);
+//        }
+//
+//        if (user == null) {
+//            // Tạo mới user
+//            user = User.builder()
+//                    .deviceId((device != null && !device.isBlank()) ? device : null)
+//                    .email((email != null && !email.isBlank()) ? email : null)
+//                    .providerUserId(providerUserId)
+//                    .provider(Provider.SUPABASE_GOOGLE)
+//                    .role(Role.USER)
+//                    .status(UserStatus.ACTIVE)
+//                    .build();
+//            isNewUser = true;
+//        } else {
+//            // Đã có user
+//            if (user.getRole() == Role.GUEST) {
+//                user.setRole(Role.USER);
+//                user.setProviderUserId(providerUserId);
+//                user.setProvider(Provider.SUPABASE_GOOGLE);
+//                user.setStatus(UserStatus.ACTIVE);
+//                if ((user.getDeviceId() == null || user.getDeviceId().isBlank()) && device != null && !device.isBlank()) {
+//                    user.setDeviceId(device);
+//                }
+//
+//                if (user.getEmail() == null || user.getEmail().isBlank() || user.getEmail().equalsIgnoreCase(email)) {
+//                        user.setEmail(email);
+//                }
+//                Profile profile = profileRepository.findByUser_Id(user.getId())
+//                        .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+//                profile.setName(name);
+//                profile.setAvataUrl(avatar);
+//            }
+//        }
+//
+//        // Lưu một lần duy nhất
+//        User saved = userRepository.save(user);
 
-        // (Tuỳ chọn) tìm/ghi user vào DB, phát hành JWT riêng của app
+        // Trả token theo user đã lưu
+//        LoginProviderResponse data = LoginProviderResponse.builder()
+//                .user(saved)
+//                .token(generateToken(saved))
+//                .isNewUser(isNewUser)
+//                .name(name)
+//                .urlAvatar(avatar)
+//                .build();
 
-        LoginResponse data = LoginResponse.builder()
-                .user(userView)
-                .supabaseAccessToken(tokenRes.getAccess_token())
-                .supabaseRefreshToken(tokenRes.getRefresh_token())
-                .expiresIn(tokenRes.getExpires_in())
-                .build();
-        log.info("data: {}" , data);
-        return data;
-
+        return su;
     }
-
-
 
     private String generateToken(User user){
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);

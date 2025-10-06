@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.time.Year;
 import java.util.*;
 import java.util.Comparator;
+import java.util.stream.Collectors;
 
 
 import static java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR;
@@ -121,7 +122,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         double proteinG = weight * proteinPerKg;
         double proteinKcal = proteinG * 4.0;
 
-        //5.2) Fat: 30% năng lượng
+        //5.2) Fat: 30% năng lượng (NẾU BÉO PHÌ NHỎ HƠN 30%)
         double fatKcal = targetCalories * FAT_PCT;
         double fatG = fatKcal / 9.0;
 
@@ -217,7 +218,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             int itemCount   = slotItemCounts.get(slot);               //Số món mỗi bữa
             int perItem     = (int)Math.round(slotKcal / Math.max(1, itemCount));  //Kcal mục tiêu mỗi món
 
-            List<Food> pool = Collections.emptyList();
+            List<Food> pool = new ArrayList<>();
             double lowMul  = 0.5, highMul = 2.0;
 
             for (int attempt = 0; attempt < 5; attempt++) {
@@ -239,7 +240,8 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             TagDirectives tagDir = buildTagDirectives(rules, request);
             pool = pool.stream()
                     .filter(f -> Collections.disjoint(tagsOf(f), tagDir.avoid))
-                    .toList();
+                    .collect(Collectors.toCollection(ArrayList::new)); // MUTABLE
+
 
             // Tính target nutriton bữa
             Nutrition slotTarget = approxMacroTargetForMeal(target, slotKcalPct.get(slot), rules, weight, request);
@@ -270,6 +272,8 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             // Sắp xếp giảm dần theo điểm
             pool.sort(Comparator.<Food>comparingDouble(
                     f -> score.getOrDefault(f.getId(), 0.0)).reversed());
+
+
 
             // Xáo nhẹ nhóm 5 món để tăng đa dạng
             for (int i=0; i+4<pool.size(); i+=5)
@@ -390,7 +394,12 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
 
                 // nếu vẫn thiếu món -> lấp món kcal thấp
                 if (picked < itemCount) {
-                    for (Food f : pool.stream().sorted(Comparator.comparingDouble(ff -> safeDouble(ff.getNutrition().getKcal()))).toList()) {
+                    for (Food f : pool.stream()
+                            .sorted(Comparator.comparingDouble(ff -> {
+                                var n = ff.getNutrition();
+                                return (n == null) ? Double.MAX_VALUE : safeDouble(n.getKcal());
+                            }))
+                            .collect(Collectors.toList())){
                         if (picked >= itemCount) break;
                         if (recentBySlot.get(slot).contains(f.getId())) continue;
                         var nut = f.getNutrition();
@@ -795,21 +804,10 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             if (r.getScope() != RuleScope.ITEM) continue;
             if (!appliesToDemographics(r, request)) continue;
 
-            switch (r.getTargetType()) {
-                case FOOD_TAG -> {
-                    Set<FoodTag> ruleTags = r.getFoodTags();
-                    if (ruleTags == null || ruleTags.isEmpty()) break;
-                    Set<FoodTag> foodTags = food.getTags();
-                    boolean hasOverlap = foodTags != null && !Collections.disjoint(foodTags, ruleTags);  //Có tag trùng --> true, Không có tag trùng --> false
-                    //Nếu rule bắt món PHẢI CÓ các tags này, mà món KHÔNG CÓ → LOẠI BỎ
-                    if (r.getComparator() == com.hn.nutricarebe.enums.Comparator.IN_SET && !hasOverlap) return false;
-                    //Nếu rule bắt món KHÔNG ĐƯỢC CÓ các tags này, mà món CÓ → LOẠI BỎ
-                    if (r.getComparator() == com.hn.nutricarebe.enums.Comparator.NOT_IN_SET && hasOverlap) return false;
-                }
-                case NUTRIENT -> {
-                    String code = safeStr(r.getTargetCode());
-                    //Lấy chất dinh dưỡng theo mã code
-                    BigDecimal value = switch (code){
+            if (r.getTargetType() == TargetType.NUTRIENT) {
+                String code = safeStr(r.getTargetCode());
+                //Lấy chất dinh dưỡng theo mã code
+                BigDecimal value = switch (code){
                         case "KCAL" -> snap.getKcal();
                         case "PROTEIN"        -> snap.getProteinG();
                         case "CARB"           -> snap.getCarbG();
@@ -818,27 +816,26 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                         case "SODIUM"         -> snap.getSodiumMg();
                         case "SUGAR"          -> snap.getSugarMg();
                         default               -> null;
-                    };
-                    if (value == null) break;
+                };
+                if (value == null) break;
 
-                    BigDecimal min = r.getThresholdMin();
-                    BigDecimal max = r.getThresholdMax();
+                BigDecimal min = r.getThresholdMin();
+                BigDecimal max = r.getThresholdMax();
 
-                    if (Boolean.TRUE.equals(r.getPerKg())) {
-                        int weight = Math.max(1, request.getProfile().getWeightKg());
-                        if (min != null) min = min.multiply(BigDecimal.valueOf(weight));
-                        if (max != null) max = max.multiply(BigDecimal.valueOf(weight));
-                    }
+                if (Boolean.TRUE.equals(r.getPerKg())) {
+                    int weight = Math.max(1, request.getProfile().getWeightKg());
+                    if (min != null) min = min.multiply(BigDecimal.valueOf(weight));
+                    if (max != null) max = max.multiply(BigDecimal.valueOf(weight));
+                }
 
-                    switch (r.getComparator()) {
-                        case LT:      return max != null && value.compareTo(max) < 0;
-                        case LTE:     return max != null && value.compareTo(max) <= 0;
-                        case GT:      return min != null && value.compareTo(min) > 0;
-                        case GTE:     return min != null && value.compareTo(min) >= 0;
-                        case EQ:      return (min != null) && value.compareTo(min) == 0;
-                        case BETWEEN: return (min != null && max != null) && value.compareTo(min) >= 0 && value.compareTo(max) <= 0;
-                        default: return true;
-                    }
+                switch (r.getComparator()) {
+                    case LT:      return max != null && value.compareTo(max) < 0;
+                    case LTE:     return max != null && value.compareTo(max) <= 0;
+                    case GT:      return min != null && value.compareTo(min) > 0;
+                    case GTE:     return min != null && value.compareTo(min) >= 0;
+                    case EQ:      return (min != null) && value.compareTo(min) == 0;
+                    case BETWEEN: return (min != null && max != null) && value.compareTo(min) >= 0 && value.compareTo(max) <= 0;
+                    default: return true;
                 }
             }
         }

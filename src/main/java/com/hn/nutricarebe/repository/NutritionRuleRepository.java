@@ -20,7 +20,6 @@ public interface NutritionRuleRepository extends JpaRepository<NutritionRule, UU
               or
               (:allergyIdsIsEmpty = true or r.allergy.id in :allergyIds)
           )
-        order by r.priority asc
     """)
     List<NutritionRule> findActiveByConditionsOrAllergies(
             @Param("conditionIds") Set<UUID> conditionIds,

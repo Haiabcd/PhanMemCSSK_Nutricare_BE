@@ -34,30 +34,31 @@ public class AuthController {
 
     // ===========================Google OAuth2================================= //
     @PostMapping("/google/start")
-    public ApiResponse<Map<String, String>> googleStart() {
+    public ApiResponse<Map<String, String>> googleStart(String device) {
         return ApiResponse.<Map<String, String>>builder()
                 .message("Khởi tạo OAuth với Google thành công")
-                .data(authService.startGoogleOAuth())
+                .data(authService.startGoogleOAuth(device))
                 .build();
     }
 
     @GetMapping("/google/callback")
-    public ApiResponse<LoginResponse> googleCallback(
-            @RequestParam String code,
+    public ApiResponse<SupabaseUser> googleCallback(
+            @RequestParam String code, // Mã xác thực từ Google trả về
             @RequestParam("app_state") String appState,
-            @RequestParam(required = false) String error,
-            @RequestParam(name = "error_description", required = false) String errorDesc
+            @RequestParam("device") String device,
+            @RequestParam(required = false) String error,  // Lỗi (nếu có)
+            @RequestParam(name = "error_description", required = false) String errorDesc // Mô tả lỗi
     ) {
         if (error != null) {
-            return ApiResponse.<LoginResponse>builder()
+            return ApiResponse.<SupabaseUser>builder()
                     .code(4000)
                     .message("OAuth error: " + error)
                     .errors(Map.of("supabase", List.of(errorDesc != null ? errorDesc : "unknown")))
                     .build();
         }
-        return ApiResponse.<LoginResponse>builder()
+        return ApiResponse.<SupabaseUser>builder()
                 .message("Đăng nhập GOOGLE thành công")
-                .data(authService.googleCallback(code, appState))
+                .data(authService.googleCallback(code, appState, device))
                 .build();
     }
     // ===========================Google OAuth2================================= //

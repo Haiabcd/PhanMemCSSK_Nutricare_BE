@@ -41,7 +41,7 @@ public class User {
     @Column(name = "provider")
     Provider provider;
 
-    @Column(name = "provider_user_id")
+    @Column(name = "provider_user_id", unique = true)
     String providerUserId;
 
     @Column(name = "device_id", unique = true)
