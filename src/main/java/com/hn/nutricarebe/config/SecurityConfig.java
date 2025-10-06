@@ -28,7 +28,8 @@ public class SecurityConfig {
             "/foods/save",
             "/ingredients/save",
             "/conditions/save",
-            "/allergies/save"
+            "/allergies/save",
+            "/nutrition-rules/save"
     };
 
 
@@ -45,6 +46,7 @@ public class SecurityConfig {
             "/allergies/all/**",
             "/allergies/search/**",
             "/allergies/**",
+            "/nutrition-rules/**"
     };
 
     private final String[] PUBLIC_DELETE_ENDPOINTS = {

@@ -4,7 +4,6 @@ import com.hn.nutricarebe.enums.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.tool.schema.TargetType;
 
 import java.math.BigDecimal;
 import java.util.HashSet;
@@ -47,23 +46,14 @@ public class NutritionRuleCreationRequest {
     @Digits(integer = 8, fraction = 4, message = "thresholdMax không hợp lệ (tối đa 8 số nguyên và 4 số thập phân)")
     private BigDecimal thresholdMax;
 
-    // Đơn vị & cách tính (áp dụng chủ yếu khi targetType = NUTRIENT)
-    private Unit unit;
 
     // Tính theo kg thể trọng
     @NotNull(message = "perKg là bắt buộc")
     private Boolean perKg = Boolean.FALSE;
-    @Digits(integer = 6, fraction = 3, message = "perKgFactor không hợp lệ (tối đa 6 số nguyên và 3 số thập phân)")
-    private BigDecimal perKgFactor;
 
     // Tần suất trong 1 scope (nếu có)
     @PositiveOrZero(message = "frequencyPerScope phải >= 0")
     private Integer frequencyPerScope;
-
-    // Mức độ, ưu tiên, trạng thái
-    private RuleSeverity severity;
-    @NotNull(message = "priority là bắt buộc")
-    private Integer priority = 0;
 
     @NotNull(message = "active là bắt buộc")
     private Boolean active = Boolean.TRUE;
@@ -78,8 +68,6 @@ public class NutritionRuleCreationRequest {
     // Tập tag dùng cho comparator IN_SET / NOT_IN_SET
     @Builder.Default
     private Set<FoodTag> foodTags = new HashSet<>();
-    @Builder.Default
-    private Set<IngredientTag> ingredientTags = new HashSet<>();
 
     // Thông điệp & nguồn
     @NotBlank(message = "message là bắt buộc")
@@ -114,29 +102,12 @@ public class NutritionRuleCreationRequest {
         }
     }
 
-    /** Nếu targetType=NUTRIENT → cần unit, basis, aggregation. */
-    @AssertTrue(message = "TargetType=NUTRIENT yêu cầu khai báo unit, basis và aggregation")
-    public boolean isNutrientFieldsPresent() {
-        if (targetType == null) return true;
-        if (targetType != TargetType.NUTRIENT) return true;
-        return unit != null && basis != null && aggregation != null;
-    }
-
-    /** perKg = true → cần perKgFactor > 0. */
-    @AssertTrue(message = "perKgFactor phải > 0 khi perKg = true")
-    public boolean isPerKgFactorValid() {
-        if (perKg == null || !perKg) return true;
-        return perKgFactor != null && perKgFactor.compareTo(BigDecimal.ZERO) > 0;
-    }
-
     /** IN_SET/NOT_IN_SET → yêu cầu có ít nhất 1 tag tương ứng. */
     @AssertTrue(message = "IN_SET/NOT_IN_SET yêu cầu cung cấp ít nhất một tag (foodTags/ingredientTags)")
     public boolean isTagsProvidedForSetComparators() {
         if (comparator == null) return true;
         if (comparator != Comparator.IN_SET && comparator != Comparator.NOT_IN_SET) return true;
-        boolean hasFood = foodTags != null && !foodTags.isEmpty();
-        boolean hasIng = ingredientTags != null && !ingredientTags.isEmpty();
-        return hasFood || hasIng;
+        return foodTags != null && !foodTags.isEmpty();
     }
 
     /** Kiểm tra khoảng tuổi nếu cả hai đều có. */

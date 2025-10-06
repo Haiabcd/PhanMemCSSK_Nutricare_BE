@@ -39,6 +39,8 @@ public enum ErrorCode {
     INVALID_OR_EXPIRED_STATE(2000, "State không hợp lệ hoặc đã hết hạn", HttpStatus.BAD_REQUEST),
     TOKEN_EXCHANGE_FAILED(2002, "Lấy token thất bại", HttpStatus.BAD_REQUEST),
 
+    NUTRITION_RULE_NOT_FOUND(1020, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND),
+
     VALIDATION_ERROR(2001, "Dữ liệu không hợp lệ", HttpStatus.BAD_REQUEST),
     INTERNAL_ERROR(1999, "Lỗi hệ thống", HttpStatus.INTERNAL_SERVER_ERROR);
 

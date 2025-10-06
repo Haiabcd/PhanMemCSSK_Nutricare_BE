@@ -22,7 +22,7 @@ import java.util.UUID;
                 @Index(name = "idx_rule_condition", columnList = "condition_id"),
                 @Index(name = "idx_rule_target", columnList = "target_type,target_code"),
                 @Index(name = "idx_rule_scope", columnList = "scope"),
-                @Index(name = "idx_rule_active_priority", columnList = "active,priority")
+                @Index(name = "idx_rule_active", columnList = "active")
         }
 )
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -67,34 +67,16 @@ public class NutritionRule {
     @Column(name = "threshold_max", precision = 12, scale = 4)
     BigDecimal thresholdMax;
 
-    // Đơn vị & cơ sở dữ liệu dinh dưỡng
-    @Enumerated(EnumType.STRING)
-    @Column(name = "unit", length = 24)
-    Unit unit;
-
-
     @Builder.Default
     @Column(name = "per_kg", nullable = false)
     Boolean perKg = Boolean.FALSE;
 
-    @Column(name = "per_kg_factor", precision = 6, scale = 3)
-    BigDecimal perKgFactor;
-
     @Column(name = "frequency_per_scope")
     Integer frequencyPerScope;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "severity", length = 24)
-    RuleSeverity severity;
-
-    @Builder.Default
-    @Column(name = "priority", nullable = false)
-    Integer priority = 0;
 
     @Builder.Default
     @Column(name = "active", nullable = false)
     Boolean active = Boolean.TRUE;
-
 
     @Enumerated(EnumType.STRING)
     @Column(name = "applicable_sex", length = 16)
@@ -119,20 +101,6 @@ public class NutritionRule {
     @Column(name = "tag_code", nullable = false, length = 128)
     @Builder.Default
     Set<FoodTag> foodTags = new HashSet<>();
-
-
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(
-            name = "nutrition_rule_ingredient_tags",
-            joinColumns = @JoinColumn(
-                    name = "rule_id",
-                    foreignKey = @ForeignKey(name = "fk_rule_ingredient_tags_rule")
-            )
-    )
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tag_code", nullable = false, length = 128)
-    @Builder.Default
-    Set<IngredientTag> ingredientTags = new HashSet<>();
 
     @Column(name = "message", nullable = false, length = 1000)
     String message;

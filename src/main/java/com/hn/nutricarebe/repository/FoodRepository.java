@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,4 +37,21 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
     @EntityGraph(attributePaths = {"mealSlots", "tags"})
     Slice<Food> findAllBy(Pageable pageable);
 
+    @Query(value = """
+    SELECT f.*
+    FROM foods f
+    JOIN food_meal_slots ms ON ms.food_id = f.id
+    WHERE ms.meal_slot = :slot
+      AND f.kcal IS NOT NULL
+      AND f.kcal BETWEEN :minKcal AND :maxKcal
+    ORDER BY ABS(f.kcal - :perItemTargetKcal) ASC
+    LIMIT :limit
+    """, nativeQuery = true)
+    List<Food> selectCandidatesBySlotAndKcalWindow(
+            @Param("slot") String slot,
+            @Param("minKcal") int minKcal,
+            @Param("maxKcal") int maxKcal,
+            @Param("perItemTargetKcal") int perItemTargetKcal,
+            @Param("limit") int limit
+    );
 }

@@ -4,6 +4,8 @@ import com.hn.nutricarebe.dto.request.NutritionRuleCreationRequest;
 import com.hn.nutricarebe.entity.Allergy;
 import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.entity.NutritionRule;
+import com.hn.nutricarebe.exception.AppException;
+import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.NutritionRuleMapper;
 import com.hn.nutricarebe.repository.AllergyRepository;
 import com.hn.nutricarebe.repository.ConditionRepository;
@@ -14,6 +16,8 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -44,5 +48,15 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
             return false;
         }
         return true;
+    }
+
+    @Override
+    @Transactional
+    public NutritionRule getById(UUID id) {
+        NutritionRule nutritionRule = nutritionRuleRepository.findWithCollectionsById(id);
+        if (nutritionRule == null) {
+            throw new AppException(ErrorCode.NUTRITION_RULE_NOT_FOUND);
+        }
+        return nutritionRule;
     }
 }
