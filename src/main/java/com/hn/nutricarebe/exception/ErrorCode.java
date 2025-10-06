@@ -42,8 +42,11 @@ public enum ErrorCode {
     NUTRITION_RULE_NOT_FOUND(1020, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND),
 
     VALIDATION_ERROR(2001, "Dữ liệu không hợp lệ", HttpStatus.BAD_REQUEST),
-    INTERNAL_ERROR(1999, "Lỗi hệ thống", HttpStatus.INTERNAL_SERVER_ERROR);
+    INTERNAL_ERROR(1999, "Lỗi hệ thống", HttpStatus.INTERNAL_SERVER_ERROR),
 
+    UNAUTHENTICATED(1006, "Vui lòng đăng nhập", HttpStatus.UNAUTHORIZED),
+    UNAUTHORIZED(1007, "Bạn không có quyền thực hiện hành động này", HttpStatus.FORBIDDEN),
+    ;
     int code;
     String message;
     HttpStatus httpStatus;
