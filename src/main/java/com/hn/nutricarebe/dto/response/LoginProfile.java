@@ -1,19 +1,19 @@
 package com.hn.nutricarebe.dto.response;
 
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
-import java.util.List;
-import java.util.Map;
-
 @Getter
 @Setter
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class SupabaseUser {
-    String id;
+@Builder
+public class LoginProfile {
+    String providerUserId;
     String email;
-    Map<String, Object> user_metadata;
-    List<SupabaseIdentity> identities;
+    String name;
+    String avatar;
+    boolean emailVerified;
 }

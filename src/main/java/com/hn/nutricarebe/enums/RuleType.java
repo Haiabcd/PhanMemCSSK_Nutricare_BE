@@ -4,6 +4,6 @@ public enum RuleType {
     AVOID,
     LIMIT,
     REQUIRE,
-    PREFE,
+    PREFER,
     ALLOW
 }

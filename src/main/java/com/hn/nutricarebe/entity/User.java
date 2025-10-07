@@ -23,6 +23,7 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "users")
+@ToString
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -41,7 +42,7 @@ public class User {
     @Column(name = "provider")
     Provider provider;
 
-    @Column(name = "provider_user_id")
+    @Column(name = "provider_user_id", unique = true)
     String providerUserId;
 
     @Column(name = "device_id", unique = true)

@@ -33,6 +33,4 @@ public class UserCreationResponse {
     String providerUserId;
     String deviceId;
     UserStatus status;
-    Instant createdAt;
-    Instant updatedAt;
 }

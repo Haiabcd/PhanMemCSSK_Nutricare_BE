@@ -6,15 +6,17 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @Entity
 @Table(
         name = "nutrition_rule",
@@ -33,10 +35,12 @@ public class NutritionRule {
     @Column(updatable = false, nullable = false, name = "id")
     UUID id;
 
+    // Liên kết bệnh lý (gout, T2D, CKD...)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "condition_id", foreignKey = @ForeignKey(name = "fk_nutrition_rule_condition"))
     Condition condition;
 
+    // Dị ứng (nếu có)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "allergy_id", foreignKey = @ForeignKey(name = "fk_nutrition_rule_allergy"))
     Allergy allergy;
@@ -45,18 +49,21 @@ public class NutritionRule {
     @Column(name = "rule_type", nullable = false)
     RuleType ruleType;
 
+    // Phạm vi áp dụng: ITEM, MEAL, DAY
     @Enumerated(EnumType.STRING)
     @Column(name = "scope", nullable = false)
     RuleScope scope;
 
+    // Đối tượng: NUTRIENT, FOOD_TAG
     @Enumerated(EnumType.STRING)
     @Column(name = "target_type", nullable = false)
     TargetType targetType;
 
+    // Mã đích: ví dụ "NA" (natri) nếu NUTRIENT; "HIGH_PURINE" nếu FOOD_TAG
     @Column(name = "target_code", nullable = false, length = 128)
     String targetCode;
 
-    // ====== So sánh & ngưỡng ======
+    // ===== So sánh & ngưỡng =====
     @Enumerated(EnumType.STRING)
     @Column(name = "comparator", nullable = false, length = 16)
     Comparator comparator;
@@ -67,6 +74,7 @@ public class NutritionRule {
     @Column(name = "threshold_max", precision = 12, scale = 4)
     BigDecimal thresholdMax;
 
+    // Tính theo kg thể trọng (ví dụ: PROTEIN ≥ 1.0 g/kg/day)
     @Builder.Default
     @Column(name = "per_kg", nullable = false)
     Boolean perKg = Boolean.FALSE;
@@ -88,7 +96,7 @@ public class NutritionRule {
     @Column(name = "age_max")
     Integer ageMax;
 
-
+    // Tag món ăn dùng cho comparator IN_SET/NOT_IN_SET khi targetType = FOOD_TAG
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "nutrition_rule_food_tags",
@@ -108,6 +116,7 @@ public class NutritionRule {
     @Column(name = "source", length = 512)
     String source;
 
+    // Audit
     @CreationTimestamp
     @Column(name = "create_at", updatable = false, nullable = false)
     Instant createAt;

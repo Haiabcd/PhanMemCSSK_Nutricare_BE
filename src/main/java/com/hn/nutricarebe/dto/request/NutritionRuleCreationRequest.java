@@ -45,7 +45,6 @@ public class NutritionRuleCreationRequest {
     @Digits(integer = 8, fraction = 4, message = "thresholdMax không hợp lệ (tối đa 8 số nguyên và 4 số thập phân)")
     private BigDecimal thresholdMax;
 
-
     // Tính theo kg thể trọng
     @NotNull(message = "perKg là bắt buộc")
     private Boolean perKg = Boolean.FALSE;
@@ -75,7 +74,6 @@ public class NutritionRuleCreationRequest {
 
     @Size(max = 512, message = "source tối đa 512 ký tự")
     private String source;
-
 
 
     /** BETWEEN → cần cả min & max và min <= max. */

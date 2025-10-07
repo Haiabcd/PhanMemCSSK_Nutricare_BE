@@ -19,6 +19,7 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "profiles")
+@ToString(exclude = "user")
 public class Profile {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -58,6 +59,9 @@ public class Profile {
 
     @Column(name = "name")
     String name;
+
+    @Column(name = "avata_url")
+    String avataUrl;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

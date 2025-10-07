@@ -5,18 +5,13 @@ import com.hn.nutricarebe.dto.request.OnboardingRequest;
 import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
 import com.hn.nutricarebe.dto.request.UserConditionCreationRequest;
 import com.hn.nutricarebe.dto.response.*;
-import com.hn.nutricarebe.entity.Profile;
 import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.*;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
-import com.hn.nutricarebe.mapper.ProfileMapper;
+import com.hn.nutricarebe.helper.GoogleLoginHelper;
 import com.hn.nutricarebe.mapper.UserMapper;
-import com.hn.nutricarebe.repository.ProfileRepository;
-import com.hn.nutricarebe.repository.UserRepository;
-import com.hn.nutricarebe.service.AuthService;
-import com.hn.nutricarebe.service.UserAllergyService;
-import com.hn.nutricarebe.service.UserConditionService;
+import com.hn.nutricarebe.service.*;
 import com.hn.nutricarebe.utils.PkceStore;
 import com.hn.nutricarebe.utils.PkceUtil;
 import com.nimbusds.jose.*;
@@ -35,7 +30,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
-
 import java.net.URI;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -46,15 +40,14 @@ import java.util.*;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class AuthServiceImpl implements AuthService {
-    UserRepository userRepository;
-    ProfileRepository profileRepository;
-    UserMapper userMapper;
-    ProfileMapper profileMapper;
+    ProfileService profileService;
     UserAllergyService userAllergyService;
-    MealPlanDayServiceImpl mealPlanDayServiceImpl;
+    MealPlanDayService mealPlanDayService;
     UserConditionService userConditionService;
+    UserMapper userMapper;
+    UserService userService;
     PkceStore pkceStore;
-    WebClient webClient;;
+    WebClient webClient;
 
     @NonFinal
     @Value("${supabase.host}")
@@ -76,20 +69,10 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public OnboardingResponse onBoarding(OnboardingRequest request) {
         //B1: Lưu user
-        if(userRepository.existsByDeviceId(request.getUser().getDeviceId())){
-            throw new AppException(ErrorCode.DEVICE_ID_EXISTED);
-        }
-        User user =  userMapper.toUser(request.getUser());
-        user.setRole(Role.GUEST);
-        user.setProvider(Provider.NONE);
-        user.setStatus(UserStatus.ACTIVE);
-        User savedUser = userRepository.save(user);
+        User savedUser = userService.saveOnboarding(request.getUser());
         UserCreationResponse userCreationResponse = userMapper.toUserCreationResponse(savedUser);
         //B2: Lưu profile
-        Profile profile = profileMapper.toProfile(request.getProfile());
-        profile.setUser(savedUser);
-        Profile savedProfile = profileRepository.save(profile);
-        ProfileCreationResponse profileCreationResponse = profileMapper.toProfileCreationResponse(savedProfile);
+        ProfileCreationResponse profileCreationResponse = profileService.save(request.getProfile(), savedUser);
         //B3: Lưu bệnh nền
         Set<UUID> conditionIds = request.getConditions();
         List<UserConditionResponse> listCondition = new ArrayList<>();
@@ -110,17 +93,14 @@ public class AuthServiceImpl implements AuthService {
             listAllergy = userAllergyService.saveUserAllergy(uar);
         }
         //B5: Lập kế hoạch tuần (MealPlanDay - 7 ngày)
-        MealPlanResponse mealPlanResponse = mealPlanDayServiceImpl.createPlan(
+        MealPlanResponse mealPlanResponse = mealPlanDayService.createPlan(
                 MealPlanCreationRequest.builder()
                         .userId(savedUser.getId())
                         .profile(request.getProfile())
-                        .build()
+                        .build(), 7
         );
         //B6: Lập kế hoạch chi tiết (MealPlanItem)
 
-
-
-        //Tạo token (xong)
         //Trả về
         return OnboardingResponse.builder()
                 .user(userCreationResponse)
@@ -133,7 +113,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Map<String, String> startGoogleOAuth() {
+    public Map<String, String> startGoogleOAuth(String device) {
         String myState = UUID.randomUUID().toString();
         //BKCE
         String verifier = PkceUtil.generateCodeVerifier();
@@ -141,18 +121,19 @@ public class AuthServiceImpl implements AuthService {
 
         pkceStore.save(myState, verifier);
 
+        // Tạo url callback
         String redirectToWithAppState = UriComponentsBuilder
                 .fromHttpUrl(CALLBACK_URL)
                 .queryParam("app_state", myState)
+                .queryParam("device", device)
                 .build(true)
                 .toUriString();
-
 
         URI authorize = UriComponentsBuilder
                 .fromHttpUrl(SUPABASE_HOST + "/auth/v1/authorize")
                 .queryParam("provider", "google")
                 .queryParam("redirect_to", redirectToWithAppState)
-                .queryParam("code_challenge", challenge)
+                .queryParam("code_challenge", challenge)  // Mã bảo mật (khóa công khai)
                 .queryParam("code_challenge_method", "S256")
                 .queryParam("scope", "openid profile email")
                 .build()
@@ -197,7 +178,9 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public LoginResponse googleCallback(String code, String state) {
+    @Transactional
+    public LoginProviderResponse googleCallback(String code, String state,String device) {
+
         String verifier = pkceStore.consume(state);
         if (verifier == null) {
             throw new AppException(ErrorCode.INVALID_OR_EXPIRED_STATE);
@@ -205,39 +188,62 @@ public class AuthServiceImpl implements AuthService {
 
         SupabaseTokenResponse tokenRes;
         try {
+            // Đổi code lấy token
             tokenRes = exchangeCodeForToken(code, verifier, CALLBACK_URL);
         } catch (Exception e) {
             throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
         }
 
-        SupabaseUser u = tokenRes.getUser();
+        // Lấy thông tin user từ token
+        SupabaseUser su = tokenRes.getUser();
+        LoginProfile gp = GoogleLoginHelper.parse(su);
 
-        Map<String,Object> meta = u!= null && u.getUser_metadata()!=null ? u.getUser_metadata() : Map.of();
-        String name = (String) meta.getOrDefault("full_name", meta.getOrDefault("name", ""));
-        String avatar = (String) meta.getOrDefault("avatar_url", meta.getOrDefault("picture",""));
+        if (gp.getProviderUserId().isBlank()) {
+            throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
+        }
 
-        LoginUserView userView = LoginUserView.builder()
-                .id(u!=null?u.getId():null)
-                .email(u!=null?u.getEmail():null)
-                .name(name)
-                .avatarUrl(avatar)
-                .provider("google")
+        boolean isNewUser = false;
+
+        User user = userService.getUserByProvider(gp.getProviderUserId(), device);
+
+        if (user == null) {
+            // Tạo mới user
+            user = User.builder()
+                    .deviceId((device != null && !device.isBlank()) ? device : null)
+                    .email((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null)
+                    .providerUserId(gp.getProviderUserId())
+                    .provider(Provider.SUPABASE_GOOGLE)
+                    .role(Role.USER)
+                    .status(UserStatus.ACTIVE)
+                    .build();
+            isNewUser = true;
+        } else {
+            // Đã có user
+            if (user.getRole() == Role.GUEST) {
+                user.setRole(Role.USER);
+                user.setProviderUserId(gp.getProviderUserId());
+                user.setProvider(Provider.SUPABASE_GOOGLE);
+                user.setStatus(UserStatus.ACTIVE);
+                if ((user.getDeviceId() == null || user.getDeviceId().isBlank()) && device != null && !device.isBlank()) {
+                    user.setDeviceId(device);
+                }
+
+                if (user.getEmail() == null || user.getEmail().isBlank() || user.getEmail().equalsIgnoreCase(gp.getEmail())) {
+                        user.setEmail((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null);
+                }
+                profileService.updateAvatarAndName(gp.getAvatar(), gp.getName(), user.getId());
+            }
+        }
+        UserCreationResponse saved = userService.saveGG(user);
+
+        return LoginProviderResponse.builder()
+                .user(saved)
+                .token(generateToken(user))
+                .isNewUser(isNewUser)
+                .name(gp.getName())
+                .urlAvatar(gp.getAvatar())
                 .build();
-
-        // (Tuỳ chọn) tìm/ghi user vào DB, phát hành JWT riêng của app
-
-        LoginResponse data = LoginResponse.builder()
-                .user(userView)
-                .supabaseAccessToken(tokenRes.getAccess_token())
-                .supabaseRefreshToken(tokenRes.getRefresh_token())
-                .expiresIn(tokenRes.getExpires_in())
-                .build();
-        log.info("data: {}" , data);
-        return data;
-
     }
-
-
 
     private String generateToken(User user){
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
