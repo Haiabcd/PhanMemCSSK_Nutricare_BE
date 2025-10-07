@@ -19,6 +19,7 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "profiles")
+@ToString(exclude = "user")
 public class Profile {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

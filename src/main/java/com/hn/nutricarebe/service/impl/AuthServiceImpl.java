@@ -200,8 +200,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-//    public LoginProviderResponse googleCallback(String code, String state,String device) {
-    public SupabaseUser googleCallback(String code, String state,String device) {
+    @Transactional
+    public LoginProviderResponse googleCallback(String code, String state,String device) {
 
         String verifier = pkceStore.consume(state);
         if (verifier == null) {
@@ -216,6 +216,7 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
         }
 
+        // Lấy thông tin user từ token
         SupabaseUser su = tokenRes.getUser();
         LoginProfile gp = GoogleLoginHelper.parse(su);
 
@@ -223,61 +224,64 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
         }
 
-//        boolean isNewUser = false;
-//
-//        // 1) Kiểm tra đã liên kết gg chưa
-//        User user = userRepository.findByProviderUserId(providerUserId).orElse(null);
-//
-//        // 2) Nếu vẫn chưa, thử theo device
-//        if (user == null && device != null && !device.isBlank()) {
-//            user = userRepository.findByDeviceId(device).orElse(null);
-//        }
-//
-//        if (user == null) {
-//            // Tạo mới user
-//            user = User.builder()
-//                    .deviceId((device != null && !device.isBlank()) ? device : null)
-//                    .email((email != null && !email.isBlank()) ? email : null)
-//                    .providerUserId(providerUserId)
-//                    .provider(Provider.SUPABASE_GOOGLE)
-//                    .role(Role.USER)
-//                    .status(UserStatus.ACTIVE)
-//                    .build();
-//            isNewUser = true;
-//        } else {
-//            // Đã có user
-//            if (user.getRole() == Role.GUEST) {
-//                user.setRole(Role.USER);
-//                user.setProviderUserId(providerUserId);
-//                user.setProvider(Provider.SUPABASE_GOOGLE);
-//                user.setStatus(UserStatus.ACTIVE);
-//                if ((user.getDeviceId() == null || user.getDeviceId().isBlank()) && device != null && !device.isBlank()) {
-//                    user.setDeviceId(device);
-//                }
-//
-//                if (user.getEmail() == null || user.getEmail().isBlank() || user.getEmail().equalsIgnoreCase(email)) {
-//                        user.setEmail(email);
-//                }
-//                Profile profile = profileRepository.findByUser_Id(user.getId())
-//                        .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
-//                profile.setName(name);
-//                profile.setAvataUrl(avatar);
-//            }
-//        }
-//
-//        // Lưu một lần duy nhất
-//        User saved = userRepository.save(user);
+        boolean isNewUser = false;
+
+        // Kiểm tra đã liên kết gg chưa
+        User user = userRepository.findByProviderUserId(gp.getProviderUserId()).orElse(null);
+
+        // Nếu vẫn chưa, thử theo device
+        if (user == null && device != null && !device.isBlank()) {
+            user = userRepository.findByDeviceId(device).orElse(null);
+        }
+
+        if (user == null) {
+            // Tạo mới user
+            user = User.builder()
+                    .deviceId((device != null && !device.isBlank()) ? device : null)
+                    .email((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null)
+                    .providerUserId(gp.getProviderUserId())
+                    .provider(Provider.SUPABASE_GOOGLE)
+                    .role(Role.USER)
+                    .status(UserStatus.ACTIVE)
+                    .build();
+            isNewUser = true;
+        } else {
+            // Đã có user
+            if (user.getRole() == Role.GUEST) {
+                user.setRole(Role.USER);
+                user.setProviderUserId(gp.getProviderUserId());
+                user.setProvider(Provider.SUPABASE_GOOGLE);
+                user.setStatus(UserStatus.ACTIVE);
+                if ((user.getDeviceId() == null || user.getDeviceId().isBlank()) && device != null && !device.isBlank()) {
+                    user.setDeviceId(device);
+                }
+
+                if (user.getEmail() == null || user.getEmail().isBlank() || user.getEmail().equalsIgnoreCase(gp.getEmail())) {
+                        user.setEmail((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null);
+                }
+                Profile profile = profileRepository.findByUser_Id(user.getId())
+                        .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+                profile.setName(gp.getName());
+                profile.setAvataUrl(gp.getAvatar());
+
+                profileRepository.save(profile);
+            }
+        }
+
+        // Lưu một lần duy nhất
+        User saved = userRepository.save(user);
+
 
         // Trả token theo user đã lưu
-//        LoginProviderResponse data = LoginProviderResponse.builder()
-//                .user(saved)
-//                .token(generateToken(saved))
-//                .isNewUser(isNewUser)
-//                .name(name)
-//                .urlAvatar(avatar)
-//                .build();
+        LoginProviderResponse data = LoginProviderResponse.builder()
+                .user(userMapper.toUserCreationResponse(saved))
+                .token(generateToken(saved))
+                .isNewUser(isNewUser)
+                .name(gp.getName())
+                .urlAvatar(gp.getAvatar())
+                .build();
 
-        return su;
+        return data;
     }
 
     private String generateToken(User user){

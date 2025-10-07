@@ -23,6 +23,7 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "users")
+@ToString
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

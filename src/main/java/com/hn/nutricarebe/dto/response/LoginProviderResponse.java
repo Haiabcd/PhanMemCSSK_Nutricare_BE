@@ -1,6 +1,6 @@
 package com.hn.nutricarebe.dto.response;
 
-import com.hn.nutricarebe.entity.User;
+import com.hn.nutricarebe.entity.Profile;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -11,7 +11,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class LoginProviderResponse {
-    User user;
+    UserCreationResponse user;
     String token;
     Boolean isNewUser;
     String name;

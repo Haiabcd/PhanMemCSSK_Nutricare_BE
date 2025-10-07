@@ -34,7 +34,7 @@ public class AuthController {
 
     // ===========================Google OAuth2================================= //
     @PostMapping("/google/start")
-    public ApiResponse<Map<String, String>> googleStart(String device) {
+    public ApiResponse<Map<String, String>> googleStart(@RequestParam(required = false) String device) {
         return ApiResponse.<Map<String, String>>builder()
                 .message("Khởi tạo OAuth với Google thành công")
                 .data(authService.startGoogleOAuth(device))
@@ -42,7 +42,7 @@ public class AuthController {
     }
 
     @GetMapping("/google/callback")
-    public ApiResponse<SupabaseUser> googleCallback(
+    public ApiResponse<LoginProviderResponse> googleCallback(
             @RequestParam String code, // Mã xác thực từ Google trả về
             @RequestParam("app_state") String appState,
             @RequestParam("device") String device,
@@ -50,13 +50,13 @@ public class AuthController {
             @RequestParam(name = "error_description", required = false) String errorDesc // Mô tả lỗi
     ) {
         if (error != null) {
-            return ApiResponse.<SupabaseUser>builder()
+            return ApiResponse.<LoginProviderResponse>builder()
                     .code(4000)
                     .message("OAuth error: " + error)
                     .errors(Map.of("supabase", List.of(errorDesc != null ? errorDesc : "unknown")))
                     .build();
         }
-        return ApiResponse.<SupabaseUser>builder()
+        return ApiResponse.<LoginProviderResponse>builder()
                 .message("Đăng nhập GOOGLE thành công")
                 .data(authService.googleCallback(code, appState, device))
                 .build();

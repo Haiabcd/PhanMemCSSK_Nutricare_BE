@@ -22,7 +22,7 @@ public class SecurityConfig {
 
     private final String[] PUBLIC_POST_ENDPOINTS = {
             "/auths/onboarding",
-            "/auths/google/start",
+            "/auths/google/start/**",
             "/auths/google/callback",
             "/ai/plan",
             "/foods/save",
