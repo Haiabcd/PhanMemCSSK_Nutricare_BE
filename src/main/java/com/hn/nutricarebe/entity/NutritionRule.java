@@ -79,16 +79,13 @@ public class NutritionRule {
     @Column(name = "per_kg", nullable = false)
     Boolean perKg = Boolean.FALSE;
 
-    // Tần suất trong phạm vi scope (nếu có)
     @Column(name = "frequency_per_scope")
     Integer frequencyPerScope;
 
-    // Trạng thái
     @Builder.Default
     @Column(name = "active", nullable = false)
     Boolean active = Boolean.TRUE;
 
-    // Điều kiện áp dụng theo nhân khẩu học (tối giản)
     @Enumerated(EnumType.STRING)
     @Column(name = "applicable_sex", length = 16)
     Gender applicableSex;
@@ -113,7 +110,6 @@ public class NutritionRule {
     @Builder.Default
     Set<FoodTag> foodTags = new HashSet<>();
 
-    // Thông điệp & nguồn
     @Column(name = "message", nullable = false, length = 1000)
     String message;
 

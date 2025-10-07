@@ -53,7 +53,6 @@ public class NutritionRuleCreationRequest {
     @PositiveOrZero(message = "frequencyPerScope phải >= 0")
     private Integer frequencyPerScope;
 
-
     @NotNull(message = "active là bắt buộc")
     private Boolean active = Boolean.TRUE;
 

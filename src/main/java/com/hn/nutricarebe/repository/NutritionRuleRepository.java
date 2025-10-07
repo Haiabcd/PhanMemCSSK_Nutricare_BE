@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.repository;
 
 import com.hn.nutricarebe.entity.NutritionRule;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,4 +28,7 @@ public interface NutritionRuleRepository extends JpaRepository<NutritionRule, UU
             @Param("conditionIdsIsEmpty") boolean conditionIdsIsEmpty,
             @Param("allergyIdsIsEmpty") boolean allergyIdsIsEmpty
     );
+           
+    @EntityGraph(attributePaths = {"condition", "allergy", "foodTags"})
+    NutritionRule findWithCollectionsById(UUID id);
 }
