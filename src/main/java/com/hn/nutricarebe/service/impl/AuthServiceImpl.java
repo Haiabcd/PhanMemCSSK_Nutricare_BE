@@ -5,19 +5,13 @@ import com.hn.nutricarebe.dto.request.OnboardingRequest;
 import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
 import com.hn.nutricarebe.dto.request.UserConditionCreationRequest;
 import com.hn.nutricarebe.dto.response.*;
-import com.hn.nutricarebe.entity.Profile;
 import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.*;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.helper.GoogleLoginHelper;
-import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.mapper.UserMapper;
-import com.hn.nutricarebe.repository.ProfileRepository;
-import com.hn.nutricarebe.repository.UserRepository;
-import com.hn.nutricarebe.service.AuthService;
-import com.hn.nutricarebe.service.UserAllergyService;
-import com.hn.nutricarebe.service.UserConditionService;
+import com.hn.nutricarebe.service.*;
 import com.hn.nutricarebe.utils.PkceStore;
 import com.hn.nutricarebe.utils.PkceUtil;
 import com.nimbusds.jose.*;
@@ -36,7 +30,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
-
 import java.net.URI;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -47,15 +40,14 @@ import java.util.*;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class AuthServiceImpl implements AuthService {
-    UserRepository userRepository;
-    ProfileRepository profileRepository;
-    UserMapper userMapper;
-    ProfileMapper profileMapper;
+    ProfileService profileService;
     UserAllergyService userAllergyService;
-    MealPlanDayServiceImpl mealPlanDayServiceImpl;
+    MealPlanDayService mealPlanDayService;
     UserConditionService userConditionService;
+    UserMapper userMapper;
+    UserService userService;
     PkceStore pkceStore;
-    WebClient webClient;;
+    WebClient webClient;
 
     @NonFinal
     @Value("${supabase.host}")
@@ -77,20 +69,10 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public OnboardingResponse onBoarding(OnboardingRequest request) {
         //B1: Lưu user
-        if(userRepository.existsByDeviceId(request.getUser().getDeviceId())){
-            throw new AppException(ErrorCode.DEVICE_ID_EXISTED);
-        }
-        User user =  userMapper.toUser(request.getUser());
-        user.setRole(Role.GUEST);
-        user.setProvider(Provider.NONE);
-        user.setStatus(UserStatus.ACTIVE);
-        User savedUser = userRepository.save(user);
+        User savedUser = userService.saveOnboarding(request.getUser());
         UserCreationResponse userCreationResponse = userMapper.toUserCreationResponse(savedUser);
         //B2: Lưu profile
-        Profile profile = profileMapper.toProfile(request.getProfile());
-        profile.setUser(savedUser);
-        Profile savedProfile = profileRepository.save(profile);
-        ProfileCreationResponse profileCreationResponse = profileMapper.toProfileCreationResponse(savedProfile);
+        ProfileCreationResponse profileCreationResponse = profileService.save(request.getProfile(), savedUser);
         //B3: Lưu bệnh nền
         Set<UUID> conditionIds = request.getConditions();
         List<UserConditionResponse> listCondition = new ArrayList<>();
@@ -111,7 +93,7 @@ public class AuthServiceImpl implements AuthService {
             listAllergy = userAllergyService.saveUserAllergy(uar);
         }
         //B5: Lập kế hoạch tuần (MealPlanDay - 7 ngày)
-        MealPlanResponse mealPlanResponse = mealPlanDayServiceImpl.createPlan(
+        MealPlanResponse mealPlanResponse = mealPlanDayService.createPlan(
                 MealPlanCreationRequest.builder()
                         .userId(savedUser.getId())
                         .profile(request.getProfile())
@@ -119,9 +101,6 @@ public class AuthServiceImpl implements AuthService {
         );
         //B6: Lập kế hoạch chi tiết (MealPlanItem)
 
-
-
-        //Tạo token (xong)
         //Trả về
         return OnboardingResponse.builder()
                 .user(userCreationResponse)
@@ -149,7 +128,6 @@ public class AuthServiceImpl implements AuthService {
                 .queryParam("device", device)
                 .build(true)
                 .toUriString();
-
 
         URI authorize = UriComponentsBuilder
                 .fromHttpUrl(SUPABASE_HOST + "/auth/v1/authorize")
@@ -226,13 +204,7 @@ public class AuthServiceImpl implements AuthService {
 
         boolean isNewUser = false;
 
-        // Kiểm tra đã liên kết gg chưa
-        User user = userRepository.findByProviderUserId(gp.getProviderUserId()).orElse(null);
-
-        // Nếu vẫn chưa, thử theo device
-        if (user == null && device != null && !device.isBlank()) {
-            user = userRepository.findByDeviceId(device).orElse(null);
-        }
+        User user = userService.getUserByProvider(gp.getProviderUserId(), device);
 
         if (user == null) {
             // Tạo mới user
@@ -259,29 +231,18 @@ public class AuthServiceImpl implements AuthService {
                 if (user.getEmail() == null || user.getEmail().isBlank() || user.getEmail().equalsIgnoreCase(gp.getEmail())) {
                         user.setEmail((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null);
                 }
-                Profile profile = profileRepository.findByUser_Id(user.getId())
-                        .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
-                profile.setName(gp.getName());
-                profile.setAvataUrl(gp.getAvatar());
-
-                profileRepository.save(profile);
+                profileService.updateAvatarAndName(gp.getAvatar(), gp.getName(), user.getId());
             }
         }
+        UserCreationResponse saved = userService.saveGG(user);
 
-        // Lưu một lần duy nhất
-        User saved = userRepository.save(user);
-
-
-        // Trả token theo user đã lưu
-        LoginProviderResponse data = LoginProviderResponse.builder()
-                .user(userMapper.toUserCreationResponse(saved))
-                .token(generateToken(saved))
+        return LoginProviderResponse.builder()
+                .user(saved)
+                .token(generateToken(user))
                 .isNewUser(isNewUser)
                 .name(gp.getName())
                 .urlAvatar(gp.getAvatar())
                 .build();
-
-        return data;
     }
 
     private String generateToken(User user){
