@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.controller;
 
 import com.hn.nutricarebe.dto.request.OnboardingRequest;
+import com.hn.nutricarebe.dto.request.RefreshRequest;
 import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.service.AuthService;
 import jakarta.validation.Valid;
@@ -62,5 +63,17 @@ public class AuthController {
                 .build();
     }
     // ===========================Google OAuth2================================= //
+
+    // ===========================Refresh token================================= //
+    @PostMapping("/refresh")
+    public ApiResponse<TokenPairResponse> refresh(@Valid @RequestBody RefreshRequest req) {
+        var tokens = authService.refresh(req.getRefreshToken());
+        return ApiResponse.<TokenPairResponse>builder()
+                .message("Làm mới token thành công")
+                .data(tokens)
+                .build();
+    }
+    // ===========================Refresh token================================= //
+
 
 }

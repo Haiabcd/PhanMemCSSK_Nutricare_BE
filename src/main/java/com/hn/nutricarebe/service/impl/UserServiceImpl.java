@@ -28,22 +28,25 @@ public class UserServiceImpl implements UserService {
 
 
     @Override
-    public User saveOnboarding(UserCreationRequest request) {
-        if(userRepository.existsByDeviceId(request.getDeviceId())){
+    public User saveOnboarding(String device) {
+        if(userRepository.existsByDeviceId(device)){
             throw new AppException(ErrorCode.DEVICE_ID_EXISTED);
         }
-        User user =  userMapper.toUser(request);
-        user.setRole(Role.GUEST);
-        user.setProvider(Provider.NONE);
-        user.setStatus(UserStatus.ACTIVE);
+
+        User user = User.builder()
+                .deviceId(device)
+                .role(Role.GUEST)
+                .provider(Provider.NONE)
+                .status(UserStatus.ACTIVE)
+                .build();
         return userRepository.save(user);
     }
 
     @Override
-    public UserCreationResponse getUserById(UUID id) {
+    public User getUserById(UUID id) {
         User u =  userRepository.findById(id).
                 orElseThrow(() -> new RuntimeException("User with id " + id + " not found"));
-        return userMapper.toUserCreationResponse(u);
+        return u;
     }
 
     @Override

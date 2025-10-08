@@ -29,7 +29,8 @@ public class SecurityConfig {
             "/ingredients/save",
             "/conditions/save",
             "/allergies/save",
-            "/nutrition-rules/save"
+            "/nutrition-rules/save",
+            "/auths/refresh"
     };
 
 

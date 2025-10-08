@@ -11,8 +11,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class LoginProviderResponse {
-    UserCreationResponse user;
-    String token;
+    TokenPairResponse tokenResponse;
     Boolean isNewUser;
     String name;
     String urlAvatar;

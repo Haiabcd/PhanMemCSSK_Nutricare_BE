@@ -5,18 +5,20 @@ import com.hn.nutricarebe.dto.request.OnboardingRequest;
 import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
 import com.hn.nutricarebe.dto.request.UserConditionCreationRequest;
 import com.hn.nutricarebe.dto.response.*;
+import com.hn.nutricarebe.entity.RefreshToken;
 import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.*;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.helper.GoogleLoginHelper;
-import com.hn.nutricarebe.mapper.UserMapper;
 import com.hn.nutricarebe.service.*;
 import com.hn.nutricarebe.utils.PkceStore;
 import com.hn.nutricarebe.utils.PkceUtil;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -31,9 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+
 
 @Service
 @RequiredArgsConstructor
@@ -44,10 +49,10 @@ public class AuthServiceImpl implements AuthService {
     UserAllergyService userAllergyService;
     MealPlanDayService mealPlanDayService;
     UserConditionService userConditionService;
-    UserMapper userMapper;
     UserService userService;
     PkceStore pkceStore;
     WebClient webClient;
+    RefreshTokenService refreshTokenService;
 
     @NonFinal
     @Value("${supabase.host}")
@@ -65,35 +70,39 @@ public class AuthServiceImpl implements AuthService {
     @Value("${supabase.anon-key}")
     String SUPABASE_ANON_KEY;
 
+    @NonFinal
+    @Value("${jwt.valid-duration}")
+    protected long ACCESS_TTL_SECONDS;
+
+    @NonFinal
+    @Value("${jwt.refreshable-duration}")
+    protected long REFRESH_TTL_SECONDS;
+
     @Override
     @Transactional
     public OnboardingResponse onBoarding(OnboardingRequest request) {
         //B1: Lưu user
-        User savedUser = userService.saveOnboarding(request.getUser());
-        UserCreationResponse userCreationResponse = userMapper.toUserCreationResponse(savedUser);
+        User savedUser = userService.saveOnboarding(request.getDeviceId());
         //B2: Lưu profile
-        ProfileCreationResponse profileCreationResponse = profileService.save(request.getProfile(), savedUser);
+        profileService.save(request.getProfile(), savedUser);
         //B3: Lưu bệnh nền
         Set<UUID> conditionIds = request.getConditions();
-        List<UserConditionResponse> listCondition = new ArrayList<>();
         if(conditionIds != null && !conditionIds.isEmpty()){
-            listCondition = userConditionService.saveUserCondition(UserConditionCreationRequest.builder()
+            userConditionService.saveUserCondition(UserConditionCreationRequest.builder()
                     .user(savedUser)
                     .conditionIds(conditionIds)
                     .build());
         }
         //B4: Lưu dị ứng
         Set<UUID> allergyIds = request.getAllergies();
-        List<UserAllergyResponse> listAllergy = new ArrayList<>();
         if(allergyIds != null && !allergyIds.isEmpty()){
-             UserAllergyCreationRequest uar = UserAllergyCreationRequest.builder()
+            userAllergyService.saveUserAllergy(UserAllergyCreationRequest.builder()
                     .user(savedUser)
                     .allergyIds(allergyIds)
-                    .build();
-            listAllergy = userAllergyService.saveUserAllergy(uar);
+                    .build());
         }
         //B5: Lập kế hoạch tuần (MealPlanDay - 7 ngày)
-        MealPlanResponse mealPlanResponse = mealPlanDayService.createPlan(
+        mealPlanDayService.createPlan(
                 MealPlanCreationRequest.builder()
                         .userId(savedUser.getId())
                         .profile(request.getProfile())
@@ -101,14 +110,32 @@ public class AuthServiceImpl implements AuthService {
         );
         //B6: Lập kế hoạch chi tiết (MealPlanItem)
 
+
+        //B7: Tạo token
+        String familyId = UUID.randomUUID().toString();
+
+        String access  = createAccessToken(savedUser);
+        String refresh = createRefreshToken(savedUser, familyId);
+
+        long accessExp = getClaims(parseJwt(access)).getExpirationTime().toInstant().getEpochSecond();
+        long refreshExp = getClaims(parseJwt(refresh)).getExpirationTime().toInstant().getEpochSecond();
+
+
+        TokenPairResponse tokenPair = TokenPairResponse.builder()
+                .tokenType("Bearer")
+                .accessToken(access)
+                .accessExpiresAt(accessExp)
+                .refreshToken(refresh)
+                .refreshExpiresAt(refreshExp)
+                .build();
+
+        //Lưu refresh token vào DB
+        saveRefreshRecord(savedUser.getId(), refresh);
+
+
         //Trả về
         return OnboardingResponse.builder()
-                .user(userCreationResponse)
-                .token(generateToken(savedUser))
-                .profile(profileCreationResponse)
-                .conditions(listCondition)
-                .allergies(listAllergy)
-                .mealPlan(mealPlanResponse)
+                .tokenResponse(tokenPair)
                 .build();
     }
 
@@ -234,38 +261,214 @@ public class AuthServiceImpl implements AuthService {
                 profileService.updateAvatarAndName(gp.getAvatar(), gp.getName(), user.getId());
             }
         }
-        UserCreationResponse saved = userService.saveGG(user);
+        userService.saveGG(user);
+
+        String familyId = UUID.randomUUID().toString();
+
+        String access  = createAccessToken(user);
+        String refresh = createRefreshToken(user, familyId);
+
+        long accessExp = getClaims(parseJwt(access)).getExpirationTime().toInstant().getEpochSecond();
+        long refreshExp = getClaims(parseJwt(refresh)).getExpirationTime().toInstant().getEpochSecond();
+
+        // Lưu refresh token vào DB
+        saveRefreshRecord(user.getId(), refresh);
+
+        TokenPairResponse tokenPair = TokenPairResponse.builder()
+                .tokenType("Bearer")
+                .accessToken(access)
+                .accessExpiresAt(accessExp)
+                .refreshToken(refresh)
+                .refreshExpiresAt(refreshExp)
+                .build();
 
         return LoginProviderResponse.builder()
-                .user(saved)
-                .token(generateToken(user))
+                .tokenResponse(tokenPair)
                 .isNewUser(isNewUser)
                 .name(gp.getName())
                 .urlAvatar(gp.getAvatar())
                 .build();
     }
 
-    private String generateToken(User user){
-        JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+    // Lấy token mới
+    @Override
+    public TokenPairResponse refresh(String refreshTokenRaw)  {
+        // 1. Parse, verify và validate token
+        SignedJWT jwt = parseAndVerify(refreshTokenRaw);
+        JWTClaimsSet claims = getClaims(jwt);
+        validateRefreshClaims(claims);
 
-        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+        String jti = claims.getJWTID();
+        UUID sub = UUID.fromString(claims.getSubject());
+        String familyId;
+        try {
+            familyId = claims.getStringClaim("familyId");
+        } catch (java.text.ParseException e) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+
+
+        // 2. Kiểm tra token trong DB và phát hiện reuse
+        RefreshToken tokenOld = refreshTokenService.findById(jti);
+
+        if (tokenOld.isRevoked() || tokenOld.isRotated()) {
+            refreshTokenService.revokeFamily(familyId);
+            throw new AppException(ErrorCode.REFRESH_TOKEN_REUSED);
+        }
+
+        // 3. Lấy user và tạo token mới
+        User user = userService.getUserById(sub);
+
+        String newAccessToken = createAccessToken(user);
+        String newRefreshToken = createRefreshToken(user, familyId);
+
+        // 4. Rotation: đánh dấu token cũ và lưu token mới
+        tokenOld.setRotated(true);
+
+        JWTClaimsSet newClaims = getClaims(parseJwt(newRefreshToken));
+        RefreshToken newToken = RefreshToken.builder()
+                .jti(newClaims.getJWTID())
+                .userId(sub)
+                .familyId(familyId)
+                .expiresAt(newClaims.getExpirationTime().toInstant())
+                .rotated(false)
+                .revoked(false)
+                .build();
+
+        tokenOld.setReplacedByJti(newToken.getJti());
+        refreshTokenService.saveAll(List.of(tokenOld, newToken));
+
+        // 5. Trả về response
+        long accessExp = getClaims(parseJwt(newAccessToken))
+                .getExpirationTime().toInstant().getEpochSecond();
+        long refreshExp = newClaims.getExpirationTime().toInstant().getEpochSecond();
+
+        return TokenPairResponse.builder()
+                .tokenType("Bearer")
+                .accessToken(newAccessToken)
+                .accessExpiresAt(accessExp)
+                .refreshToken(newRefreshToken)
+                .refreshExpiresAt(refreshExp)
+                .build();
+
+    }
+
+    /* ----------------- Helper methods ----------------- */
+
+    private void validateRefreshClaims(JWTClaimsSet claims) {
+        try {
+            if (!"nutricare.com".equals(claims.getIssuer()) ||
+                    !"refresh".equals(claims.getStringClaim("typ")) ||
+                    claims.getJWTID() == null ||
+                    claims.getSubject() == null ||
+                    claims.getStringClaim("familyId") == null) {
+                throw new AppException(ErrorCode.INVALID_TOKEN);
+            }
+
+            Instant exp = claims.getExpirationTime().toInstant();
+            if (Instant.now().isAfter(exp.plusSeconds(60))) {
+                throw new AppException(ErrorCode.EXPIRED_REFRESH_TOKEN);
+            }
+        } catch (java.text.ParseException e) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+    }
+
+    private SignedJWT parseJwt(String raw) {
+        try {
+            return SignedJWT.parse(raw);
+        } catch (java.text.ParseException e) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+    }
+
+    private SignedJWT parseAndVerify(String raw) {
+        try {
+            SignedJWT jwt = SignedJWT.parse(raw);
+            if (!jwt.verify(new MACVerifier(SIGNER_KEY.getBytes(StandardCharsets.UTF_8)))) {
+                throw new AppException(ErrorCode.INVALID_SIGNATURE);
+            }
+            return jwt;
+        } catch (ParseException | JOSEException e) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+    }
+
+    private JWTClaimsSet getClaims(SignedJWT jwt) {
+        try {
+            return jwt.getJWTClaimsSet();
+        } catch (ParseException e) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+    }
+
+   //Tạo token
+    private String createAccessToken(User user) {
+        Instant now = Instant.now();
+        Instant exp = now.plus(ACCESS_TTL_SECONDS, ChronoUnit.SECONDS);
+
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .jwtID(UUID.randomUUID().toString())
                 .subject(user.getId().toString())
                 .issuer("nutricare.com")
-                .issueTime(new Date())
-                .expirationTime(new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()))
+                .issueTime(Date.from(now))
+                .expirationTime(Date.from(exp))
+                .claim("typ", "access")
                 .claim("scope", user.getRole().toString())
                 .build();
 
-        Payload payload = new Payload(claimsSet.toJSONObject());
+        return sign(claims);
+    }
 
-        JWSObject jwsObject = new JWSObject(header, payload);
+    private String createRefreshToken(User user, String familyId) {
+        Instant now = Instant.now();
+        Instant exp = now.plus(REFRESH_TTL_SECONDS, ChronoUnit.SECONDS);
 
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .jwtID(UUID.randomUUID().toString())
+                .subject(user.getId().toString())
+                .issuer("nutricare.com")
+                .issueTime(Date.from(now))
+                .expirationTime(Date.from(exp))
+                .claim("typ", "refresh")
+                .claim("familyId", familyId) // chống reuse theo “token family”
+                .build();
+
+        return sign(claims);
+    }
+
+    private String sign(JWTClaimsSet claims) {
         try {
-            jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
-            return jwsObject.serialize();
+            JWSObject jws = new JWSObject(new JWSHeader(JWSAlgorithm.HS512), new Payload(claims.toJSONObject()));
+            jws.sign(new MACSigner(SIGNER_KEY.getBytes()));
+            return jws.serialize();
         } catch (JOSEException e) {
-            log.error("Error while signing the token: {}", e.getMessage());
-            throw new RuntimeException("Error while signing the token: " + e.getMessage());
+            throw new RuntimeException("Sign token failed: " + e.getMessage(), e);
         }
     }
+
+    private void saveRefreshRecord(UUID userId, String refreshToken) {
+        var claims = getClaims(parseJwt(refreshToken));
+        refreshTokenService.saveRefreshToken(RefreshToken.builder()
+                .jti(claims.getJWTID())
+                .userId(userId)
+                .familyId(getFamilyIdSafe(claims))
+                .expiresAt(claims.getExpirationTime().toInstant())
+                .rotated(false)
+                .revoked(false)
+                .build());
+    }
+
+    private String getFamilyIdSafe(JWTClaimsSet claims) {
+        try {
+            String fid = claims.getStringClaim("familyId");
+            if (fid == null) throw new AppException(ErrorCode.INVALID_TOKEN);
+            return fid;
+        } catch (ParseException e) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+    }
+
+
+
 }
