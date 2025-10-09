@@ -7,8 +7,14 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
@@ -29,7 +35,8 @@ public class SecurityConfig {
             "/ingredients/save",
             "/conditions/save",
             "/allergies/save",
-            "/nutrition-rules/save"
+            "/nutrition-rules/save",
+            "/auths/refresh"
     };
 
 
@@ -84,21 +91,40 @@ public class SecurityConfig {
         return httpSecurity.build();
     }
 
+
     @Bean
-    JwtAuthenticationConverter jwtAuthenticationConverter(){
-        JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        jwtGrantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
-        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
-        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(jwtGrantedAuthoritiesConverter);
-        return jwtAuthenticationConverter;
+    JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        authoritiesConverter.setAuthorityPrefix("ROLE_");
+
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
+
+        converter.setPrincipalClaimName("sub");
+        return converter;
     }
 
     @Bean
-    JwtDecoder jwtDecoder(){
-        SecretKeySpec secretKeySpec = new SecretKeySpec(signerKey.getBytes(), "HS512");
-        return NimbusJwtDecoder
-                .withSecretKey(secretKeySpec)
+    JwtDecoder jwtDecoder() {
+        SecretKeySpec key = new SecretKeySpec(signerKey.getBytes(), "HS512");
+        NimbusJwtDecoder decoder = NimbusJwtDecoder
+                .withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS512)
                 .build();
+
+        // Validate iss = nutricare.com + các mặc định (exp, nbf, iat)
+        OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer("nutricare.com");
+
+        // Validate tùy biến: typ phải là "access"
+        OAuth2TokenValidator<Jwt> typeIsAccess = jwt -> {
+            Object typ = jwt.getClaims().get("typ");
+            if ("access".equals(typ)) return OAuth2TokenValidatorResult.success();
+            OAuth2Error err = new OAuth2Error("invalid_token", "typ must be 'access'", null);
+            return OAuth2TokenValidatorResult.failure(err);
+        };
+
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(withIssuer, typeIsAccess));
+        return decoder;
     }
+
 }

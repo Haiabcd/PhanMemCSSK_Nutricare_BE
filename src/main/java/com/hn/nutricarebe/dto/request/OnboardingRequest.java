@@ -3,6 +3,7 @@ package com.hn.nutricarebe.dto.request;
 
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -18,9 +19,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 public class OnboardingRequest {
-    @Valid
-    @NotNull(message = "Thông tin user là bắt buộc")
-    UserCreationRequest user;
+    @NotBlank(message = "Mã thiết bị là bắt buộc")
+    String deviceId;
 
     @Valid
     @NotNull(message = "Thông tin profile là bắt buộc")

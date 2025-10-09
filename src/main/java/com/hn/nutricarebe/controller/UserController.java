@@ -31,4 +31,15 @@ public class UserController {
 //                .data(userService.save(request))
 //                .build();
 //    }
+
+//    @GetMapping("/my-info")
+//    public ApiResponse<UserResponse> getMyInfo() {
+//        return ApiResponse.<UserResponse>builder()
+//                .result(userService.getMyInfo())
+//                .build();
+//    }
+
+
+
+
 }

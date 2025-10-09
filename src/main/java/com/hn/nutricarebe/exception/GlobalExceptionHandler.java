@@ -42,8 +42,8 @@ public class GlobalExceptionHandler {
                 ));
 
         ApiResponse<Void> body = ApiResponse.<Void>builder()
-                .code(ErrorCode.VALIDATION_ERROR.getCode())
-                .message(ErrorCode.VALIDATION_ERROR.getMessage())
+                .code(ErrorCode.VALIDATION_FAILED.getCode())
+                .message(ErrorCode.VALIDATION_FAILED.getMessage())
                 .errors(errors)
                 .build();
 

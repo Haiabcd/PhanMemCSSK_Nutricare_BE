@@ -10,10 +10,12 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.UserMapper;
 import com.hn.nutricarebe.repository.UserRepository;
+import com.hn.nutricarebe.service.AuthService;
 import com.hn.nutricarebe.service.UserService;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -24,26 +26,30 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     UserRepository userRepository;
+    AuthService authService;
     UserMapper userMapper;
 
 
     @Override
-    public User saveOnboarding(UserCreationRequest request) {
-        if(userRepository.existsByDeviceId(request.getDeviceId())){
+    public User saveOnboarding(String device) {
+        if(userRepository.existsByDeviceId(device)){
             throw new AppException(ErrorCode.DEVICE_ID_EXISTED);
         }
-        User user =  userMapper.toUser(request);
-        user.setRole(Role.GUEST);
-        user.setProvider(Provider.NONE);
-        user.setStatus(UserStatus.ACTIVE);
+
+        User user = User.builder()
+                .deviceId(device)
+                .role(Role.GUEST)
+                .provider(Provider.NONE)
+                .status(UserStatus.ACTIVE)
+                .build();
         return userRepository.save(user);
     }
 
     @Override
-    public UserCreationResponse getUserById(UUID id) {
+    public User getUserById(UUID id) {
         User u =  userRepository.findById(id).
-                orElseThrow(() -> new RuntimeException("User with id " + id + " not found"));
-        return userMapper.toUserCreationResponse(u);
+                orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return u;
     }
 
     @Override
@@ -63,4 +69,16 @@ public class UserServiceImpl implements UserService {
         }
         return user;
     }
+
+    @Override
+    public User getUserByToken() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
+
+        UUID userId = UUID.fromString(auth.getName());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return user;
+    }
+
 }
