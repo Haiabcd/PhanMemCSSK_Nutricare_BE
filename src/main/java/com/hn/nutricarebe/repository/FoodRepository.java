@@ -55,4 +55,5 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
             @Param("limit") int limit
     );
 
+
 }
