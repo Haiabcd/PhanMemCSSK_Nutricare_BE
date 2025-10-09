@@ -8,8 +8,9 @@ import com.hn.nutricarebe.entity.User;
 import java.util.UUID;
 
 public interface UserService {
-    public User saveOnboarding(String device);
-    public User getUserById(UUID id);
-    public User getUserByProvider(String providerId, String device);
-    public UserCreationResponse saveGG(User user);
+    User saveOnboarding(String device);
+    User getUserById(UUID id);
+    User getUserByProvider(String providerId, String device);
+    UserCreationResponse saveGG(User user);
+    User getUserByToken();
 }

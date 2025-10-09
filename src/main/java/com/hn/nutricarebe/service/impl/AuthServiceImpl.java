@@ -139,6 +139,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    //============================ Auth GG ============================//
     @Override
     public Map<String, String> startGoogleOAuth(String device) {
         String myState = UUID.randomUUID().toString();
@@ -289,8 +290,9 @@ public class AuthServiceImpl implements AuthService {
                 .urlAvatar(gp.getAvatar())
                 .build();
     }
+    //============================ Auth GG ==============================//
 
-    // Lấy token mới
+    //============================ Cấp token ============================//
     @Override
     public TokenPairResponse refresh(String refreshTokenRaw)  {
         // 1. Parse, verify và validate token
@@ -352,9 +354,34 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
     }
+    //============================ Cấp token ============================//
 
-    /* ----------------- Helper methods ----------------- */
+    //============================ Get id by token ======================//
+    @Override
+    public UUID extractUserIdFromAccessToken(String accessToken) {
+        String raw = accessToken;
+        if (raw != null && raw.startsWith("Bearer ")) {
+            raw = raw.substring("Bearer ".length());
+        }
+        if (raw == null || raw.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
 
+        SignedJWT jwt = parseAndVerify(raw);
+        JWTClaimsSet claims = getClaims(jwt);
+        validateAccessClaims(claims);
+
+        // Trả về UUID trong subject (đã set bằng user.getId().toString())
+        try {
+            return UUID.fromString(claims.getSubject());
+        } catch (IllegalArgumentException ex) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+    }
+    //============================ Get id by token ======================//
+
+
+    /* ------------------------- Helper methods -------------------------*/
     private void validateRefreshClaims(JWTClaimsSet claims) {
         try {
             if (!"nutricare.com".equals(claims.getIssuer()) ||
@@ -368,6 +395,25 @@ public class AuthServiceImpl implements AuthService {
             Instant exp = claims.getExpirationTime().toInstant();
             if (Instant.now().isAfter(exp.plusSeconds(60))) {
                 throw new AppException(ErrorCode.EXPIRED_REFRESH_TOKEN);
+            }
+        } catch (java.text.ParseException e) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+    }
+
+    private void validateAccessClaims(JWTClaimsSet claims) {
+        try {
+            if (!"nutricare.com".equals(claims.getIssuer()) ||
+                    !"access".equals(claims.getStringClaim("typ")) ||
+                    claims.getJWTID() == null ||
+                    claims.getSubject() == null) {
+                throw new AppException(ErrorCode.INVALID_TOKEN);
+            }
+
+            Instant exp = claims.getExpirationTime().toInstant();
+            // Cho phép lệch clock nhẹ, không bắt buộc:
+            if (Instant.now().isAfter(exp.plusSeconds(60))) {
+                throw new AppException(ErrorCode.EXPIRED_ACCESS_TOKEN);
             }
         } catch (java.text.ParseException e) {
             throw new AppException(ErrorCode.INVALID_TOKEN);
@@ -401,8 +447,7 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
     }
-
-   //Tạo token
+    //============================ Tạo token & refresh token =============//
     private String createAccessToken(User user) {
         Instant now = Instant.now();
         Instant exp = now.plus(ACCESS_TTL_SECONDS, ChronoUnit.SECONDS);
@@ -446,7 +491,7 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("Sign token failed: " + e.getMessage(), e);
         }
     }
-
+    //============================ Tạo token & refresh token =============//
     private void saveRefreshRecord(UUID userId, String refreshToken) {
         var claims = getClaims(parseJwt(refreshToken));
         refreshTokenService.saveRefreshToken(RefreshToken.builder()
@@ -468,7 +513,4 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
     }
-
-
-
 }

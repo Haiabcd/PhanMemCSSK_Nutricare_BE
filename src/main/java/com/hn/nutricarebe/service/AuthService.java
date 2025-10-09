@@ -7,11 +7,13 @@ import com.hn.nutricarebe.dto.response.TokenPairResponse;
 
 
 import java.util.Map;
+import java.util.UUID;
 
 
 public interface AuthService {
-    public OnboardingResponse onBoarding(OnboardingRequest request);
-    public Map<String, String> startGoogleOAuth(String device);
-    public LoginProviderResponse googleCallback(String code, String state, String device);
-    public TokenPairResponse refresh(String refreshTokenRaw);
+    OnboardingResponse onBoarding(OnboardingRequest request);
+    Map<String, String> startGoogleOAuth(String device);
+    LoginProviderResponse googleCallback(String code, String state, String device);
+    TokenPairResponse refresh(String refreshTokenRaw);
+    UUID extractUserIdFromAccessToken(String accessToken);
 }

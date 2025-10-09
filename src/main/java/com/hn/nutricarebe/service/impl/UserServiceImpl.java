@@ -10,10 +10,12 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.UserMapper;
 import com.hn.nutricarebe.repository.UserRepository;
+import com.hn.nutricarebe.service.AuthService;
 import com.hn.nutricarebe.service.UserService;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -24,6 +26,7 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     UserRepository userRepository;
+    AuthService authService;
     UserMapper userMapper;
 
 
@@ -45,7 +48,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public User getUserById(UUID id) {
         User u =  userRepository.findById(id).
-                orElseThrow(() -> new RuntimeException("User with id " + id + " not found"));
+                orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         return u;
     }
 
@@ -66,4 +69,16 @@ public class UserServiceImpl implements UserService {
         }
         return user;
     }
+
+    @Override
+    public User getUserByToken() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
+
+        UUID userId = UUID.fromString(auth.getName());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return user;
+    }
+
 }

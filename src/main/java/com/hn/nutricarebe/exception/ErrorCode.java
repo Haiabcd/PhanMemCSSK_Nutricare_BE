@@ -49,8 +49,9 @@ public enum ErrorCode {
     INVALID_TOKEN(9006, "Token không hợp lệ", HttpStatus.UNAUTHORIZED),
     INVALID_SIGNATURE(9007, "Chữ ký token không hợp lệ", HttpStatus.UNAUTHORIZED),
     EXPIRED_REFRESH_TOKEN(9008, "Refresh token đã hết hạn", HttpStatus.UNAUTHORIZED),
-    REFRESH_TOKEN_NOT_FOUND(9009, "Refresh token không tồn tại", HttpStatus.UNAUTHORIZED),
-    REFRESH_TOKEN_REUSED(9010, "Refresh token đã được sử dụng", HttpStatus.UNAUTHORIZED),
+    EXPIRED_ACCESS_TOKEN(9009, "Access token đã hết hạn", HttpStatus.UNAUTHORIZED),
+    REFRESH_TOKEN_NOT_FOUND(9010, "Refresh token không tồn tại", HttpStatus.UNAUTHORIZED),
+    REFRESH_TOKEN_REUSED(9011, "Refresh token đã được sử dụng", HttpStatus.UNAUTHORIZED),
     ;
     int code;
     String message;
