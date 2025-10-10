@@ -52,6 +52,9 @@ public enum ErrorCode {
     EXPIRED_ACCESS_TOKEN(9009, "Access token đã hết hạn", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_NOT_FOUND(9010, "Refresh token không tồn tại", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_REUSED(9011, "Refresh token đã được sử dụng", HttpStatus.UNAUTHORIZED),
+
+
+    NUTRITION_RULE_NOT_FOUND(9012, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND)
     ;
     int code;
     String message;

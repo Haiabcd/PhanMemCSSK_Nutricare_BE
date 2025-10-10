@@ -26,7 +26,6 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     UserRepository userRepository;
-    AuthService authService;
     UserMapper userMapper;
 
 
