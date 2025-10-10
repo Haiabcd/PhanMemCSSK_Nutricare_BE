@@ -2,11 +2,10 @@ package com.hn.nutricarebe.dto.response;
 
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.hn.nutricarebe.entity.User;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Set;
 import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -22,4 +21,5 @@ public class MealPlanResponse {
     LocalDate date;
     NutritionResponse targetNutrition;
     Integer waterTargetMl;
+    Set<MealPlanItemResponse> items;
 }
