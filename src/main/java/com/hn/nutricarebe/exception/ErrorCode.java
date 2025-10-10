@@ -54,7 +54,9 @@ public enum ErrorCode {
     REFRESH_TOKEN_REUSED(9011, "Refresh token đã được sử dụng", HttpStatus.UNAUTHORIZED),
 
 
-    NUTRITION_RULE_NOT_FOUND(9012, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND)
+    NUTRITION_RULE_NOT_FOUND(9012, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND),
+
+    MEAL_PLAN_NOT_FOUND(10001, "Kế hoạch không tồn tại", HttpStatus.NOT_FOUND),
     ;
     int code;
     String message;

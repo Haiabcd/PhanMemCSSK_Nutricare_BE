@@ -9,5 +9,5 @@ import java.util.UUID;
 
 public interface UserConditionService {
    List<UserConditionResponse> saveUserCondition(UserConditionCreationRequest request);
-    List<UserConditionResponse> findByUser_Id(UUID userId);
+   List<UserConditionResponse> findByUser_Id(UUID userId);
 }

@@ -5,8 +5,10 @@ import com.hn.nutricarebe.entity.MealPlanDay;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring", uses = { NutritionMapper.class })
 public interface MealPlanDayMapper {
-    @Mapping(target = "user", ignore = true)
+    @Mapping(source = "user.id", target = "user")
     MealPlanResponse toMealPlanResponse(MealPlanDay mealPlanDay);
 }

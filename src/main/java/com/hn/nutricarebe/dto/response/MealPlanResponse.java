@@ -18,7 +18,7 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class MealPlanResponse {
     UUID id;
-    User user;
+    UUID user;
     LocalDate date;
     NutritionResponse targetNutrition;
     Integer waterTargetMl;
