@@ -2,17 +2,16 @@ package com.hn.nutricarebe.controller;
 
 import com.hn.nutricarebe.dto.request.UserCreationRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
+import com.hn.nutricarebe.dto.response.InfoResponse;
 import com.hn.nutricarebe.dto.response.UserCreationResponse;
+import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.service.UserService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
 
@@ -32,12 +31,13 @@ public class UserController {
 //                .build();
 //    }
 
-//    @GetMapping("/my-info")
-//    public ApiResponse<UserResponse> getMyInfo() {
-//        return ApiResponse.<UserResponse>builder()
-//                .result(userService.getMyInfo())
-//                .build();
-//    }
+    @GetMapping("/my-info")
+    public ApiResponse<InfoResponse> getMyInfo() {
+        return ApiResponse.<InfoResponse>builder()
+                .message("Lấy thông tin người dùng thành công")
+                .data(userService.getUserByToken())
+                .build();
+    }
 
 
 

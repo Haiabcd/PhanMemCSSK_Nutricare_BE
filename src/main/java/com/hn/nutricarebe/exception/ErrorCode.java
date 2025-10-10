@@ -15,8 +15,7 @@ public enum ErrorCode {
     VALIDATION_FAILED(2001, "Dữ liệu không hợp lệ", HttpStatus.BAD_REQUEST),
 
     USER_NOT_FOUND(3001, "Người dùng không tồn tại", HttpStatus.NOT_FOUND),
-    DEVICE_ID_EXISTED(3002, "Device ID đã tồn tại", HttpStatus.CONFLICT),
-    USERID_EXISTED(3003, "User ID đã tồn tại", HttpStatus.CONFLICT),
+    USERID_EXISTED(3002, "User ID đã tồn tại", HttpStatus.CONFLICT),
 
     PROFILE_NOT_FOUND(4001, "Hồ sơ không tồn tại", HttpStatus.NOT_FOUND),
 
@@ -52,6 +51,7 @@ public enum ErrorCode {
     EXPIRED_ACCESS_TOKEN(9009, "Access token đã hết hạn", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_NOT_FOUND(9010, "Refresh token không tồn tại", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_REUSED(9011, "Refresh token đã được sử dụng", HttpStatus.UNAUTHORIZED),
+    NUTRITION_RULE_NOT_FOUND(9012, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND),
     ;
     int code;
     String message;
