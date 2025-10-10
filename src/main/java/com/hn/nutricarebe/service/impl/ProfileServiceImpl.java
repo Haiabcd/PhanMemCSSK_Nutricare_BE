@@ -8,9 +8,7 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
-import com.hn.nutricarebe.repository.UserRepository;
 import com.hn.nutricarebe.service.ProfileService;
-import com.hn.nutricarebe.service.UserService;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -33,6 +31,12 @@ public class ProfileServiceImpl implements ProfileService {
         profile.setUser(user);
         Profile savedProfile = profileRepository.save(profile);
         return profileMapper.toProfileCreationResponse(savedProfile);
+    }
+
+    @Override
+    public ProfileCreationResponse findByUserId(UUID userId) {
+        Profile p =  profileRepository.findByUser_Id(userId).orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+        return profileMapper.toProfileCreationResponse(p);
     }
 
     @Override
