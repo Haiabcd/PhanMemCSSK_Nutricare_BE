@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.dto.request.UserCreationRequest;
+import com.hn.nutricarebe.dto.response.InfoResponse;
+import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
 import com.hn.nutricarebe.dto.response.UserCreationResponse;
 import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.Provider;
@@ -10,7 +11,9 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.UserMapper;
 import com.hn.nutricarebe.repository.UserRepository;
-import com.hn.nutricarebe.service.AuthService;
+import com.hn.nutricarebe.service.ProfileService;
+import com.hn.nutricarebe.service.UserAllergyService;
+import com.hn.nutricarebe.service.UserConditionService;
 import com.hn.nutricarebe.service.UserService;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -24,17 +27,15 @@ import java.util.UUID;
 @AllArgsConstructor
 @Service
 public class UserServiceImpl implements UserService {
-
     UserRepository userRepository;
     UserMapper userMapper;
+    ProfileService profileService;
+    UserAllergyService userAllergyService;
+    UserConditionService userConditionService;
 
 
     @Override
     public User saveOnboarding(String device) {
-        if(userRepository.existsByDeviceId(device)){
-            throw new AppException(ErrorCode.DEVICE_ID_EXISTED);
-        }
-
         User user = User.builder()
                 .deviceId(device)
                 .role(Role.GUEST)
@@ -46,9 +47,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User getUserById(UUID id) {
-        User u =  userRepository.findById(id).
+        return  userRepository.findById(id).
                 orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return u;
     }
 
     @Override
@@ -70,14 +70,15 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User getUserByToken() {
+    public InfoResponse getUserByToken() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
-
         UUID userId = UUID.fromString(auth.getName());
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return user;
+        return InfoResponse.builder()
+                .profileCreationResponse(profileService.findByUserId(userId))
+                .allergies(userAllergyService.findByUser_Id(userId))
+                .conditions(userConditionService.findByUser_Id(userId))
+                .build();
     }
 
 }

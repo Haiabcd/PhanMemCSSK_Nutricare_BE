@@ -29,6 +29,13 @@ public class UserConditionServiceImpl implements UserConditionService {
     ConditionMapper conditionMapper;
 
     @Override
+    public List<UserConditionResponse> findByUser_Id(UUID userId) {
+        return userConditionRepository.findByUser_Id(userId).stream()
+                .map(uc -> conditionMapper.toUserConditionResponse(uc.getCondition()))
+                .toList();
+    }
+
+    @Override
     public List<UserConditionResponse> saveUserCondition(UserConditionCreationRequest request) {
        User u = request.getUser();
        List<UserConditionResponse> response = new ArrayList<>();

@@ -27,6 +27,13 @@ public class UserAllergyServiceImpl implements UserAllergyService {
     AllergyMapper allergyMapper;
 
     @Override
+    public List<UserAllergyResponse> findByUser_Id(UUID userId) {
+        return userAllergyRepository.findByUser_Id(userId).stream()
+                .map(ua -> allergyMapper.toUserAllergyResponse(ua.getAllergy()))
+                .toList();
+    }
+
+    @Override
     public List<UserAllergyResponse> saveUserAllergy(UserAllergyCreationRequest request) {
         User u = request.getUser();
         List<UserAllergyResponse> response = new ArrayList<>();

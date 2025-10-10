@@ -8,5 +8,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface UserConditionService {
-   public List<UserConditionResponse> saveUserCondition(UserConditionCreationRequest request);
+   List<UserConditionResponse> saveUserCondition(UserConditionCreationRequest request);
+    List<UserConditionResponse> findByUser_Id(UUID userId);
 }

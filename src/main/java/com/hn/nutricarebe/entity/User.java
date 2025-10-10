@@ -4,8 +4,6 @@ import com.hn.nutricarebe.enums.Provider;
 import com.hn.nutricarebe.enums.Role;
 import com.hn.nutricarebe.enums.UserStatus;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
@@ -45,8 +43,8 @@ public class User {
     @Column(name = "provider_user_id", unique = true)
     String providerUserId;
 
-    @Column(name = "device_id", unique = true)
-    String deviceId;   //duy nhat
+    @Column(name = "device_id")
+    String deviceId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
