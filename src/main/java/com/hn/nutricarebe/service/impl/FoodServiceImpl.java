@@ -8,7 +8,7 @@ import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.CdnHelper;
-import com.hn.nutricarebe.mapper.FoodMaper;
+import com.hn.nutricarebe.mapper.FoodMapper;
 import com.hn.nutricarebe.mapper.UserResolver;
 import com.hn.nutricarebe.repository.FoodRepository;
 import com.hn.nutricarebe.service.FoodService;
@@ -32,7 +32,7 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class FoodServiceImpl implements FoodService {
     FoodRepository foodRepository;
-    FoodMaper foodMapper;
+    FoodMapper foodMapper;
     UserResolver userResolver;
     S3Service s3Service;
     CdnHelper cdnHelper;

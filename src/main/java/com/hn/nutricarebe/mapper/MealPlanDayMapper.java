@@ -1,12 +1,22 @@
 package com.hn.nutricarebe.mapper;
 
+
 import com.hn.nutricarebe.dto.response.MealPlanResponse;
 import com.hn.nutricarebe.entity.MealPlanDay;
+import org.mapstruct.Context;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "spring", uses = { NutritionMapper.class })
+
+
+
+@Mapper(
+        componentModel = "spring",
+        uses = { MealPlanItemMapper.class }
+)
 public interface MealPlanDayMapper {
-    @Mapping(target = "user", ignore = true)
-    MealPlanResponse toMealPlanResponse(MealPlanDay mealPlanDay);
+    @Mapping(source = "user.id", target = "user")
+    MealPlanResponse toMealPlanResponse(MealPlanDay mealPlanDay, @Context CdnHelper cdnHelper);
+
+
 }

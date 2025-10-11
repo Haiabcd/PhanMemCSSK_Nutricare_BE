@@ -5,17 +5,24 @@ import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
 import com.hn.nutricarebe.dto.response.MealPlanResponse;
 import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.*;
+import com.hn.nutricarebe.exception.AppException;
+import com.hn.nutricarebe.exception.ErrorCode;
+import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.MealPlanDayMapper;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanDayService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Year;
+import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.Comparator;
 import java.util.stream.Collectors;
@@ -32,11 +39,13 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     MealPlanDayMapper mealPlanDayMapper;
     FoodRepository foodRepository;
     MealPlanItemRepository mealPlanItemRepository;
-
     // Nạp bệnh nền, dị ứng, rules
     UserConditionRepository userConditionRepository;
     UserAllergyRepository userAllergyRepository;
     NutritionRuleRepository nutritionRuleRepository;
+    CdnHelper cdnHelper;
+
+
 
 
     //Tính BMI
@@ -188,6 +197,8 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         }
         List<MealPlanDay> savedDays  = mealPlanDayRepository.saveAll(days);
 
+
+
         /* ===================== CẤU HÌNH BỮA & SỐ MÓN/BỮA ===================== */
         Map<MealSlot, Double> slotKcalPct = Map.of(
                 MealSlot.BREAKFAST, 0.25,
@@ -297,7 +308,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             for (MealSlot slot : MealSlot.values()) {
                 double slotKcal = safeDouble(dayTarget.getKcal()) * slotKcalPct.get(slot);  // Tính sô kcal mục tiêu mỗi bữa
                 int itemCount   = slotItemCounts.get(slot);               // Số món mỗi bữa
-                Nutrition slotTarget = approxMacroTargetForMeal(dayTarget, slotKcalPct.get(slot),rules, weight, request);  //Tính dinh dưỡng mục tiêu bữa
 
                 SlotPool sp = pools.get(slot);
                 List<Food> pool = sp.foods();
@@ -324,7 +334,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
 
                     // Lấy dinh dưỡng của món
                     var nut = cand.getNutrition();
-                    // Nếu món không có đinh dưỡng loại này hoặc kcal ≤0 → bỏ qua
+                    // Nếu món không có dinh dưỡng loại này hoặc kcal ≤0 → bỏ qua
                     if (nut == null || nut.getKcal()==null || safeDouble(nut.getKcal())<=0) continue;
 
                     // Nếu món có tag trùng với tag đã dùng → 30% bỏ qua
@@ -427,9 +437,18 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         }
 
         // Trả về ngày đầu
-        return mealPlanDayMapper.toMealPlanResponse(savedDays.getFirst());
+        return mealPlanDayMapper.toMealPlanResponse(savedDays.getFirst(), cdnHelper);
     }
 
+    @Override
+    public MealPlanResponse getMealPlanByDate(LocalDate date) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
+        UUID userId = UUID.fromString(auth.getName());
+        MealPlanDay m = mealPlanDayRepository.findByUser_IdAndDate(userId, date)
+                .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
+        return mealPlanDayMapper.toMealPlanResponse(m, cdnHelper);
+    }
     /* ===================== HÀM PHỤ TRỢ ===================== */
 
     private static BigDecimal bd(double value, int scale) {

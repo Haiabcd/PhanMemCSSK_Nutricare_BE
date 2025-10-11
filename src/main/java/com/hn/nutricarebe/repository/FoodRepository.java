@@ -29,6 +29,7 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
     @Query("select distinct f from Food f join f.mealSlots ms where ms = :slot")
     Slice<Food> findByMealSlot(@Param("slot") MealSlot slot, Pageable pageable);
 
+
     // Tìm món ăn theo tên gần đúng
     @EntityGraph(attributePaths = {"mealSlots", "tags"})
     Slice<Food> findByNameContainingIgnoreCase(String q, Pageable pageable);

@@ -35,7 +35,7 @@ public class RefreshToken {
     boolean rotated;             // đổi refresh token
 
     @Column(nullable = false)
-    boolean revoked;             // bị vô hiệu
+    boolean revoked;             // bị vô hiệu (thu hồi toàn bộ family)
 
     String replacedByJti;        // jti mới nếu đã rotation
 
