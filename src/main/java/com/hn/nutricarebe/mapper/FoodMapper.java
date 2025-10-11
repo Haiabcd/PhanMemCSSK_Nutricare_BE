@@ -5,9 +5,16 @@ import com.hn.nutricarebe.dto.request.FoodPatchRequest;
 import com.hn.nutricarebe.dto.response.FoodResponse;
 import com.hn.nutricarebe.entity.Food;
 import org.mapstruct.*;
+import java.util.HashSet;
+import java.util.Collections;
+import java.util.stream.Collectors;
 
-@Mapper(componentModel = "spring", uses = { NutritionMapper.class })
-public interface FoodMaper {
+@Mapper(
+        componentModel = "spring",
+        uses = { NutritionMapper.class },
+        imports = { HashSet.class, Collections.class, Collectors.class }
+)
+public interface FoodMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
@@ -20,11 +27,9 @@ public interface FoodMaper {
     @Mapping(target = "createdBy", ignore = true)
     Food toFood(FoodCreationRequest req);
 
-
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void patch(@MappingTarget Food entity, FoodPatchRequest req);
 
-    // Sau khi patch, (null = giữ nguyên; [] = clear)
     @AfterMapping
     default void afterPatch(@MappingTarget Food entity, FoodPatchRequest req) {
         if (req.getMealSlots() != null) {
@@ -37,8 +42,13 @@ public interface FoodMaper {
         }
     }
 
-
+    // Nếu bạn có CdnHelper là bean/context:
     @Mapping(target = "imageUrl", expression = "java(cdnHelper.buildUrl(food.getImageKey()))")
-    @Mapping(target = "createdById", expression = "java(food.getCreatedBy() != null ? food.getCreatedBy().getId() : null)")
+    @Mapping(target = "tags",
+            expression = "java(food.getTags() != null ? " +
+                    "food.getTags().stream().map(Enum::name).collect(Collectors.toSet()) : " +
+                    "Collections.emptySet())")
+    @Mapping(target = "mealSlots",
+            expression = "java(food.getMealSlots() != null ? new HashSet<>(food.getMealSlots()) : Collections.emptySet())")
     FoodResponse toFoodResponse(Food food, @Context CdnHelper cdnHelper);
 }

@@ -36,7 +36,7 @@ cdn:
 
 jwt:
   signerKey: "y1dxnqQi/A28NV/zHsbVY1dOZhtByCOGUs9mov/l7LlJTnCnLtXvZjHB5jURJm66"
-  valid-duration: 900 # in second 900
+  valid-duration: 900 # in second
   refreshable-duration: 2592000 # in seconds
 
 supabase:

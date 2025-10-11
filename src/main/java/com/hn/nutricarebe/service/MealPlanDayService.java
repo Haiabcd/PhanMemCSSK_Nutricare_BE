@@ -4,6 +4,10 @@ package com.hn.nutricarebe.service;
 import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
 import com.hn.nutricarebe.dto.response.MealPlanResponse;
 
+import java.time.LocalDate;
+import java.util.List;
+
 public interface MealPlanDayService {
-    public MealPlanResponse createPlan(MealPlanCreationRequest request, int number);
+    MealPlanResponse createPlan(MealPlanCreationRequest request, int number);
+    MealPlanResponse getMealPlanByDate(LocalDate date);
 }
