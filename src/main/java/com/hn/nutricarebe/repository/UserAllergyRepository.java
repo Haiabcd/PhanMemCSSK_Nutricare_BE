@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.repository;
 
 import com.hn.nutricarebe.entity.UserAllergy;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -9,5 +10,6 @@ import java.util.UUID;
 
 @Repository
 public interface UserAllergyRepository extends JpaRepository<UserAllergy, UUID> {
+    @EntityGraph(attributePaths = "allergy")
     List<UserAllergy> findByUser_Id(UUID userId);
 }
