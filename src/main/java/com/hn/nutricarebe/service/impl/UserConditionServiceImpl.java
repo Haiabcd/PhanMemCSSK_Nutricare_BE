@@ -1,7 +1,6 @@
 package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.UserConditionCreationRequest;
-import com.hn.nutricarebe.dto.response.UserAllergyResponse;
 import com.hn.nutricarebe.dto.response.UserConditionResponse;
 import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.entity.User;
@@ -10,6 +9,7 @@ import com.hn.nutricarebe.mapper.ConditionMapper;
 import com.hn.nutricarebe.repository.ConditionRepository;
 import com.hn.nutricarebe.repository.UserConditionRepository;
 import com.hn.nutricarebe.service.UserConditionService;
+import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
