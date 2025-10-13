@@ -59,21 +59,19 @@ public class User {
     Instant updatedAt;
 
 
-    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
-            cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Profile profile;
 
 
-    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
-            cascade = CascadeType.ALL, orphanRemoval = true)
-    WaterLog waterLog;
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    Set<WaterLog> waterLogs = new HashSet<>();
 
     @OneToOne(mappedBy = "user", fetch = FetchType.LAZY,
             cascade = CascadeType.ALL, orphanRemoval = true)
     ActivityLog activityLog;
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<MealPlanDay>  mealPlanDay = new HashSet<>();;
+    Set<MealPlanDay>  mealPlanDays = new HashSet<>();;
 
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<UserCondition> userConditions = new HashSet<>();
@@ -82,7 +80,7 @@ public class User {
     Set<Food> foods = new HashSet<>();
 
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
-    Set<FoodLog> foodLogs = new HashSet<>();
+    Set<PlanLog> foodLogs = new HashSet<>();
 
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<UserAllergy> userAllergies = new HashSet<>();
@@ -90,6 +88,4 @@ public class User {
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY,
             cascade = CascadeType.ALL, orphanRemoval = true)
     Set<SavedFood> savedFoods = new HashSet<>();
-
-
 }

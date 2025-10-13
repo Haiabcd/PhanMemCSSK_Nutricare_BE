@@ -11,5 +11,5 @@ import java.util.UUID;
 public interface MealPlanItemService {
     MealPlanItemResponse createMealPlanItems(MealPlanItemCreationRequest request);
     Page<FoodResponse> getUpcomingFoods(int page, int size);
-//    void smartSwapMealItem(UUID itemId);
+    void smartSwapMealItem(UUID itemId);
 }

@@ -107,7 +107,7 @@ public class Food {
     Set<SavedFood> savedByUsers = new HashSet<>();
 
     @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<FoodLog> loggedByUsers = new HashSet<>();
+    Set<PlanLog> loggedByUsers = new HashSet<>();
 
     @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<MealPlanItem> inMealPlanItems = new HashSet<>();

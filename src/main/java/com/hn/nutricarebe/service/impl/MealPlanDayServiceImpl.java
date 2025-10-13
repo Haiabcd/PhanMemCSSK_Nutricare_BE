@@ -17,17 +17,13 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Year;
-import java.time.ZoneId;
-import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.Comparator;
 import java.util.stream.Collectors;
 
-
+import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 import static java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR;
 
 @Service
@@ -39,7 +35,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     MealPlanDayMapper mealPlanDayMapper;
     FoodRepository foodRepository;
     MealPlanItemRepository mealPlanItemRepository;
-    // Nạp bệnh nền, dị ứng, rules
     UserConditionRepository userConditionRepository;
     UserAllergyRepository userAllergyRepository;
     NutritionRuleRepository nutritionRuleRepository;
@@ -451,9 +446,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     }
     /* ===================== HÀM PHỤ TRỢ ===================== */
 
-    private static BigDecimal bd(double value, int scale) {
-        return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP);
-    }
+
 
 
     /* ===== TÍNH DINH DƯỠNG NGÀY ===== */
@@ -668,19 +661,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     /* ===== TÍNH DINH DƯỠNG BỮA ===== */
 
 
-    /* ===== TÍNH DINH DƯỠNG MÓN ===== */
-    private Nutrition scaleNutrition(Nutrition base, double portion) {
-        return Nutrition.builder()
-                .kcal(bd(safeDouble(base.getKcal()) * portion, 2))
-                .proteinG(bd(safeDouble(base.getProteinG()) * portion, 2))
-                .carbG(bd(safeDouble(base.getCarbG()) * portion, 2))
-                .fatG(bd(safeDouble(base.getFatG()) * portion, 2))
-                .fiberG(bd(safeDouble(base.getFiberG()) * portion, 2))
-                .sodiumMg(bd(safeDouble(base.getSodiumMg()) * portion, 2))
-                .sugarMg(bd(safeDouble(base.getSugarMg()) * portion, 2))
-                .build();
-    }
-    /* ===== TÍNH DINH DƯỠNG MÓN ===== */
+
 
     /* ===== LỌC MÓN + TÍNH ĐIỂM ===== */
     static class TagDirectives {
@@ -780,7 +761,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     /* ===== LỌC MÓN + TÍNH ĐIỂM ===== */
 
     /* ===== CHỌN KHẨU PHẦN ===== */
-    static final double[] PORTION_STEPS = {1.5, 1.0, 0.5};
+
     private static double pickPortionStep(double kcalRemain, double foodKcal) {
         if (foodKcal <= 0) return 1.0;
         double best = PORTION_STEPS[0];
@@ -884,8 +865,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     //trả về giá trị lớn hơn (ưu tiên đảm bảo cho chất cần thiết)
     private BigDecimal maxOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.max(b); }
 
-    private double safeDouble(BigDecimal x){
-        return x == null ? 0.0 : x.doubleValue();
-    }
+
     private String safeStr(String s){ return s==null? "" : s.trim(); }
 }
