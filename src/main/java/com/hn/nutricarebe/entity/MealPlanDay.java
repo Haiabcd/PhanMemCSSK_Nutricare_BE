@@ -26,7 +26,6 @@ public class MealPlanDay {
     @Column(updatable = false, nullable = false, name = "id")
     UUID id;
 
-
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     User user;
