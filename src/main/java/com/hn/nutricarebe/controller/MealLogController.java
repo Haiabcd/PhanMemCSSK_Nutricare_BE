@@ -3,6 +3,7 @@ package com.hn.nutricarebe.controller;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.LogResponse;
+import com.hn.nutricarebe.dto.response.NutritionResponse;
 import com.hn.nutricarebe.service.PlanLogService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -20,23 +21,31 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @RequestMapping("/logs")
 public class MealLogController {
-    PlanLogService foodLogService;
+    PlanLogService logService;
 
     @PostMapping("/plan")
     public ApiResponse<Void> savePlanLog(@RequestBody @Valid SaveLogRequest req) {
-        foodLogService.savePlanLog(req);
+        logService.savePlanLog(req);
         return ApiResponse.<Void>builder()
                 .message("Ghi log theo kế hoạch thành công")
                 .build();
     }
 
+    @DeleteMapping("/plan")
+    public ApiResponse<Void> deletePlanLog(@RequestBody @Valid SaveLogRequest req) {
+        logService.deletePlanLog(req);
+        return ApiResponse.<Void>builder()
+                .message("Xoá log theo kế hoạch thành công")
+                .build();
+    }
+
     @GetMapping
-    public ApiResponse<List<LogResponse>> getByDate(
+    public ApiResponse<NutritionResponse> getLogByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
-        return ApiResponse.<List<LogResponse>>builder()
-                .message("Lấy log theo ngày thành công")
-                .data(foodLogService.getByDate(date))
+        return ApiResponse.<NutritionResponse>builder()
+                .message("Lấy log theo kế hoạch thành công")
+                .data(logService.getByDate(date))
                 .build();
     }
 }

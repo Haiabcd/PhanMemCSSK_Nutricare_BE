@@ -33,6 +33,7 @@ public class MealPlanController {
                 .data(mealPlanDayService.getMealPlanByDate(date))
                 .build();
     }
+
     @GetMapping("/suggestions")
     public ApiResponse<Page<FoodResponse>> getUpcomingFoods(
             @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -43,7 +44,6 @@ public class MealPlanController {
                 .data(mealPlanItemService.getUpcomingFoods(page, size))
                 .build();
     }
-
 
     @PutMapping("/{itemId}/swap")
     public ApiResponse<Void> smartSwap(@PathVariable UUID itemId) {

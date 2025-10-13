@@ -30,7 +30,6 @@ import java.util.UUID;
         }
 )
 public class WaterLog {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, name = "id")
