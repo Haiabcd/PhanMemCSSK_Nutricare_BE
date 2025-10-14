@@ -7,10 +7,10 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
@@ -24,6 +24,15 @@ public class WaterLogController {
         waterLogService.create(request);
         return ApiResponse.<Void>builder()
                 .message("Tạo log nước thành công")
+                .build();
+    }
+
+    @GetMapping("/log")
+    public ApiResponse<Integer> getTotalWaterByDate(@RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        int totalAmount = waterLogService.getTotalAmountByDate(date);
+        return ApiResponse.<Integer>builder()
+                .data(totalAmount)
+                .message("Lấy tổng lượng nước theo ngày thành công")
                 .build();
     }
 }

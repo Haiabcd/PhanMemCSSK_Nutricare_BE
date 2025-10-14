@@ -48,4 +48,14 @@ public class WaterLogServiceImpl implements WaterLogService {
                 .build();
        waterLogRepository.save(entity);
     }
+
+    @Override
+    public int getTotalAmountByDate(LocalDate date) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UUID userId = UUID.fromString(auth.getName());
+        return waterLogRepository.sumAmountByUserAndDate(userId, date);
+    }
 }
