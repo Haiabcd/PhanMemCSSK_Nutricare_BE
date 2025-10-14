@@ -73,6 +73,10 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
+        if(item.isUsed()) {
+            throw new AppException(ErrorCode.MEAL_PLAN_ITEM_USED);
+        }
+
         // Dữ liệu tham chiếu cũ
         MealSlot slot = item.getMealSlot();
         var oldFood = item.getFood();

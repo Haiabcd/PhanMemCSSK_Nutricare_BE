@@ -34,6 +34,7 @@ public class MealPlanController {
                 .data(mealPlanDayService.getMealPlanByDate(date))
                 .build();
     }
+
     @GetMapping("/suggestions")
     public ApiResponse<Slice<FoodResponse>> getUpcomingFoods(
             @RequestParam(defaultValue = "0") @Min(0) int page,

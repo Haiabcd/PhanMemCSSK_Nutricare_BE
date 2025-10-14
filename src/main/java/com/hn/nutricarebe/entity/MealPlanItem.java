@@ -50,6 +50,9 @@ public class MealPlanItem {
     @Column(name = "note", columnDefinition = "text")
     String note;
 
+    @Column(name = "is_use", nullable = false)
+    boolean used;
+
     @Embedded
     @AttributeOverrides({
             @AttributeOverride(name = "kcal", column = @Column(name = "snap_kcal", precision = 10, scale = 2)),

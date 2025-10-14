@@ -5,6 +5,7 @@ import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.LogResponse;
 import com.hn.nutricarebe.entity.PlanLog;
 import com.hn.nutricarebe.enums.MealSlot;
+import com.hn.nutricarebe.dto.response.NutritionResponse;
 import com.hn.nutricarebe.service.PlanLogService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -15,11 +16,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
-
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+
 
 
 @RestController
@@ -49,6 +50,25 @@ public class MealLogController {
         return ApiResponse.<List<LogResponse>>builder()
                 .message("Lấy danh sách log theo ngày thành công")
                 .data(data)
+                .build();
+    }
+          
+    
+    @DeleteMapping("/plan")
+    public ApiResponse<Void> deletePlanLog(@RequestBody @Valid SaveLogRequest req) {
+        logService.deletePlanLog(req);
+        return ApiResponse.<Void>builder()
+                .message("Xoá log theo kế hoạch thành công")
+                .build();
+    }
+
+    @GetMapping("/nutriLog")
+    public ApiResponse<NutritionResponse> getNutritionLogByDate(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        return ApiResponse.<NutritionResponse>builder()
+                .message("Lấy log theo kế hoạch thành công")
+                .data(logService.getNutritionLogByDate(date))
                 .build();
     }
 
