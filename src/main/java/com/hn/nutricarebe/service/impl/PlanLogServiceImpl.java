@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
+import com.hn.nutricarebe.dto.response.LogResponse;
 import com.hn.nutricarebe.dto.response.NutritionResponse;
 import com.hn.nutricarebe.entity.PlanLog;
 import com.hn.nutricarebe.entity.MealPlanItem;
@@ -9,6 +10,7 @@ import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
+import com.hn.nutricarebe.mapper.PlanLogMapper;
 import com.hn.nutricarebe.repository.PlanLogRepository;
 import com.hn.nutricarebe.repository.MealPlanItemRepository;
 import com.hn.nutricarebe.service.PlanLogService;
@@ -32,6 +34,7 @@ import static com.hn.nutricarebe.helper.PlanLogHelper.aggregateActual;
 public class PlanLogServiceImpl implements PlanLogService {
     MealPlanItemRepository mealPlanItemRepository;
     PlanLogRepository logRepository;
+    PlanLogMapper logMapper;
 
     @Override
     @Transactional
@@ -77,20 +80,20 @@ public class PlanLogServiceImpl implements PlanLogService {
         }
         UUID userId = UUID.fromString(auth.getName());
 
-        List<PlanLog> logs = foodLogRepository.findByUser_IdAndDateAndMealSlot(userId, date, mealSlot);
+        List<PlanLog> logs = logRepository.findByUser_IdAndDateAndMealSlot(userId, date, mealSlot);
         return logs.stream()
-                .map(foodLogMapper::toLogResponse)
+                .map(logMapper::toLogResponse)
                 .toList();
     }
 
     @Override
     @Transactional
     public void deleteById(UUID id) {
-        if (!foodLogRepository.existsById(id)) {
+        if (!logRepository.existsById(id)) {
             throw new AppException(ErrorCode.NOT_FOUND_PLAN_LOG);
         }
 
-        foodLogRepository.deleteById(id);
+        logRepository.deleteById(id);
     }
 
      @Override
