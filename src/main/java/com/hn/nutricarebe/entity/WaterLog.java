@@ -13,15 +13,13 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(
-        name = "water_logs",
+@Table(name = "water_logs",
         indexes = {
                 @Index(name = "idx_waterlog_user_date", columnList = "user_id,log_date"),
-                @Index(name = "idx_waterlog_drinked_at", columnList = "drinked_at")
-        }
-)
-@FieldDefaults(level = AccessLevel.PRIVATE)
+                @Index(name = "idx_waterlog_user_drankat", columnList = "user_id,drank_at")
+        })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class WaterLog {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -33,15 +31,15 @@ public class WaterLog {
             foreignKey = @ForeignKey(name = "fk_waterlog_user"))
     User user;
 
-    // Thời điểm uống thực tế (UTC)
-    @Column(name = "drinked_at", nullable = false)
-    Instant drinkedAt;
-
-    // Ngày nghiệp vụ (theo timezone app) để nhóm theo ngày
+    // Ngày nghiệp vụ theo TZ app, derive từ drankAt
     @Column(name = "log_date", nullable = false)
     LocalDate date;
 
-    // Số ml CỦA LẦN UỐNG NÀY (dương: cộng, âm: trừ/undo)
+    // Thời điểm uống thực tế (UTC)
+    @Column(name = "drank_at", nullable = false)
+    Instant drankAt;
+
+    // Lượng nước ở LẦN uống này
     @Column(name = "amount_ml", nullable = false)
     Integer amountMl;
 

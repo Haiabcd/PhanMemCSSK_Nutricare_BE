@@ -55,6 +55,7 @@ public enum ErrorCode {
 
     NOT_FOUND_PLAN_LOG(9012, "Log không tồn tại", HttpStatus.NOT_FOUND),
 
+
     NUTRITION_RULE_NOT_FOUND(9012, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND),
 
     MEAL_PLAN_NOT_FOUND(10001, "Kế hoạch không tồn tại", HttpStatus.NOT_FOUND),
