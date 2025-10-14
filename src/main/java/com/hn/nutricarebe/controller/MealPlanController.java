@@ -11,6 +11,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,15 +35,16 @@ public class MealPlanController {
                 .build();
     }
     @GetMapping("/suggestions")
-    public ApiResponse<Page<FoodResponse>> getUpcomingFoods(
+    public ApiResponse<Slice<FoodResponse>> getUpcomingFoods(
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(200) int size
     ) {
-        return ApiResponse.<Page<FoodResponse>>builder()
+        return ApiResponse.<Slice<FoodResponse>>builder()
                 .message("Lấy danh sách món ăn gợi ý thành công")
                 .data(mealPlanItemService.getUpcomingFoods(page, size))
                 .build();
     }
+
 
 
     @PutMapping("/{itemId}/swap")

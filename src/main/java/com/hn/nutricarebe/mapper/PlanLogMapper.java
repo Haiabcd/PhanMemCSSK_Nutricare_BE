@@ -6,5 +6,5 @@ import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring", uses = { NutritionMapper.class })
 public interface PlanLogMapper {
-    LogResponse toFoodLogResponse(PlanLog foodLog);
+    LogResponse toLogResponse(PlanLog foodLog);
 }

@@ -18,10 +18,7 @@ import com.hn.nutricarebe.service.MealPlanItemService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,17 +43,19 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
     }
 
     @Override
-    @Transactional
-    public Page<FoodResponse> getUpcomingFoods(int page, int size) {
+    @Transactional(readOnly = true)
+    public Slice<FoodResponse> getUpcomingFoods(int page, int size) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated())
             throw new AppException(ErrorCode.UNAUTHORIZED);
         UUID userId = UUID.fromString(auth.getName());
         LocalDate today = LocalDate.now();
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-        Page<Food> foods = mealPlanItemRepository.findFoodsFromDate(userId, today, pageable);
+        // Sort đã viết trong JPQL -> không cần sort ở đây
+        Pageable pageable = PageRequest.of(page, size);
+        Slice<Food> foods = mealPlanItemRepository.findFoodsFromDate(userId, today, pageable);
         return foods.map(f -> foodMapper.toFoodResponse(f, cdnHelper));
     }
+
 
     @Override
     @Transactional

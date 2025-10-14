@@ -6,6 +6,7 @@ import com.hn.nutricarebe.entity.PlanLog;
 import com.hn.nutricarebe.entity.MealPlanItem;
 import com.hn.nutricarebe.entity.Nutrition;
 import com.hn.nutricarebe.entity.User;
+import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.PlanLogMapper;
@@ -65,7 +66,7 @@ public class PlanLogServiceImpl implements PlanLogService {
     }
 
     @Override
-    public List<LogResponse> getByDate(LocalDate date) {
+    public List<LogResponse> getLog(LocalDate date, MealSlot mealSlot) {
         if (date == null) {
             throw new AppException(ErrorCode.VALIDATION_FAILED);
         }
@@ -75,9 +76,21 @@ public class PlanLogServiceImpl implements PlanLogService {
         }
         UUID userId = UUID.fromString(auth.getName());
 
-        List<PlanLog> logs = foodLogRepository.findByUser_IdAndDate(userId, date);
+        List<PlanLog> logs = foodLogRepository.findByUser_IdAndDateAndMealSlot(userId, date, mealSlot);
         return logs.stream()
-                .map(log -> foodLogMapper.toFoodLogResponse(log))
+                .map(foodLogMapper::toLogResponse)
                 .toList();
     }
+
+    @Override
+    @Transactional
+    public void deleteById(UUID id) {
+        if (!foodLogRepository.existsById(id)) {
+            throw new AppException(ErrorCode.NOT_FOUND_PLAN_LOG);
+        }
+
+        foodLogRepository.deleteById(id);
+    }
+
+
 }

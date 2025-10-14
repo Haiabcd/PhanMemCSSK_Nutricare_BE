@@ -2,8 +2,8 @@ package com.hn.nutricarebe.repository;
 
 import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.entity.MealPlanItem;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,11 +16,15 @@ import java.util.UUID;
 public interface MealPlanItemRepository extends JpaRepository<MealPlanItem, UUID> {
 
     @Query("""
-        select i.food from MealPlanItem i
-        where i.day.user.id = :userId
-          and i.day.date >= :fromDate
-    """)
-    Page<Food> findFoodsFromDate(
+    select distinct f
+    from MealPlanItem i
+    join i.day d
+    join i.food f
+    where d.user.id = :userId
+      and d.date >= :fromDate
+    order by f.id desc
+""")
+    Slice<Food> findFoodsFromDate(
             @Param("userId") UUID userId,
             @Param("fromDate") LocalDate fromDate,
             Pageable pageable

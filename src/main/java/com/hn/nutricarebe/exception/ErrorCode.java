@@ -53,6 +53,7 @@ public enum ErrorCode {
     REFRESH_TOKEN_NOT_FOUND(9010, "Refresh token không tồn tại", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_REUSED(9011, "Refresh token đã được sử dụng", HttpStatus.UNAUTHORIZED),
 
+    NOT_FOUND_PLAN_LOG(9012, "Log không tồn tại", HttpStatus.NOT_FOUND),
 
     NUTRITION_RULE_NOT_FOUND(9012, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND),
 
