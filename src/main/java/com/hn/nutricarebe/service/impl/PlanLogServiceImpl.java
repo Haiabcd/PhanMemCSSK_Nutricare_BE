@@ -1,14 +1,13 @@
 package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
-import com.hn.nutricarebe.dto.response.LogResponse;
+import com.hn.nutricarebe.dto.response.NutritionResponse;
 import com.hn.nutricarebe.entity.PlanLog;
 import com.hn.nutricarebe.entity.MealPlanItem;
 import com.hn.nutricarebe.entity.Nutrition;
 import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
-import com.hn.nutricarebe.mapper.PlanLogMapper;
 import com.hn.nutricarebe.repository.PlanLogRepository;
 import com.hn.nutricarebe.repository.MealPlanItemRepository;
 import com.hn.nutricarebe.service.PlanLogService;
@@ -19,10 +18,11 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+
+import static com.hn.nutricarebe.helper.PlanLogHelper.aggregateActual;
 
 @Slf4j
 @Service
@@ -30,8 +30,7 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class PlanLogServiceImpl implements PlanLogService {
     MealPlanItemRepository mealPlanItemRepository;
-    PlanLogRepository foodLogRepository;
-    PlanLogMapper foodLogMapper;
+    PlanLogRepository logRepository;
 
     @Override
     @Transactional
@@ -61,23 +60,40 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .actualNutrition(snap)
                 .build();
 
-        foodLogRepository.save(log);
+        item.setUsed(true);
+        mealPlanItemRepository.save(item);
+        logRepository.save(log);
     }
 
     @Override
-    public List<LogResponse> getByDate(LocalDate date) {
-        if (date == null) {
-            throw new AppException(ErrorCode.VALIDATION_FAILED);
-        }
+    public NutritionResponse getNutritionLogByDate(LocalDate date) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         UUID userId = UUID.fromString(auth.getName());
+        List<PlanLog> logs = logRepository.findByUser_IdAndDate(userId, date);
+        return aggregateActual(logs);
+    }
 
-        List<PlanLog> logs = foodLogRepository.findByUser_IdAndDate(userId, date);
-        return logs.stream()
-                .map(log -> foodLogMapper.toFoodLogResponse(log))
-                .toList();
+
+    @Override
+    @Transactional
+    public void deletePlanLog(SaveLogRequest req) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UUID userId = UUID.fromString(auth.getName());
+        PlanLog log = logRepository.findTopByUser_IdAndPlanItem_IdOrderByCreatedAtDesc(userId, req.getMealPlanItemId())
+                .orElse(null);
+        if (log != null) {
+            MealPlanItem item = log.getPlanItem();
+            if (item != null) {
+                item.setUsed(false);
+                mealPlanItemRepository.save(item);
+            }
+            logRepository.delete(log);
+        }
     }
 }

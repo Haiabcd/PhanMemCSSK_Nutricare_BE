@@ -11,4 +11,6 @@ public interface ProfileMapper {
     public Profile toProfile(ProfileCreationRequest request);
 
     public ProfileCreationResponse toProfileCreationResponse(Profile profile);
+
+    public ProfileCreationRequest toProfileCreationRequest(Profile profile);
 }

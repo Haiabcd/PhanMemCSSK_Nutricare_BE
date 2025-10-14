@@ -14,7 +14,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)
+//@JsonInclude(JsonInclude.Include.NON_NULL)
 public class MealPlanItemResponse {
     UUID id;
     String mealSlot;
@@ -22,5 +22,6 @@ public class MealPlanItemResponse {
     BigDecimal portion;
     Integer rank;
     String note;
+    boolean used;
     NutritionResponse nutrition;
 }

@@ -11,9 +11,11 @@ import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.MealPlanDayMapper;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanDayService;
+import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
 import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 import static java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR;
 
+@Log4j2
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -382,6 +385,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                             .mealSlot(slot)
                             .food(cand)
                             .portion(bd(portion,2))
+                            .used(false)
                             .rank(rank++)
                             .nutrition(snap)
                             .build());
@@ -419,6 +423,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                                 .mealSlot(slot)
                                 .food(f)
                                 .portion(bd(1.0,2))
+                                .used(false)
                                 .rank(rank++)
                                 .nutrition(snap)
                                 .build());
@@ -442,8 +447,17 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         UUID userId = UUID.fromString(auth.getName());
         MealPlanDay m = mealPlanDayRepository.findByUser_IdAndDate(userId, date)
                 .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
+        log.info("Meal Plan Day {}:", m);
         return mealPlanDayMapper.toMealPlanResponse(m, cdnHelper);
     }
+
+    @Override
+    @Transactional
+    public void removeFromDate(LocalDate today, UUID userId) {
+        mealPlanItemRepository.deleteItemsFromDate(userId, today);
+        mealPlanDayRepository.deleteFromDate(userId, today);
+    }
+
     /* ===================== HÀM PHỤ TRỢ ===================== */
 
 
