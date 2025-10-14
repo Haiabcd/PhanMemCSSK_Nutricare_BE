@@ -66,7 +66,7 @@ public class PlanLogServiceImpl implements PlanLogService {
     }
 
     @Override
-    public NutritionResponse getByDate(LocalDate date) {
+    public NutritionResponse getNutritionLogByDate(LocalDate date) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
             throw new AppException(ErrorCode.UNAUTHORIZED);

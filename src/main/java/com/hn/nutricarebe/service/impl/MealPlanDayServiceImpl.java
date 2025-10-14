@@ -11,6 +11,7 @@ import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.MealPlanDayMapper;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanDayService;
+import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -449,6 +450,14 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         log.info("Meal Plan Day {}:", m);
         return mealPlanDayMapper.toMealPlanResponse(m, cdnHelper);
     }
+
+    @Override
+    @Transactional
+    public void removeFromDate(LocalDate today, UUID userId) {
+        mealPlanItemRepository.deleteItemsFromDate(userId, today);
+        mealPlanDayRepository.deleteFromDate(userId, today);
+    }
+
     /* ===================== HÀM PHỤ TRỢ ===================== */
 
 

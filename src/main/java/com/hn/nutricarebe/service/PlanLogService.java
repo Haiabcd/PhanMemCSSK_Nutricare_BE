@@ -7,6 +7,6 @@ import java.time.LocalDate;
 
 public interface PlanLogService {
     void savePlanLog(SaveLogRequest req);
-    NutritionResponse getByDate(LocalDate date);
+    NutritionResponse getNutritionLogByDate(LocalDate date);
     void deletePlanLog(SaveLogRequest req);
 }

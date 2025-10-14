@@ -2,9 +2,7 @@ package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
 import com.hn.nutricarebe.dto.response.UserAllergyResponse;
-import com.hn.nutricarebe.entity.Allergy;
-import com.hn.nutricarebe.entity.User;
-import com.hn.nutricarebe.entity.UserAllergy;
+import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.mapper.AllergyMapper;
 import com.hn.nutricarebe.repository.AllergyRepository;
 import com.hn.nutricarebe.repository.UserAllergyRepository;
@@ -13,9 +11,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -49,5 +46,43 @@ public class UserAllergyServiceImpl implements UserAllergyService {
             }
         }
         return response;
+    }
+
+    @Override
+    public void updateUserAllergys(UUID userId, Set<UUID> allergyIds) {
+        if (allergyIds == null || allergyIds.isEmpty()) {
+            userAllergyRepository.deleteAllByUserId(userId);
+            return;
+        }
+
+        List<UserAllergy> current = userAllergyRepository.findByUser_Id(userId);
+        Set<UUID> currentIds = current.stream()
+                .map(uc -> uc.getAllergy().getId())
+                .collect(Collectors.toSet());
+
+        Set<UUID> toAdd = new LinkedHashSet<>(allergyIds);
+        toAdd.removeAll(currentIds);
+
+        Set<UUID> toRemove = new LinkedHashSet<>(currentIds);
+        toRemove.removeAll(allergyIds);
+
+        if (toAdd.isEmpty() && toRemove.isEmpty()) {
+            return;
+        }
+
+        if (!toRemove.isEmpty()) {
+            userAllergyRepository.deleteByUserIdAndAllergyIdIn(userId, toRemove);
+        }
+
+        if (!toAdd.isEmpty()) {
+            List<Allergy> conditionsToAdd = allergyRepository.findAllById(toAdd);
+            List<UserAllergy> newLinks = conditionsToAdd.stream()
+                    .map(c -> UserAllergy.builder()
+                            .user(User.builder().id(userId).build())
+                            .allergy(c)
+                            .build())
+                    .collect(Collectors.toList());
+            userAllergyRepository.saveAll(newLinks);
+        }
     }
 }

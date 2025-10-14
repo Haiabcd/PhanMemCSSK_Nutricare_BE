@@ -2,7 +2,6 @@ package com.hn.nutricarebe.controller;
 
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
-import com.hn.nutricarebe.dto.response.LogResponse;
 import com.hn.nutricarebe.dto.response.NutritionResponse;
 import com.hn.nutricarebe.service.PlanLogService;
 import jakarta.validation.Valid;
@@ -11,9 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
-
 import java.time.LocalDate;
-import java.util.List;
+
 
 
 @RestController
@@ -39,13 +37,13 @@ public class MealLogController {
                 .build();
     }
 
-    @GetMapping
-    public ApiResponse<NutritionResponse> getLogByDate(
+    @GetMapping("/nutriLog")
+    public ApiResponse<NutritionResponse> getNutritionLogByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
         return ApiResponse.<NutritionResponse>builder()
                 .message("Lấy log theo kế hoạch thành công")
-                .data(logService.getByDate(date))
+                .data(logService.getNutritionLogByDate(date))
                 .build();
     }
 }

@@ -15,9 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +49,47 @@ public class UserConditionServiceImpl implements UserConditionService {
            }
        }
        return response;
+    }
+
+
+
+    @Transactional
+    @Override
+    public void updateUserConditions(UUID userId, Set<UUID> conditionIds) {
+        if (conditionIds == null || conditionIds.isEmpty()) {
+            userConditionRepository.deleteAllByUserId(userId);
+            return;
+        }
+
+        List<UserCondition> current = userConditionRepository.findByUser_Id(userId);
+        Set<UUID> currentIds = current.stream()
+                .map(uc -> uc.getCondition().getId())
+                .collect(Collectors.toSet());
+
+        Set<UUID> toAdd = new LinkedHashSet<>(conditionIds);
+        toAdd.removeAll(currentIds);
+
+        Set<UUID> toRemove = new LinkedHashSet<>(currentIds);
+        toRemove.removeAll(conditionIds);
+
+        if (toAdd.isEmpty() && toRemove.isEmpty()) {
+            return;
+        }
+
+        if (!toRemove.isEmpty()) {
+            userConditionRepository.deleteByUserIdAndConditionIdIn(userId, toRemove);
+        }
+
+        if (!toAdd.isEmpty()) {
+            List<Condition> conditionsToAdd = conditionRepository.findAllById(toAdd);
+            List<UserCondition> newLinks = conditionsToAdd.stream()
+                    .map(c -> UserCondition.builder()
+                            .user(User.builder().id(userId).build())
+                            .condition(c)
+                            .build())
+                    .collect(Collectors.toList());
+            userConditionRepository.saveAll(newLinks);
+        }
     }
 }
 
