@@ -51,4 +51,3 @@ public class WaterLog {
     @Column(name = "updated_at", nullable = false)
     Instant updatedAt;
 }
-
