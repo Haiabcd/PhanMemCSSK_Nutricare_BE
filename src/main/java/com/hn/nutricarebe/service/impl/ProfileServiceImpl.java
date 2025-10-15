@@ -61,6 +61,7 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
 
+    @Override
     @Transactional
     public void updateProfile(UpdateRequest request) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
