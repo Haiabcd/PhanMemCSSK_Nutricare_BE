@@ -14,4 +14,6 @@ public interface PlanLogRepository extends JpaRepository<PlanLog, UUID> {
     @EntityGraph(attributePaths = {"food"})
     List<PlanLog> findByUser_IdAndDateAndMealSlot(UUID userId, LocalDate date, MealSlot mealSlot);
     List<PlanLog> findByUser_IdAndDate(UUID userId, LocalDate date);
+
+    List<PlanLog> findByUser_IdAndDateBetween(UUID userId, LocalDate start, LocalDate end);
 }

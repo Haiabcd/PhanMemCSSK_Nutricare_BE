@@ -7,9 +7,7 @@ import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.NutritionRuleMapper;
-import com.hn.nutricarebe.repository.AllergyRepository;
-import com.hn.nutricarebe.repository.ConditionRepository;
-import com.hn.nutricarebe.repository.NutritionRuleRepository;
+import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.NutritionRuleService;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
@@ -17,6 +15,9 @@ import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 
@@ -28,6 +29,8 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
     ConditionRepository conditionRepository;
     AllergyRepository allergyRepository;
     NutritionRuleMapper nutritionRuleMapper;
+    UserConditionRepository userConditionRepository;
+    UserAllergyRepository userAllergyRepository;
 
 
     @Override
@@ -58,5 +61,21 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
             throw new AppException(ErrorCode.NUTRITION_RULE_NOT_FOUND);
         }
         return nutritionRule;
+    }
+
+
+    @Override
+    public List<NutritionRule> getRuleByUserId(UUID userId) {
+        Set<UUID> conditionIds = new HashSet<>();
+        userConditionRepository.findByUser_Id(userId)
+                .forEach(uc -> conditionIds.add(uc.getCondition().getId()));
+        Set<UUID> allergyIds = new HashSet<>();
+
+        userAllergyRepository.findByUser_Id(userId)
+                .forEach(ua -> allergyIds.add(ua.getAllergy().getId()));
+
+        return nutritionRuleRepository.findActiveByConditionsOrAllergies(
+                conditionIds, allergyIds, conditionIds.isEmpty(), allergyIds.isEmpty()
+        );
     }
 }

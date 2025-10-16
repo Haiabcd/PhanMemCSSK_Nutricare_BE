@@ -15,7 +15,6 @@ public interface MealPlanItemMapper {
     @Mapping(source = "mealSlot", target = "mealSlot") // Enum -> String
     MealPlanItemResponse toMealPlanItemResponse(MealPlanItem mealPlanItem, @Context CdnHelper cdnHelper);
 
-    // Enum -> String (MapStruct sẽ tự gọi)
     default String map(MealSlot slot) {
         return slot != null ? slot.name() : null;
     }

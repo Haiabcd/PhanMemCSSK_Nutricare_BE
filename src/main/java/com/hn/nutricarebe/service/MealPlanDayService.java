@@ -10,4 +10,5 @@ public interface MealPlanDayService {
     MealPlanResponse createPlan(MealPlanCreationRequest request, int number);
     MealPlanResponse getMealPlanByDate(LocalDate date);
     void removeFromDate(LocalDate today, UUID userId);
+    MealPlanResponse createOrUpdatePlanForOneDay(LocalDate date);
 }

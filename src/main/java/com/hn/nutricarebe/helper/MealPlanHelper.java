@@ -63,6 +63,7 @@ public final class MealPlanHelper {
     }
     /* ===== TÍNH DINH DƯỠNG MÓN ===== */
 
+    //Tìm các tag cần tránh, ưu tiên, giới hạn từ rule
     public static TagDirectives buildTagDirectives(List<NutritionRule> rules, MealPlanCreationRequest request) {
         TagDirectives d = new TagDirectives();
         if (rules == null || rules.isEmpty()) return d;

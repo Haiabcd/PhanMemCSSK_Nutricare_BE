@@ -7,6 +7,9 @@ import com.hn.nutricarebe.entity.PlanLog;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static com.hn.nutricarebe.helper.MealPlanHelper.safeDouble;
+import static com.hn.nutricarebe.helper.MealPlanHelper.scaleNutrition;
+
 public final class  PlanLogHelper {
     private PlanLogHelper() {}
 
@@ -42,5 +45,18 @@ public final class  PlanLogHelper {
                 .sodiumMg(sodiumMg)
                 .sugarMg(sugarMg)
                 .build();
+    }
+
+
+    // Lấy dinh dưỡng thực tế từ log; nếu thiếu thì fallback từ món * portion
+    public static Nutrition resolveActualOrFallback(PlanLog l) {
+        if (l.getActualNutrition() != null && safeDouble(l.getActualNutrition().getKcal()) > 0) {
+            return l.getActualNutrition();
+        }
+        if (l.getFood() != null && l.getFood().getNutrition() != null) {
+            double portion = l.getPortion() == null ? 1.0 : l.getPortion().doubleValue();
+            return scaleNutrition(l.getFood().getNutrition(), portion);
+        }
+        return new Nutrition();
     }
 }

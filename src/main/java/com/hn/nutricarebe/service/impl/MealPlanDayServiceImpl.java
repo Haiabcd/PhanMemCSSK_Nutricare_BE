@@ -10,8 +10,10 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.MealPlanDayMapper;
+import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanDayService;
+import com.hn.nutricarebe.service.NutritionRuleService;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +27,8 @@ import java.time.Year;
 import java.util.*;
 import java.util.Comparator;
 import java.util.stream.Collectors;
-
 import static com.hn.nutricarebe.helper.MealPlanHelper.*;
+import static com.hn.nutricarebe.helper.PlanLogHelper.resolveActualOrFallback;
 import static java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR;
 
 @Log4j2
@@ -34,17 +36,15 @@ import static java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class MealPlanDayServiceImpl implements MealPlanDayService {
-
     MealPlanDayRepository mealPlanDayRepository;
     MealPlanDayMapper mealPlanDayMapper;
     FoodRepository foodRepository;
     MealPlanItemRepository mealPlanItemRepository;
-    UserConditionRepository userConditionRepository;
-    UserAllergyRepository userAllergyRepository;
-    NutritionRuleRepository nutritionRuleRepository;
+    NutritionRuleService nutritionRuleService;
+    ProfileRepository profileRepository;
+    ProfileMapper profileMapper;
+    PlanLogRepository planLogRepository;
     CdnHelper cdnHelper;
-
-
 
 
     //Tính BMI
@@ -101,13 +101,11 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         return targetCalories;
     }
 
-
-    @Override
-    public MealPlanResponse createPlan(MealPlanCreationRequest request, int number) {
+    //Tính nutrtion cho ngày
+    public Nutrition caculateNutrition(MealPlanCreationRequest request,AggregateConstraints agg){
         final double FAT_PCT = 0.30;              // WHO: chat beo ≤30%
         final double FREE_SUGAR_PCT_MAX = 0.10;   // WHO: <10%
         final int    SODIUM_MG_LIMIT = 2000;      // WHO: <2000 mg natri/ngày
-        final double WATER_ML_PER_KG = 35.0;      // 30–35 ml/kg
 
         var profile = request.getProfile();
         int weight = Math.max(1, profile.getWeightKg());
@@ -118,10 +116,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         //2) Tính kcal mục tiêu / ngày
         double targetCalories = calculateTargetKcal(tdee, profile);
 
-        //3) Nước
-        double waterMl = weight * WATER_ML_PER_KG;
-
-        //5.1) Protein (Đạm) theo g/kg
+        //3.1) Protein (Đạm) theo g/kg
         double proteinPerKg = switch (profile.getGoal()) {
             case MAINTAIN -> 0.8;
             case LOSE     -> 1.0;
@@ -130,18 +125,18 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         double proteinG = weight * proteinPerKg;
         double proteinKcal = proteinG * 4.0;
 
-        //5.2) Fat: 30% năng lượng (NẾU BÉO PHÌ NHỎ HƠN 30%)
+        //3.2) Fat: 30% năng lượng (NẾU BÉO PHÌ NHỎ HƠN 30%)
         double fatKcal = targetCalories * FAT_PCT;
         double fatG = fatKcal / 9.0;
 
-        //5.3) Carb = phần còn lại
+        //3.3) Carb = phần còn lại
         double carbKcal = Math.max(0.0, targetCalories - proteinKcal - fatKcal);
         double carbG = carbKcal / 4.0;
 
-        //5.4) Fiber: tối thiểu 25g (nâng theo 14g/1000kcal nếu cần)
+        //3.4) Fiber: tối thiểu 25g (nâng theo 14g/1000kcal nếu cần)
         double fiberG = Math.max(25.0, 14.0 * (targetCalories / 1000.0));
 
-        //5.5) Free sugar trần <10% năng lượng → g → mg
+        //3.5) Free sugar trần <10% năng lượng → g → mg
         double sugarGMax = (targetCalories * FREE_SUGAR_PCT_MAX) / 4.0;
         double sugarMg = sugarGMax * 1000.0;
 
@@ -156,29 +151,31 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 .sugarMg(bd(sugarMg, 2))
                 .build();
 
+        return applyAggregateConstraintsToDayTarget(target, agg);
+    }
+
+
+    @Override
+    public MealPlanResponse createPlan(MealPlanCreationRequest request, int number) {
+        final double FAT_PCT = 0.30;              // WHO: chat beo ≤30%
+        final double FREE_SUGAR_PCT_MAX = 0.10;   // WHO: <10%
+        final int    SODIUM_MG_LIMIT = 2000;      // WHO: <2000 mg natri/ngày
+        final double WATER_ML_PER_KG = 35.0;      // 30–35 ml/kg
+
+        var profile = request.getProfile();
+        int weight = Math.max(1, profile.getWeightKg());
+
+        double waterMl = weight * WATER_ML_PER_KG;
         /* ===================== NẠP BỆNH NỀN, DỊ ỨNG & RULES ===================== */
         UUID userId = request.getUserId();
-
-        Set<UUID> conditionIds = new HashSet<>();
-        userConditionRepository.findByUser_Id(userId)
-                .forEach(uc -> conditionIds.add(uc.getCondition().getId()));
-
-        Set<UUID> allergyIds = new HashSet<>();
-        userAllergyRepository.findByUser_Id(userId)
-                .forEach(ua -> allergyIds.add(ua.getAllergy().getId()));
-
-        //Lấy ra danh sách rule của bệnh nền & dị ứng mà người dùng bị
-        List<NutritionRule> rules = nutritionRuleRepository.findActiveByConditionsOrAllergies(
-                conditionIds, allergyIds, conditionIds.isEmpty(), allergyIds.isEmpty()
-        );
-
+        List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
         AggregateConstraints agg = deriveAggregateConstraintsFromRules(rules, weight);
 
         if (agg.dayWaterMin != null) {
             waterMl = Math.max(waterMl, agg.dayWaterMin.doubleValue());
         }
 
-        target = applyAggregateConstraintsToDayTarget(target, agg);
+        Nutrition target = caculateNutrition(request,agg);
         /* ===================== LẬP KẾ HOẠCH CHO NUMBER NGÀY ===================== */
         LocalDate startDate = LocalDate.now();
         List<MealPlanDay> days = new ArrayList<>(number);
@@ -459,7 +456,256 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         mealPlanDayRepository.deleteFromDate(userId, today);
     }
 
+
+    @Override
+    @Transactional
+    public MealPlanResponse createOrUpdatePlanForOneDay(LocalDate date) {
+        final double WATER_ML_PER_KG = 35.0;
+
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
+        UUID userId = UUID.fromString(auth.getName());
+
+        // ===== 1) Profile + rules + day target =====
+        Profile profile = profileRepository.findByUser_Id(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+        ProfileCreationRequest pReq = profileMapper.toProfileCreationRequest(profile);
+
+        int weight = Math.max(1, profile.getWeightKg());
+        List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
+        AggregateConstraints agg = deriveAggregateConstraintsFromRules(rules, weight);
+
+        MealPlanCreationRequest mReq = MealPlanCreationRequest.builder()
+                .userId(userId)
+                .profile(pReq)
+                .build();
+
+        Nutrition dayTarget = caculateNutrition(mReq, agg);
+
+        double waterMl = weight * WATER_ML_PER_KG;
+        if (agg.dayWaterMin != null) {
+            waterMl = Math.max(waterMl, agg.dayWaterMin.doubleValue());
+        }
+
+        MealPlanDay newDay = MealPlanDay.builder()
+                .user(User.builder().id(userId).build())
+                .date(date)
+                .targetNutrition(dayTarget)
+                .waterTargetMl((int) Math.round(waterMl))
+                .build();
+
+        // ===== 2) Lấy/ tạo MealPlanDay cho date =====
+        MealPlanDay day = mealPlanDayRepository.findByUser_IdAndDate(userId, date)
+                .orElseGet(() -> mealPlanDayRepository.save(newDay));
+
+        // ===== 3) Đọc log hôm nay + gần đây (để né món và tính consumed) =====
+        final int NO_REPEAT_DAYS = 3;
+        LocalDate startRecent = date.minusDays(NO_REPEAT_DAYS);
+
+        List<PlanLog> todayLogs  = planLogRepository.findByUser_IdAndDate(userId, date);  //Lấy log ngày hôm nay
+        List<PlanLog> recentLogs = planLogRepository.findByUser_IdAndDateBetween(userId, startRecent, date.minusDays(1)); //Lấy log vài ngày gần đây
+
+        // 3.1) Consumed per slot (vector dinh dưỡng)
+        Map<MealSlot, Nutrition> consumedBySlot = new EnumMap<>(MealSlot.class);
+        for (MealSlot s : MealSlot.values()) consumedBySlot.put(s, new Nutrition()); // khởi tạo rỗng
+
+        Set<UUID> eatenFoodToday = new HashSet<>();  //Món đã ăn theo ke hoach
+        for (PlanLog l : todayLogs) {
+            MealSlot s = l.getMealSlot();
+            Nutrition add = resolveActualOrFallback(l);  //Lấy dinh dinh dưỡng đã ăn
+            consumedBySlot.put(s, addNut(consumedBySlot.get(s), add));
+            if (l.getFood() != null) eatenFoodToday.add(l.getFood().getId());
+        }
+
+        // 3.2) Né món gần đây (kể cả hôm nay)
+        Set<UUID> recentFoods = recentLogs.stream()
+                .filter(l -> l.getFood()!=null)
+                .map(l -> l.getFood().getId())
+                .collect(Collectors.toSet());
+        recentFoods.addAll(eatenFoodToday);
+
+        // ===== 4) Xóa item cũ chưa dùng (tránh FK & rác) =====
+        mealPlanItemRepository.deleteUnusedItemsByDay(day.getId());
+
+        // ===== 5) Tag directives để lọc avoid/limit/prefer =====
+        TagDirectives tagDir = buildTagDirectives(rules, mReq);
+
+        // ===== 6) Tham số slot (số món & %kcal) =====
+        Map<MealSlot, Double> slotKcalPct = Map.of(
+                MealSlot.BREAKFAST, 0.25,
+                MealSlot.LUNCH,     0.30,
+                MealSlot.DINNER,    0.30,
+                MealSlot.SNACK,     0.15
+        );
+        Map<MealSlot, Integer> slotItemCounts = Map.of(
+                MealSlot.BREAKFAST, 2,
+                MealSlot.LUNCH,     3,
+                MealSlot.DINNER,    3,
+                MealSlot.SNACK,     1
+        );
+
+        // số thứ tự tiếp theo cho rank
+        int rankBase = 1 + mealPlanItemRepository.findByDay_User_IdAndDay_Date(userId, date).size();
+
+        // ===== 7) Cho từng slot: tính target MEAL → trừ consumed → còn bao nhiêu thì bổ sung =====
+        for (MealSlot slot : MealSlot.values()) {
+            int targetItems = slotItemCounts.get(slot);
+
+            // 7.1) Meal target (vector) và remaining = max(0, target - consumed)
+            Nutrition mealTarget = approxMacroTargetForMeal(dayTarget, slotKcalPct.get(slot), rules, weight, mReq);
+            Nutrition consumed   = consumedBySlot.getOrDefault(slot, new Nutrition());  // Tổng dinh dưỡng đã ăn
+            Nutrition remaining  = subNutClamp0(mealTarget, consumed); // Phần còn thiếu cần bổ sung
+
+            // Nếu đã thừa (consumed > target) thì remaining = 0 → không bổ sung
+            if (isSatisfied(remaining)) continue;
+
+            // 7.2) Pool ứng viên theo slot
+            final int CANDIDATE_LIMIT = 120;
+            final int MIN_KCAL = 20, MAX_KCAL = 2000, PIVOT = 500;
+            List<Food> pool = foodRepository.selectCandidatesBySlotAndKcalWindow(
+                    slot.name(), MIN_KCAL, MAX_KCAL, PIVOT, CANDIDATE_LIMIT
+            );
+            if (pool == null) pool = Collections.emptyList();
+
+            // 7.3) Lọc AVOID + né recentFoods
+            List<Food> candidates = pool.stream()
+                    .filter(f -> Collections.disjoint(tagsOf(f), tagDir.getAvoid()))
+                    .filter(f -> !recentFoods.contains(f.getId()))
+                    .collect(Collectors.toCollection(ArrayList::new));
+
+            // 7.4) Sắp xếp theo độ “hợp” với phần còn thiếu của slot
+            Nutrition slotTargetRemaining = remaining;
+            candidates.sort(Comparator.<Food>comparingDouble(
+                    f -> -scoreFoodHeuristic(f, slotTargetRemaining)));
+
+            // 7.5) Quyết định số món cần bổ sung dựa trên remaining kcal (linh hoạt)
+            double slotQuotaKcal = safeDouble(dayTarget.getKcal()) * slotKcalPct.get(slot); // quota kcal của bữa
+            double rKcal = safeDouble(remaining.getKcal());                                  // kcal còn thiếu của bữa
+            int need = estimateItemNeed(slot, rKcal, slotQuotaKcal, targetItems);
+            if (need <= 0) continue;
+
+            // 7.6) Chọn món, update remaining (vector) sau mỗi lần pick
+            int picked = 0;
+            Set<UUID> usedThisSlot = new HashSet<>();
+
+            double remainingKcal = safeDouble(remaining.getKcal());
+            for (Food cand : candidates) {
+                if (picked >= need) break;
+                if (usedThisSlot.contains(cand.getId())) continue;
+
+                var nut = cand.getNutrition();
+                if (nut == null || nut.getKcal()==null || safeDouble(nut.getKcal())<=0) continue;
+
+                int remainSlots = Math.max(1, need - picked);
+                double perItemAimKcal = Math.max(60, remainingKcal / remainSlots);
+                double portion = pickPortionStep(perItemAimKcal, safeDouble(nut.getKcal()));
+                if (portion <= 0.5 && remainSlots > 1) continue;
+
+                Nutrition snap = scaleNutrition(nut, portion);
+
+                if (!passesItemRules(rules, cand, snap, mReq)) {
+                    var step = stepDown(portion);
+                    boolean fixed = false;
+                    while (step.isPresent()) {
+                        double p2 = step.getAsDouble();
+                        Nutrition s2 = scaleNutrition(nut, p2);
+                        if (passesItemRules(rules, cand, s2, mReq)) {
+                            portion = p2; snap = s2; fixed = true; break;
+                        }
+                        step = stepDown(p2);
+                    }
+                    if (!fixed) continue;
+                }
+
+                // Lưu item
+                mealPlanItemRepository.save(MealPlanItem.builder()
+                        .day(day)
+                        .mealSlot(slot)
+                        .food(cand)
+                        .portion(bd(portion,2))
+                        .used(false)
+                        .rank(rankBase++)
+                        .nutrition(snap)
+                        .build());
+
+                usedThisSlot.add(cand.getId());
+                recentFoods.add(cand.getId());
+
+                // Trừ remaining theo vector
+                remaining = subNutClamp0(remaining, snap);
+                remainingKcal = safeDouble(remaining.getKcal());
+
+                // Nếu remaining đã đạt (rất nhỏ) thì dừng slot
+                if (isSatisfied(remaining)) break;
+
+                picked++;
+            }
+        }
+        // ===== 8) Trả về response
+        MealPlanDay dayReload = mealPlanDayRepository.findByUser_IdAndDate(userId, date).orElse(day);
+        return mealPlanDayMapper.toMealPlanResponse(dayReload, cdnHelper);
+    }
+
     /* ===================== HÀM PHỤ TRỢ ===================== */
+
+    private static final double EPS_KCAL   = 40.0;
+    private static final double EPS_PROT   = 3.0;
+    private static final double EPS_CARB   = 6.0;
+    private static final double EPS_FAT    = 3.0;
+    private static final double EPS_FIBER  = 3.0;
+    private static final double EPS_SODIUM = 200.0;
+    private static final double EPS_SUGAR  = 6.0;
+
+    private boolean isSatisfied(Nutrition n) {
+        return  safeDouble(n.getKcal())     <= EPS_KCAL   &&
+                safeDouble(n.getProteinG()) <= EPS_PROT   &&
+                safeDouble(n.getCarbG())    <= EPS_CARB   &&
+                safeDouble(n.getFatG())     <= EPS_FAT    &&
+                safeDouble(n.getFiberG())   <= EPS_FIBER  &&
+                safeDouble(n.getSodiumMg()) <= EPS_SODIUM &&
+                safeDouble(n.getSugarMg())  <= EPS_SUGAR;
+    }
+
+    //Cộng 2 chất dinh dưỡng
+    private Nutrition addNut(Nutrition a, Nutrition b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return Nutrition.builder()
+                .kcal(     bd(safeDouble(a.getKcal())     + safeDouble(b.getKcal()), 2))
+                .proteinG( bd(safeDouble(a.getProteinG()) + safeDouble(b.getProteinG()), 2))
+                .carbG(    bd(safeDouble(a.getCarbG())    + safeDouble(b.getCarbG()), 2))
+                .fatG(     bd(safeDouble(a.getFatG())     + safeDouble(b.getFatG()), 2))
+                .fiberG(   bd(safeDouble(a.getFiberG())   + safeDouble(b.getFiberG()), 2))
+                .sodiumMg( bd(safeDouble(a.getSodiumMg()) + safeDouble(b.getSodiumMg()), 2))
+                .sugarMg(  bd(safeDouble(a.getSugarMg())  + safeDouble(b.getSugarMg()), 2))
+                .build();
+    }
+
+    // remaining = max(0, target - consumed)
+    private Nutrition subNutClamp0(Nutrition target, Nutrition consumed) {
+        double kcal   = Math.max(0, safeDouble(target.getKcal())     - safeDouble(consumed.getKcal()));
+        double prot   = Math.max(0, safeDouble(target.getProteinG()) - safeDouble(consumed.getProteinG()));
+        double carb   = Math.max(0, safeDouble(target.getCarbG())    - safeDouble(consumed.getCarbG()));
+        double fat    = Math.max(0, safeDouble(target.getFatG())     - safeDouble(consumed.getFatG()));
+        double fiber  = Math.max(0, safeDouble(target.getFiberG())   - safeDouble(consumed.getFiberG()));
+        double sodium = Math.max(0, safeDouble(target.getSodiumMg()) - safeDouble(consumed.getSodiumMg()));
+        double sugar  = Math.max(0, safeDouble(target.getSugarMg())  - safeDouble(consumed.getSugarMg()));
+
+        return Nutrition.builder()
+                .kcal(bd(kcal,2)).proteinG(bd(prot,2)).carbG(bd(carb,2)).fatG(bd(fat,2))
+                .fiberG(bd(fiber,2)).sodiumMg(bd(sodium,2)).sugarMg(bd(sugar,2))
+                .build();
+    }
+
+    // Ước lượng cần mấy món dựa trên kcal còn thiếu + “khung” số món mặc định
+    private int estimateItemNeed(MealSlot slot, double rKcal, double slotQuotaKcal, int targetItems) {
+        if (rKcal <= EPS_KCAL) return 0;
+        int maxBySlot = (slot == MealSlot.SNACK ? 1 : targetItems);
+        if (rKcal < 0.33 * slotQuotaKcal) return Math.min(1, maxBySlot);
+        if (rKcal < 0.66 * slotQuotaKcal) return Math.min(2, maxBySlot);
+        return maxBySlot;
+    }
+
 
     /* ===== TÍNH DINH DƯỠNG NGÀY ===== */
     private AggregateConstraints deriveAggregateConstraintsFromRules(List<NutritionRule> rules, int weightKg) {
@@ -736,8 +982,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         return 0.0;
     }
     /* ===== LỌC MÓN + TÍNH ĐIỂM ===== */
-
-
     //trả về giá trị nhỏ hơn (ưu tiên an toàn cho chất cần hạn chế)
     private BigDecimal minOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.min(b); }
     //trả về giá trị lớn hơn (ưu tiên đảm bảo cho chất cần thiết)

@@ -58,5 +58,4 @@ public class MealPlanController {
                 .data(suggestions)
                 .build();
     }
-
 }

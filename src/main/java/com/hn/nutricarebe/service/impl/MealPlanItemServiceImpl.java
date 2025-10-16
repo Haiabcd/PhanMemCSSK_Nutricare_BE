@@ -15,6 +15,7 @@ import com.hn.nutricarebe.mapper.FoodMapper;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanItemService;
+import com.hn.nutricarebe.service.NutritionRuleService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -34,11 +35,9 @@ import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class MealPlanItemServiceImpl implements MealPlanItemService {
     MealPlanItemRepository mealPlanItemRepository;
-    FoodRepository foodRepository;
-    UserConditionRepository userConditionRepository;
-    UserAllergyRepository userAllergyRepository;
-    NutritionRuleRepository nutritionRuleRepository;
+    NutritionRuleService nutritionRuleService;
     ProfileRepository profileRepository;
+    FoodRepository foodRepository;
     ProfileMapper profileMapper;
     FoodMapper foodMapper;
     CdnHelper cdnHelper;
@@ -130,17 +129,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
                 .profile(pReq)
                 .build();
 
-        Set<UUID> conditionIds = new HashSet<>();
-        userConditionRepository.findByUser_Id(userId)
-                .forEach(uc -> conditionIds.add(uc.getCondition().getId()));
-        Set<UUID> allergyIds = new HashSet<>();
-
-        userAllergyRepository.findByUser_Id(userId)
-                .forEach(ua -> allergyIds.add(ua.getAllergy().getId()));
-
-        List<NutritionRule> rules = nutritionRuleRepository.findActiveByConditionsOrAllergies(
-                conditionIds, allergyIds, conditionIds.isEmpty(), allergyIds.isEmpty()
-        );
+        List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
 
         TagDirectives tagDir = buildTagDirectives(rules, req);
 
