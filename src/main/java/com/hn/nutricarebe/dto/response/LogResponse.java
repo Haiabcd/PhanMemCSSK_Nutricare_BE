@@ -21,7 +21,7 @@ public class LogResponse {
     UUID id;
     LocalDate date;
     MealSlot mealSlot;
-    Food food;
+    FoodResponse food;
     boolean isFromPlan;
     BigDecimal portion;
     NutritionResponse actualNutrition;

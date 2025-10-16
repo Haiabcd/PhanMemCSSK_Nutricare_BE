@@ -70,6 +70,7 @@ public class PlanLogServiceImpl implements PlanLogService {
     }
 
     @Override
+    @Transactional
     public List<LogResponse> getLog(LocalDate date, MealSlot mealSlot) {
         if (date == null) {
             throw new AppException(ErrorCode.VALIDATION_FAILED);
@@ -89,10 +90,17 @@ public class PlanLogServiceImpl implements PlanLogService {
     @Override
     @Transactional
     public void deleteById(UUID id) {
-        if (!logRepository.existsById(id)) {
-            throw new AppException(ErrorCode.NOT_FOUND_PLAN_LOG);
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        UUID userId = UUID.fromString(auth.getName());
+        PlanLog p = logRepository.findById(id).orElse(null);
+        if(p == null || p.getUser() == null || !userId.equals(p.getUser().getId())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-
+        if (p != null && p.getPlanItem() != null) {
+            MealPlanItem item = p.getPlanItem();
+            item.setUsed(false);
+            mealPlanItemRepository.save(item);
+        }
         logRepository.deleteById(id);
     }
 
