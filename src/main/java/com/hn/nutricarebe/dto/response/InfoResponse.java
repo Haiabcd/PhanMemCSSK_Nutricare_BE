@@ -17,4 +17,5 @@ public class InfoResponse {
     ProfileCreationResponse profileCreationResponse;
     List<UserConditionResponse> conditions;
     List<UserAllergyResponse> allergies;
+    String provider;
 }

@@ -30,6 +30,4 @@ public class ProfileController {
                 .message("Update profile successfully")
                 .build();
     }
-
-
 }

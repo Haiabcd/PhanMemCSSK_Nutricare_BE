@@ -1,4 +1,3 @@
-// src/main/java/com/hn/nutricarebe/service/impl/AiAnalyzeServiceImpl.java
 package com.hn.nutricarebe.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;

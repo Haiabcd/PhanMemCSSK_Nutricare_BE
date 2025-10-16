@@ -2,7 +2,6 @@ package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.IngredientCreationRequest;
 import com.hn.nutricarebe.dto.response.IngredientResponse;
-import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.entity.Ingredient;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;

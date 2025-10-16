@@ -10,6 +10,6 @@ import java.util.UUID;
 public interface UserAllergyService {
   List<UserAllergyResponse> saveUserAllergy(UserAllergyCreationRequest request);
   List<UserAllergyResponse> findByUser_Id(UUID userId);
-  void updateUserAllergys(UUID userId, Set<UUID> allergyIds);
+  boolean updateUserAllergys(UUID userId, Set<UUID> allergyIds);
 
 }

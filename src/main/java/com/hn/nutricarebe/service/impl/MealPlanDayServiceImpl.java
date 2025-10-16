@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.dto.TagDirectives;
 import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
 import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
 import com.hn.nutricarebe.dto.response.MealPlanResponse;
@@ -248,7 +249,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             // Lọc món bị cấm
             TagDirectives tagDir = buildTagDirectives(rules, request);
             pool = pool.stream()
-                    .filter(f -> Collections.disjoint(tagsOf(f), tagDir.avoid))
+                    .filter(f -> Collections.disjoint(tagsOf(f), tagDir.getAvoid()))
                     .collect(Collectors.toCollection(ArrayList::new)); // MUTABLE
 
 
@@ -266,13 +267,13 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 Set<FoodTag> ft = tagsOf(f);
 
                 // PREFER: cộng mềm theo số tag khớp
-                if (!tagDir.preferBonus.isEmpty()) {
-                    long cnt = ft.stream().filter(tagDir.preferBonus::containsKey).count();  //Đếm số tag trùng
+                if (!tagDir.getPreferBonus().isEmpty()) {
+                    long cnt = ft.stream().filter(tagDir.getPreferBonus()::containsKey).count();  //Đếm số tag trùng
                     if (cnt > 0) s += cnt * PREFER_BONUS_PER_TAG;
                 }
                 // LIMIT: trừ mềm theo số tag khớp
-                if (!tagDir.limitPenalty.isEmpty()) {
-                    long cnt = ft.stream().filter(tagDir.limitPenalty::containsKey).count();
+                if (!tagDir.getLimitPenalty().isEmpty()) {
+                    long cnt = ft.stream().filter(tagDir.getLimitPenalty()::containsKey).count();
                     if (cnt > 0) s -= cnt * LIMIT_PENALTY_PER_TAG;
                 }
                 score.put(f.getId(), s);
@@ -460,9 +461,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
 
     /* ===================== HÀM PHỤ TRỢ ===================== */
 
-
-
-
     /* ===== TÍNH DINH DƯỠNG NGÀY ===== */
     private AggregateConstraints deriveAggregateConstraintsFromRules(List<NutritionRule> rules, int weightKg) {
         AggregateConstraints a = new AggregateConstraints();
@@ -620,7 +618,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 if (r.getScope() != RuleScope.MEAL) continue;
                 if (r.getTargetType() != TargetType.NUTRIENT) continue;
                 if (r.getComparator() == null) continue;
-                if (!appliesToDemographics(r, request)) continue;
+                if (!isApplicableToDemographics(r, request)) continue;
 
                 String code = safeStr(r.getTargetCode()).toUpperCase();
                 BigDecimal min = r.getThresholdMin();
@@ -678,41 +676,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
 
 
     /* ===== LỌC MÓN + TÍNH ĐIỂM ===== */
-    static class TagDirectives {
-        Set<FoodTag> avoid = new HashSet<>();
-        Map<FoodTag, Double> preferBonus = new HashMap<>();
-        Map<FoodTag, Double> limitPenalty = new HashMap<>();
-    }
-
-    private TagDirectives buildTagDirectives(List<NutritionRule> rules, MealPlanCreationRequest request) {
-        TagDirectives d = new TagDirectives();
-        if (rules == null || rules.isEmpty()) return d;
-
-        for (NutritionRule r : rules) {
-            if (r.getTargetType() != TargetType.FOOD_TAG) continue;
-            if (r.getScope() != RuleScope.ITEM) continue;
-            if (!appliesToDemographics(r, request)) continue;
-
-            Set<FoodTag> tags = r.getFoodTags();
-            if (tags == null || tags.isEmpty()) continue;
-
-            RuleType rt = r.getRuleType();
-            if (rt == null) continue;
-
-            switch (rt) {
-                case AVOID -> d.avoid.addAll(tags);
-                case PREFER -> tags.forEach(t -> d.preferBonus.merge(t, 1.0, Double::sum));
-                case LIMIT  -> tags.forEach(t -> d.limitPenalty.merge(t, 1.0, Double::sum));
-                default -> { /* bỏ qua các loại khác nếu có */ }
-            }
-        }
-        return d;
-    }
-
-    private static Set<FoodTag> tagsOf(Food f) {
-        return f.getTags() == null ? Collections.emptySet() : f.getTags();
-    }
-
     private double scoreFoodHeuristic(Food f, Nutrition slotTarget) {
         Nutrition n = f.getNutrition();
         if (n == null) return -1e9;
@@ -774,105 +737,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     }
     /* ===== LỌC MÓN + TÍNH ĐIỂM ===== */
 
-    /* ===== CHỌN KHẨU PHẦN ===== */
-
-    private static double pickPortionStep(double kcalRemain, double foodKcal) {
-        if (foodKcal <= 0) return 1.0;
-        double best = PORTION_STEPS[0];
-        double bestDiff = Math.abs(kcalRemain - best * foodKcal);  //Độ lệch ||
-
-        for (double step : PORTION_STEPS) {
-            double diff = Math.abs(kcalRemain - step * foodKcal);  //Độ lệch từng bậc ||
-
-            boolean overBest = best * foodKcal > kcalRemain;   //Kiểm tra bậc hiện tại  (true --> vượt)
-            boolean overCur  = step * foodKcal > kcalRemain;   //Kiểm tra bậc đang xét
-
-            if (diff < bestDiff || (Math.abs(diff - bestDiff) < 1e-6 && !overCur && overBest)) {
-                best = step;
-                bestDiff = diff;
-            }
-        }
-        return best;
-    }
-    private static OptionalDouble stepDown(double current) {
-        for (int i = 0; i < PORTION_STEPS.length; i++) {
-            if (Math.abs(PORTION_STEPS[i] - current) < 1e-9) {
-                // Tìm bậc kế tiếp nhỏ hơn
-                for (int j = i + 1; j < PORTION_STEPS.length; j++) {
-                    if (PORTION_STEPS[j] < PORTION_STEPS[i]) {
-                        return OptionalDouble.of(PORTION_STEPS[j]);
-                    }
-                }
-                break;
-            }
-        }
-        return OptionalDouble.empty();
-    }
-    /* ===== CHỌN KHẨU PHẦN ===== */
-
-    /* ===== KIỂM TRA LẠI MÓN ĐƯỢC CHỌN ===== */
-    private boolean passesItemRules(List<NutritionRule> rules, Food food, Nutrition snap, MealPlanCreationRequest request) {
-        if (rules == null || rules.isEmpty()) return true;
-        for (NutritionRule r : rules) {
-            // Bỏ qua nếu rule không phải là từng món
-            if (r.getScope() != RuleScope.ITEM) continue;
-            if (!appliesToDemographics(r, request)) continue;
-
-            if (r.getTargetType() == TargetType.NUTRIENT) {
-                String code = safeStr(r.getTargetCode());
-                //Lấy chất dinh dưỡng theo mã code
-                BigDecimal value = switch (code){
-                        case "KCAL" -> snap.getKcal();
-                        case "PROTEIN"        -> snap.getProteinG();
-                        case "CARB"           -> snap.getCarbG();
-                        case "FAT"            -> snap.getFatG();
-                        case "FIBER"          -> snap.getFiberG();
-                        case "SODIUM"         -> snap.getSodiumMg();
-                        case "SUGAR"          -> snap.getSugarMg();
-                        default               -> null;
-                };
-                if (value == null) break;
-
-                BigDecimal min = r.getThresholdMin();
-                BigDecimal max = r.getThresholdMax();
-
-                if (Boolean.TRUE.equals(r.getPerKg())) {
-                    int weight = Math.max(1, request.getProfile().getWeightKg());
-                    if (min != null) min = min.multiply(BigDecimal.valueOf(weight));
-                    if (max != null) max = max.multiply(BigDecimal.valueOf(weight));
-                }
-
-                switch (r.getComparator()) {
-                    case LT:      return max != null && value.compareTo(max) < 0;
-                    case LTE:     return max != null && value.compareTo(max) <= 0;
-                    case GT:      return min != null && value.compareTo(min) > 0;
-                    case GTE:     return min != null && value.compareTo(min) >= 0;
-                    case EQ:      return (min != null) && value.compareTo(min) == 0;
-                    case BETWEEN: return (min != null && max != null) && value.compareTo(min) >= 0 && value.compareTo(max) <= 0;
-                    default: return true;
-                }
-            }
-        }
-        return true;
-    }
-    /* ===== KIỂM TRA LẠI MÓN ĐƯỢC CHỌN ===== */
-
-    // Kiểm tra rule về độ tuổi, giới tính
-    private boolean appliesToDemographics(NutritionRule r, MealPlanCreationRequest request) {
-        var p = request.getProfile();
-        // Giới tính
-        Gender ruleSex = r.getApplicableSex();
-        if (ruleSex != null) {
-            if (p.getGender() == null || p.getGender() != ruleSex) return false;
-        }
-        // Độ tuổi
-        int currentYear = java.time.Year.now().getValue();
-        int age = Math.max(0, currentYear - p.getBirthYear());
-        if (r.getAgeMin() != null && age < r.getAgeMin()) return false;
-        if (r.getAgeMax() != null && age > r.getAgeMax()) return false;
-        return true;
-    }
-
 
     //trả về giá trị nhỏ hơn (ưu tiên an toàn cho chất cần hạn chế)
     private BigDecimal minOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.min(b); }
@@ -880,5 +744,5 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     private BigDecimal maxOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.max(b); }
 
 
-    private String safeStr(String s){ return s==null? "" : s.trim(); }
+
 }

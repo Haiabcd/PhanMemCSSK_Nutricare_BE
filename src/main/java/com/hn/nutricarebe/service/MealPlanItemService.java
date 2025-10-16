@@ -1,16 +1,15 @@
 package com.hn.nutricarebe.service;
 
 
-import com.hn.nutricarebe.dto.request.MealPlanItemCreationRequest;
-import com.hn.nutricarebe.dto.response.FoodResponse;
-import com.hn.nutricarebe.dto.response.MealPlanItemResponse;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Slice;
 
+
+import com.hn.nutricarebe.dto.response.FoodResponse;
+import com.hn.nutricarebe.enums.MealSlot;
+
+import java.util.List;
 import java.util.UUID;
 
 public interface MealPlanItemService {
-    MealPlanItemResponse createMealPlanItems(MealPlanItemCreationRequest request);
-    Slice<FoodResponse> getUpcomingFoods(int page, int size);
     void smartSwapMealItem(UUID itemId);
+    List<FoodResponse> suggestAllowedFoodsInternal(MealSlot slot, int limit);
 }

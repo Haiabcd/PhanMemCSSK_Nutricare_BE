@@ -3,6 +3,7 @@ package com.hn.nutricarebe.controller;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.FoodResponse;
 import com.hn.nutricarebe.dto.response.MealPlanResponse;
+import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.service.MealPlanDayService;
 import com.hn.nutricarebe.service.MealPlanItemService;
 import jakarta.validation.constraints.Max;
@@ -35,19 +36,6 @@ public class MealPlanController {
                 .build();
     }
 
-    @GetMapping("/suggestions")
-    public ApiResponse<Slice<FoodResponse>> getUpcomingFoods(
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(200) int size
-    ) {
-        return ApiResponse.<Slice<FoodResponse>>builder()
-                .message("Lấy danh sách món ăn gợi ý thành công")
-                .data(mealPlanItemService.getUpcomingFoods(page, size))
-                .build();
-    }
-
-
-
     @PutMapping("/{itemId}/swap")
     public ApiResponse<Void> smartSwap(@PathVariable UUID itemId) {
         mealPlanItemService.smartSwapMealItem(itemId);
@@ -55,4 +43,20 @@ public class MealPlanController {
                 .message("Hoán đổi món ăn thành công")
                 .build();
     }
+
+    @GetMapping("/suggest")
+    public ApiResponse<List<FoodResponse>> suggestAllowedFoods(
+            @RequestParam(name = "slot", required = false) MealSlot slot,
+            @RequestParam(name = "limit", defaultValue = "20") int limit
+    ) {
+        if (limit < 1 || limit > 100) {
+            limit = 20;
+        }
+        List<FoodResponse> suggestions = mealPlanItemService.suggestAllowedFoodsInternal(slot, limit);
+        return ApiResponse.<List<FoodResponse>>builder()
+                .message("Gợi ý món ăn thành công")
+                .data(suggestions)
+                .build();
+    }
+
 }

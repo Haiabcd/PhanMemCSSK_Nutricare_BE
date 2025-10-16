@@ -309,7 +309,6 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
 
-
         // 2. Kiểm tra token trong DB và phát hiện reuse
         RefreshToken tokenOld = refreshTokenService.findById(jti);
 
@@ -356,29 +355,23 @@ public class AuthServiceImpl implements AuthService {
     }
     //============================ Cấp token ============================//
 
-    //============================ Get id by token ======================//
+
+    //============================ Logout ============================//
     @Override
-    public UUID extractUserIdFromAccessToken(String accessToken) {
-        String raw = accessToken;
-        if (raw != null && raw.startsWith("Bearer ")) {
-            raw = raw.substring("Bearer ".length());
-        }
-        if (raw == null || raw.isBlank()) {
-            throw new AppException(ErrorCode.INVALID_TOKEN);
-        }
-
-        SignedJWT jwt = parseAndVerify(raw);
+    @Transactional
+    public void logout(String refreshTokenRaw) {
+        SignedJWT jwt = parseAndVerify(refreshTokenRaw);
         JWTClaimsSet claims = getClaims(jwt);
-        validateAccessClaims(claims);
-
-        // Trả về UUID trong subject (đã set bằng user.getId().toString())
-        try {
-            return UUID.fromString(claims.getSubject());
-        } catch (IllegalArgumentException ex) {
-            throw new AppException(ErrorCode.INVALID_TOKEN);
+        validateRefreshClaims(claims);
+        String jti = claims.getJWTID();
+        RefreshToken token = refreshTokenService.findById(jti);
+        if (token.isRevoked() || token.isRotated()) {
+            return;
         }
+        token.setRevoked(true);
+        refreshTokenService.saveAll(List.of(token));
     }
-    //============================ Get id by token ======================//
+    //============================ Logout ============================//
 
 
     /* ------------------------- Helper methods -------------------------*/
@@ -395,25 +388,6 @@ public class AuthServiceImpl implements AuthService {
             Instant exp = claims.getExpirationTime().toInstant();
             if (Instant.now().isAfter(exp.plusSeconds(60))) {
                 throw new AppException(ErrorCode.EXPIRED_REFRESH_TOKEN);
-            }
-        } catch (java.text.ParseException e) {
-            throw new AppException(ErrorCode.INVALID_TOKEN);
-        }
-    }
-
-    private void validateAccessClaims(JWTClaimsSet claims) {
-        try {
-            if (!"nutricare.com".equals(claims.getIssuer()) ||
-                    !"access".equals(claims.getStringClaim("typ")) ||
-                    claims.getJWTID() == null ||
-                    claims.getSubject() == null) {
-                throw new AppException(ErrorCode.INVALID_TOKEN);
-            }
-
-            Instant exp = claims.getExpirationTime().toInstant();
-            // Cho phép lệch clock nhẹ, không bắt buộc:
-            if (Instant.now().isAfter(exp.plusSeconds(60))) {
-                throw new AppException(ErrorCode.EXPIRED_ACCESS_TOKEN);
             }
         } catch (java.text.ParseException e) {
             throw new AppException(ErrorCode.INVALID_TOKEN);

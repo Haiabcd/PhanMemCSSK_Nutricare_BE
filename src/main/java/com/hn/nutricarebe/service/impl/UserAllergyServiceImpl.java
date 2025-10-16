@@ -49,40 +49,44 @@ public class UserAllergyServiceImpl implements UserAllergyService {
     }
 
     @Override
-    public void updateUserAllergys(UUID userId, Set<UUID> allergyIds) {
-        if (allergyIds == null || allergyIds.isEmpty()) {
-            userAllergyRepository.deleteAllByUserId(userId);
-            return;
-        }
+    public boolean updateUserAllergys(UUID userId, Set<UUID> allergyIds) {
+        Set<UUID> newIds = (allergyIds == null) ? Collections.emptySet()
+                : new LinkedHashSet<>(allergyIds);
 
         List<UserAllergy> current = userAllergyRepository.findByUser_Id(userId);
         Set<UUID> currentIds = current.stream()
-                .map(uc -> uc.getAllergy().getId())
-                .collect(Collectors.toSet());
+                .map(ua -> ua.getAllergy().getId())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        Set<UUID> toAdd = new LinkedHashSet<>(allergyIds);
-        toAdd.removeAll(currentIds);
-
-        Set<UUID> toRemove = new LinkedHashSet<>(currentIds);
-        toRemove.removeAll(allergyIds);
-
-        if (toAdd.isEmpty() && toRemove.isEmpty()) {
-            return;
+        if (Objects.equals(currentIds, newIds)) {
+            return false;
         }
+
+        if (newIds.isEmpty()) {
+            userAllergyRepository.deleteAllByUserId(userId);
+            return true;
+        }
+        Set<UUID> toRemove = new LinkedHashSet<>(currentIds);
+        toRemove.removeAll(newIds);
+
+        Set<UUID> toAdd = new LinkedHashSet<>(newIds);
+        toAdd.removeAll(currentIds);
 
         if (!toRemove.isEmpty()) {
             userAllergyRepository.deleteByUserIdAndAllergyIdIn(userId, toRemove);
         }
 
         if (!toAdd.isEmpty()) {
-            List<Allergy> conditionsToAdd = allergyRepository.findAllById(toAdd);
-            List<UserAllergy> newLinks = conditionsToAdd.stream()
-                    .map(c -> UserAllergy.builder()
+            List<Allergy> addEntities = allergyRepository.findAllById(toAdd);
+            List<UserAllergy> newLinks = addEntities.stream()
+                    .map(a -> UserAllergy.builder()
                             .user(User.builder().id(userId).build())
-                            .allergy(c)
+                            .allergy(a)
                             .build())
                     .collect(Collectors.toList());
             userAllergyRepository.saveAll(newLinks);
         }
+        return true;
     }
+
 }
