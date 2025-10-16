@@ -38,7 +38,8 @@ public class SecurityConfig {
             "/conditions/save",
             "/allergies/save",
             "/nutrition-rules/save",
-            "/auths/refresh"
+            "/auths/refresh",
+            "/meallog-ai/analyze-url",
     };
 
 
@@ -113,7 +114,10 @@ public class SecurityConfig {
         DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
         return request -> {
             String path = request.getRequestURI();
-            if (path.startsWith("/auths/refresh") || path.startsWith("/auths/onboarding")) {
+            if (path.startsWith("/auths/refresh")
+                    || path.startsWith("/auths/onboarding")
+                    || path.startsWith("/meallog-ai/analyze-url")
+            ) {
                 return null;
             }
             return delegate.resolve(request);

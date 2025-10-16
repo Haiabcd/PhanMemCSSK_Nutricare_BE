@@ -7,6 +7,7 @@ import com.hn.nutricarebe.entity.PlanLog;
 import com.hn.nutricarebe.entity.MealPlanItem;
 import com.hn.nutricarebe.entity.Nutrition;
 import com.hn.nutricarebe.entity.User;
+import com.hn.nutricarebe.enums.LogSource;
 import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
@@ -21,6 +22,8 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -58,7 +61,8 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .date(item.getDay().getDate())
                 .mealSlot(item.getMealSlot())
                 .food(item.getFood())
-                .isFromPlan(true)
+                .servingSizeGram(BigDecimal.ZERO)
+                .source(LogSource.PLAN)
                 .planItem(item)
                 .portion(item.getPortion())
                 .actualNutrition(snap)
@@ -90,6 +94,10 @@ public class PlanLogServiceImpl implements PlanLogService {
     @Override
     @Transactional
     public void deleteById(UUID id) {
+        if (!logRepository.existsById(id)) {
+            throw new AppException(ErrorCode.NOT_FOUND_PLAN_LOG);
+        }
+
         var auth = SecurityContextHolder.getContext().getAuthentication();
         UUID userId = UUID.fromString(auth.getName());
         PlanLog p = logRepository.findById(id).orElse(null);

@@ -59,7 +59,9 @@ public enum ErrorCode {
     NUTRITION_RULE_NOT_FOUND(9012, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND),
 
     MEAL_PLAN_NOT_FOUND(10001, "Kế hoạch không tồn tại", HttpStatus.NOT_FOUND),
-    MEAL_PLAN_ITEM_USED(10002, "Món ăn trong kế hoạch đã được sử dụng", HttpStatus.BAD_REQUEST)
+    MEAL_PLAN_ITEM_USED(10002, "Món ăn trong kế hoạch đã được sử dụng", HttpStatus.BAD_REQUEST),
+
+    THIRD_PARTY_ERROR(10005, "LogMeal: missing imageId", HttpStatus.BAD_REQUEST),
     ;
     int code;
     String message;

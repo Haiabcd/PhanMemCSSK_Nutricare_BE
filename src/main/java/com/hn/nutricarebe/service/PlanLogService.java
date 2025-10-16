@@ -4,6 +4,7 @@ import com.hn.nutricarebe.dto.request.SaveLogRequest;
 
 import com.hn.nutricarebe.dto.response.LogResponse;
 import com.hn.nutricarebe.dto.response.NutritionResponse;
+import com.hn.nutricarebe.entity.PlanLog;
 import com.hn.nutricarebe.enums.MealSlot;
 
 import java.time.LocalDate;
