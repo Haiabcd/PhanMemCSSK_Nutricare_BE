@@ -1,8 +1,10 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.dto.response.HeaderResponse;
 import com.hn.nutricarebe.dto.response.InfoResponse;
 import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
 import com.hn.nutricarebe.dto.response.UserCreationResponse;
+import com.hn.nutricarebe.entity.Profile;
 import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.Provider;
 import com.hn.nutricarebe.enums.Role;
@@ -78,6 +80,18 @@ public class UserServiceImpl implements UserService {
                 .profileCreationResponse(profileService.findByUserId(userId))
                 .allergies(userAllergyService.findByUser_Id(userId))
                 .conditions(userConditionService.findByUser_Id(userId))
+                .build();
+    }
+
+    @Override
+    public HeaderResponse getHeader() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
+        UUID userId = UUID.fromString(auth.getName());
+        ProfileCreationResponse profile = profileService.findByUserId(userId);
+        return HeaderResponse.builder()
+                .name(profile.getName())
+                .avatarUrl(profile.getAvatarUrl())
                 .build();
     }
 

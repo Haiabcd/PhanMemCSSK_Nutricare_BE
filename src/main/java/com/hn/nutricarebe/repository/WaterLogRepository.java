@@ -10,8 +10,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface WaterLogRepository extends JpaRepository<WaterLog, UUID> {
-    Optional<WaterLog> findByUser_IdAndDate(UUID userId, LocalDate date);
-
     @Query("SELECT COALESCE(SUM(w.amountMl), 0) " +
             "FROM WaterLog w " +
             "WHERE w.user.id = :userId AND w.date = :date")

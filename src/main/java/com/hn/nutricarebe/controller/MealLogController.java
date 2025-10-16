@@ -54,13 +54,13 @@ public class MealLogController {
     }
           
     
-    @DeleteMapping("/plan")
-    public ApiResponse<Void> deletePlanLog(@RequestBody @Valid SaveLogRequest req) {
-        logService.deletePlanLog(req);
-        return ApiResponse.<Void>builder()
-                .message("Xoá log theo kế hoạch thành công")
-                .build();
-    }
+//    @DeleteMapping("/plan")
+//    public ApiResponse<Void> deletePlanLog(@RequestBody @Valid SaveLogRequest req) {
+//        logService.deletePlanLog(req);
+//        return ApiResponse.<Void>builder()
+//                .message("Xoá log theo kế hoạch thành công")
+//                .build();
+//    }
 
     @GetMapping("/nutriLog")
     public ApiResponse<NutritionResponse> getNutritionLogByDate(

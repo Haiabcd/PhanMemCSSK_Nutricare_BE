@@ -60,8 +60,8 @@ public class Profile {
     @Column(name = "name")
     String name;
 
-    @Column(name = "avata_url")
-    String avataUrl;
+    @Column(name = "avatar_url")
+    String avatarUrl;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

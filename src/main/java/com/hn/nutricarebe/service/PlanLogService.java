@@ -16,5 +16,4 @@ public interface PlanLogService {
     List<LogResponse> getLog(LocalDate date, MealSlot mealSlot);
     void deleteById(UUID id);
     NutritionResponse getNutritionLogByDate(LocalDate date);
-    void deletePlanLog(SaveLogRequest req);
 }

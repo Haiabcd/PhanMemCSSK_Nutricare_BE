@@ -28,7 +28,7 @@ public class MealPlanController {
     MealPlanItemService mealPlanItemService;
 
     @GetMapping
-    public ApiResponse<MealPlanResponse> getCurrentWeek( @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    public ApiResponse<MealPlanResponse> getMealPlan( @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ApiResponse.<MealPlanResponse>builder()
                 .message("Lấy thực đơn tuần hiện tại thành công")
                 .data(mealPlanDayService.getMealPlanByDate(date))

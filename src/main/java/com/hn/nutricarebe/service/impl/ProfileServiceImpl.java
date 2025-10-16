@@ -55,7 +55,7 @@ public class ProfileServiceImpl implements ProfileService {
         Profile profile = profileRepository.findByUser_Id(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
         profile.setName(name);
-        profile.setAvataUrl(avatarUrl);
+        profile.setAvatarUrl(avatarUrl);
 
         profileRepository.save(profile);
     }

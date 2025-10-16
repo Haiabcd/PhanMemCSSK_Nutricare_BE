@@ -94,10 +94,6 @@ public class PlanLogServiceImpl implements PlanLogService {
     @Override
     @Transactional
     public void deleteById(UUID id) {
-        if (!logRepository.existsById(id)) {
-            throw new AppException(ErrorCode.NOT_FOUND_PLAN_LOG);
-        }
-
         var auth = SecurityContextHolder.getContext().getAuthentication();
         UUID userId = UUID.fromString(auth.getName());
         PlanLog p = logRepository.findById(id).orElse(null);
@@ -123,25 +119,5 @@ public class PlanLogServiceImpl implements PlanLogService {
         return aggregateActual(logs);
     }
 
-
-    @Override
-    @Transactional
-    public void deletePlanLog(SaveLogRequest req) {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
-        UUID userId = UUID.fromString(auth.getName());
-        PlanLog log = logRepository.findTopByUser_IdAndPlanItem_IdOrderByCreatedAtDesc(userId, req.getMealPlanItemId())
-                .orElse(null);
-        if (log != null) {
-            MealPlanItem item = log.getPlanItem();
-            if (item != null) {
-                item.setUsed(false);
-                mealPlanItemRepository.save(item);
-            }
-            logRepository.delete(log);
-        }
-    }
 
 }

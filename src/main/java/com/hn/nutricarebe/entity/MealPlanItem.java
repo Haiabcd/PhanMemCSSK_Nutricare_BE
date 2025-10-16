@@ -53,6 +53,9 @@ public class MealPlanItem {
     @Column(name = "is_use", nullable = false)
     boolean used;
 
+    @Column(name = "is_swap", nullable = false)
+    boolean swapped;
+
     @Embedded
     @AttributeOverrides({
             @AttributeOverride(name = "kcal", column = @Column(name = "snap_kcal", precision = 10, scale = 2)),

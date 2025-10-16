@@ -24,6 +24,7 @@ public class ProfileCreationResponse {
     GoalType goal;
     ActivityLevel activityLevel;
     String name;
+    String avatarUrl;
     Integer targetWeightDeltaKg;
     Integer targetDurationWeeks;
     Instant createdAt;

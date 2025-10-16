@@ -23,5 +23,6 @@ public class MealPlanItemResponse {
     Integer rank;
     String note;
     boolean used;
+    boolean swapped;
     NutritionResponse nutrition;
 }
