@@ -43,7 +43,7 @@ public class MealLogController {
             @RequestParam @NotNull
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate date,
-            @RequestParam(required = false) @NotNull
+            @RequestParam @NotNull
             MealSlot mealSlot
     ) {
         List<LogResponse> data = logService.getLog(date, mealSlot);
