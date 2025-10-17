@@ -34,6 +34,7 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
     @EntityGraph(attributePaths = {"mealSlots", "tags"})
     Slice<Food> findByNameContainingIgnoreCase(String q, Pageable pageable);
 
+
     // Lấy tất cả món ăn
     @EntityGraph(attributePaths = {"mealSlots", "tags"})
     Slice<Food> findAllBy(Pageable pageable);
@@ -56,5 +57,6 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
             @Param("limit") int limit
     );
 
-
+    @Query("SELECT f FROM Food f WHERE LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    List<Food> searchByNameContaining(@Param("keyword") String keyword, Pageable pageable);
 }

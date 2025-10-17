@@ -10,10 +10,12 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.MealPlanDayMapper;
-import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanDayService;
 import com.hn.nutricarebe.service.NutritionRuleService;
+import com.hn.nutricarebe.service.ProfileService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +32,6 @@ import java.util.stream.Collectors;
 import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 import static com.hn.nutricarebe.helper.PlanLogHelper.resolveActualOrFallback;
 import static java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR;
-
 @Log4j2
 @Service
 @RequiredArgsConstructor
@@ -38,13 +39,16 @@ import static java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR;
 public class MealPlanDayServiceImpl implements MealPlanDayService {
     MealPlanDayRepository mealPlanDayRepository;
     MealPlanDayMapper mealPlanDayMapper;
+
+    NutritionRuleService nutritionRuleService;
+    ProfileService profileService;
     FoodRepository foodRepository;
     MealPlanItemRepository mealPlanItemRepository;
-    NutritionRuleService nutritionRuleService;
-    ProfileRepository profileRepository;
-    ProfileMapper profileMapper;
     PlanLogRepository planLogRepository;
     CdnHelper cdnHelper;
+
+    @PersistenceContext
+    EntityManager entityManager;
 
 
     //Tính BMI
@@ -157,9 +161,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
 
     @Override
     public MealPlanResponse createPlan(MealPlanCreationRequest request, int number) {
-        final double FAT_PCT = 0.30;              // WHO: chat beo ≤30%
-        final double FREE_SUGAR_PCT_MAX = 0.10;   // WHO: <10%
-        final int    SODIUM_MG_LIMIT = 2000;      // WHO: <2000 mg natri/ngày
         final double WATER_ML_PER_KG = 35.0;      // 30–35 ml/kg
 
         var profile = request.getProfile();
@@ -235,6 +236,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 pool = foodRepository.selectCandidatesBySlotAndKcalWindow(
                         slot.name(), minKcal, maxKcal, perItem, CANDIDATE_LIMIT
                 );
+
                 if (pool != null && pool.size() >= itemCount) break;
 
                 lowMul  = Math.max(0.10, lowMul * 0.70);
@@ -439,13 +441,17 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     }
 
     @Override
+    @Transactional
     public MealPlanResponse getMealPlanByDate(LocalDate date) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
         UUID userId = UUID.fromString(auth.getName());
         MealPlanDay m = mealPlanDayRepository.findByUser_IdAndDate(userId, date)
-                .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
-        log.info("Meal Plan Day {}:", m);
+                .orElse(null);
+
+        if(m == null) {
+            return createOrUpdatePlanForOneDay(date, userId);
+        }
         return mealPlanDayMapper.toMealPlanResponse(m, cdnHelper);
     }
 
@@ -457,21 +463,14 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     }
 
 
-    @Override
-    @Transactional
-    public MealPlanResponse createOrUpdatePlanForOneDay(LocalDate date) {
+
+    public MealPlanResponse createOrUpdatePlanForOneDay(LocalDate date, UUID userId) {
         final double WATER_ML_PER_KG = 35.0;
 
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
-        UUID userId = UUID.fromString(auth.getName());
-
         // ===== 1) Profile + rules + day target =====
-        Profile profile = profileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
-        ProfileCreationRequest pReq = profileMapper.toProfileCreationRequest(profile);
+        ProfileCreationRequest pReq = profileService.findByUserId_request(userId);
 
-        int weight = Math.max(1, profile.getWeightKg());
+        int weight = Math.max(1, pReq.getWeightKg());
         List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
         AggregateConstraints agg = deriveAggregateConstraintsFromRules(rules, weight);
 
@@ -487,16 +486,15 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             waterMl = Math.max(waterMl, agg.dayWaterMin.doubleValue());
         }
 
-        MealPlanDay newDay = MealPlanDay.builder()
-                .user(User.builder().id(userId).build())
-                .date(date)
-                .targetNutrition(dayTarget)
-                .waterTargetMl((int) Math.round(waterMl))
-                .build();
-
         // ===== 2) Lấy/ tạo MealPlanDay cho date =====
         MealPlanDay day = mealPlanDayRepository.findByUser_IdAndDate(userId, date)
-                .orElseGet(() -> mealPlanDayRepository.save(newDay));
+                .orElseGet(() -> MealPlanDay.builder()
+                        .user(User.builder().id(userId).build())
+                        .date(date)
+                        .build());
+        day.setTargetNutrition(dayTarget);
+        day.setWaterTargetMl((int) Math.round(waterMl));
+        day = mealPlanDayRepository.save(day);
 
         // ===== 3) Đọc log hôm nay + gần đây (để né món và tính consumed) =====
         final int NO_REPEAT_DAYS = 3;
@@ -523,6 +521,10 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 .map(l -> l.getFood().getId())
                 .collect(Collectors.toSet());
         recentFoods.addAll(eatenFoodToday);
+
+        Set<UUID> plannedRecently = mealPlanItemRepository
+                .findDistinctFoodIdsPlannedBetween(userId, startRecent, date.minusDays(1));
+        recentFoods.addAll(plannedRecently);
 
         // ===== 4) Xóa item cũ chưa dùng (tránh FK & rác) =====
         mealPlanItemRepository.deleteUnusedItemsByDay(day.getId());
@@ -641,9 +643,15 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 picked++;
             }
         }
-        // ===== 8) Trả về response
-        MealPlanDay dayReload = mealPlanDayRepository.findByUser_IdAndDate(userId, date).orElse(day);
-        return mealPlanDayMapper.toMealPlanResponse(dayReload, cdnHelper);
+        // ===== 8) Trả về response =====
+        mealPlanItemRepository.flush();
+
+        entityManager.flush();
+        entityManager.clear();
+
+        MealPlanDay hydrated = mealPlanDayRepository.findByUser_IdAndDate(userId, date)
+                .orElse(day);
+        return mealPlanDayMapper.toMealPlanResponse(hydrated, cdnHelper);
     }
 
     /* ===================== HÀM PHỤ TRỢ ===================== */
@@ -910,8 +918,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                     default -> { /* bỏ qua nutrient không hỗ trợ */ }
                 }
             }
-
-
         }
 
         return applyAggregateConstraintsToDayTarget(targetMeal,a);

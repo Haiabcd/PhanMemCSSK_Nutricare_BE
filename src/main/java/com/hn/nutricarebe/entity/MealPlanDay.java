@@ -19,7 +19,12 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "meal_plan_days")
+@Table(
+        name = "meal_plan_days",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"user_id", "date"})
+        }
+)
 public class MealPlanDay {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

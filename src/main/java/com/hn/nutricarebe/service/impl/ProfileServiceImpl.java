@@ -8,7 +8,6 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
-import com.hn.nutricarebe.service.MealPlanDayService;
 import com.hn.nutricarebe.service.ProfileService;
 import com.hn.nutricarebe.service.UserAllergyService;
 import com.hn.nutricarebe.service.UserConditionService;
@@ -27,12 +26,10 @@ import java.util.UUID;
 @AllArgsConstructor
 @Service
 public class ProfileServiceImpl implements ProfileService {
-
     ProfileRepository profileRepository;
     ProfileMapper profileMapper;
     UserAllergyService userAllergyService;
     UserConditionService userConditionService;
-    MealPlanDayService mealPlanDayService;
 
 
     @Override
@@ -50,15 +47,11 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
     @Override
-    public void updateAvatarAndName(String avatarUrl, String name, UUID userId) {
+    public ProfileCreationRequest findByUserId_request(UUID userId) {
         Profile profile = profileRepository.findByUser_Id(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
-        profile.setName(name);
-        profile.setAvatarUrl(avatarUrl);
-
-        profileRepository.save(profile);
+        return profileMapper.toProfileCreationRequest(profile);
     }
-
 
     @Override
     @Transactional
@@ -123,16 +116,17 @@ public class ProfileServiceImpl implements ProfileService {
 
         boolean shouldRecreateMealPlan = allergyUpdated || conditionUpdated || profileAffectsPlanChanged;
 
-        if (shouldRecreateMealPlan) {
-            mealPlanDayService.removeFromDate(request.getStartDate(), userId);
-
-            ProfileCreationRequest profileCreationRequest = profileMapper.toProfileCreationRequest(profileSave);
-            MealPlanCreationRequest mealPlanCreationRequest = MealPlanCreationRequest.builder()
-                    .userId(userId)
-                    .profile(profileCreationRequest)
-                    .build();
-            mealPlanDayService.createPlan(mealPlanCreationRequest, 7);
-        }
+//        if (shouldRecreateMealPlan) {
+//            mealPlanDayService.removeFromDate(request.getStartDate(), userId);
+//
+//            ProfileCreationRequest profileCreationRequest = profileMapper.toProfileCreationRequest(profileSave);
+//            MealPlanCreationRequest mealPlanCreationRequest = MealPlanCreationRequest.builder()
+//                    .userId(userId)
+//                    .profile(profileCreationRequest)
+//                    .build();
+//            mealPlanDayService.createPlan(mealPlanCreationRequest, 7);
+//        }
+//        Orchestrator
     }
 
 

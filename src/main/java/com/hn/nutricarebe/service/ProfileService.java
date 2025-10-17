@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface ProfileService {
     ProfileCreationResponse save(ProfileCreationRequest request, User user);
-    void updateAvatarAndName(String avatarUrl, String name, UUID userId);
     ProfileCreationResponse findByUserId(UUID userId);
     void updateProfile(UpdateRequest request);
+    ProfileCreationRequest findByUserId_request(UUID userId);
 }

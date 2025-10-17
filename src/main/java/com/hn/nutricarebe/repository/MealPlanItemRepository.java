@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.repository;
 
 import com.hn.nutricarebe.entity.MealPlanItem;
+import com.hn.nutricarebe.enums.MealSlot;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -32,5 +34,14 @@ public interface MealPlanItemRepository extends JpaRepository<MealPlanItem, UUID
     void deleteUnusedItemsByDay(@Param("dayId") UUID dayId);
 
     List<MealPlanItem> findByDay_User_IdAndDay_Date(UUID userId, LocalDate date);
+
+    @Query("""
+        select distinct i.food.id
+        from MealPlanItem i
+        where i.day.user.id = :userId
+          and i.day.date between :start and :end
+    """)
+    Set<UUID> findDistinctFoodIdsPlannedBetween(UUID userId, LocalDate start, LocalDate end);
+
 
 }

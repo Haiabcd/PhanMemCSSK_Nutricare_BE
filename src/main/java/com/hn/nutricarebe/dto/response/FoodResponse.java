@@ -21,6 +21,7 @@ public class FoodResponse {
     String imageUrl;
     String servingName;
     BigDecimal servingGram;
+    Integer defaultServing;
     Integer cookMinutes;
     NutritionResponse nutrition;
     boolean isIngredient;

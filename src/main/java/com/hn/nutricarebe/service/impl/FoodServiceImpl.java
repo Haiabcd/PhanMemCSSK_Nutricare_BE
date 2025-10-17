@@ -17,6 +17,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -182,6 +184,20 @@ public class FoodServiceImpl implements FoodService {
             }
         }
         return foodMapper.toFoodResponse(saved, cdnHelper);
+    }
+
+
+    @Override
+    public List<FoodResponse> autocompleteFoods(String keyword, int limit) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return List.of();
+        }
+        Pageable pageable = PageRequest.of(0, Math.min(limit, 20));
+        return foodRepository.findByNameContainingIgnoreCase(keyword.trim(), pageable)
+                .getContent()
+                .stream()
+                .map(food -> foodMapper.toFoodResponse(food, cdnHelper))
+                .toList();
     }
 
 

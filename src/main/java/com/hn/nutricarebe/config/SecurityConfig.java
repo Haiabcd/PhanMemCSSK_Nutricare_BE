@@ -48,6 +48,7 @@ public class SecurityConfig {
             "/auths/google/callback",
             "/foods/**",
             "/foods/search/**",
+            "/foods/autocomplete/**",
             "/ingredients/**",
             "/foods/all/**",
             "/ingredients/all/**",
