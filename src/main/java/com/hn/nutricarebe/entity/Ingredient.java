@@ -79,6 +79,9 @@ public class Ingredient {
     @OneToMany(mappedBy = "ingredient", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<RecipeIngredient> recipeIngredients = new HashSet<>();
 
+    @OneToMany(mappedBy = "ingredient", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    Set<PlanLogIngredient> ingredients = new HashSet<>();
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false)
     Instant createdAt;

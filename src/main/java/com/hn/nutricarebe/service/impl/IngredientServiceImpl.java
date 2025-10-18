@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -128,6 +130,22 @@ public class IngredientServiceImpl implements IngredientService {
                 pageable,
                 slice.hasNext()
         );
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<IngredientResponse> autocompleteIngredients(String keyword, int limit) {
+        int size = Math.max(1, Math.min(limit, 20));
+
+        Pageable pageable = PageRequest.of(0, size);
+
+        return ingredientRepository
+                .searchByNameOrAlias(keyword.trim(), pageable)
+                .getContent()
+                .stream()
+                .map(i -> ingredientMapper.toIngredientResponse(i, cdnHelper))
+                .toList();
     }
     }
 

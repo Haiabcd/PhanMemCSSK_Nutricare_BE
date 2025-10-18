@@ -2,6 +2,7 @@ package com.hn.nutricarebe.repository;
 
 import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.enums.MealSlot;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -57,6 +58,20 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
             @Param("limit") int limit
     );
 
-    @Query("SELECT f FROM Food f WHERE LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
-    List<Food> searchByNameContaining(@Param("keyword") String keyword, Pageable pageable);
+    @Query(
+            value = """
+        select f.*
+        from foods f
+        where unaccent(lower(f.name)) like unaccent(lower(concat('%', :kw, '%')))
+        order by f.name asc
+        """,
+            countQuery = """
+        select count(f.id)
+        from foods f
+        where unaccent(lower(f.name)) like unaccent(lower(concat('%', :kw, '%')))
+        """,
+            nativeQuery = true
+    )
+    Page<Food> searchByNameUnaccent(@Param("kw") String keyword, Pageable pageable);
+
 }

@@ -52,5 +52,4 @@ public class RecipeIngredient {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     Instant updatedAt;
-
 }

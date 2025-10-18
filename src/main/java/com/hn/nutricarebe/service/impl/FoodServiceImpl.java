@@ -188,12 +188,13 @@ public class FoodServiceImpl implements FoodService {
 
 
     @Override
+    @Transactional(readOnly = true)
     public List<FoodResponse> autocompleteFoods(String keyword, int limit) {
         if (keyword == null || keyword.trim().isEmpty()) {
             return List.of();
         }
         Pageable pageable = PageRequest.of(0, Math.min(limit, 20));
-        return foodRepository.findByNameContainingIgnoreCase(keyword.trim(), pageable)
+        return  foodRepository.searchByNameUnaccent(keyword.trim(), pageable)
                 .getContent()
                 .stream()
                 .map(food -> foodMapper.toFoodResponse(food, cdnHelper))

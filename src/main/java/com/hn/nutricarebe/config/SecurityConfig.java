@@ -50,6 +50,7 @@ public class SecurityConfig {
             "/foods/search/**",
             "/foods/autocomplete/**",
             "/ingredients/**",
+            "/ingredients/autocomplete/**",
             "/foods/all/**",
             "/ingredients/all/**",
             "/conditions/all/**",
