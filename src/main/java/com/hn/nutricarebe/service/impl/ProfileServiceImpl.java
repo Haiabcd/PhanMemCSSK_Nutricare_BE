@@ -8,10 +8,7 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
-import com.hn.nutricarebe.service.PlanOrchestrator;
-import com.hn.nutricarebe.service.ProfileService;
-import com.hn.nutricarebe.service.UserAllergyService;
-import com.hn.nutricarebe.service.UserConditionService;
+import com.hn.nutricarebe.service.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -19,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -31,7 +29,7 @@ public class ProfileServiceImpl implements ProfileService {
     ProfileMapper profileMapper;
     UserAllergyService userAllergyService;
     UserConditionService userConditionService;
-    PlanOrchestrator planOrchestrator;
+    MealPlanDayService mealPlanDayService;
 
 
     @Override
@@ -119,7 +117,9 @@ public class ProfileServiceImpl implements ProfileService {
         boolean shouldRecreateMealPlan = allergyUpdated || conditionUpdated || profileAffectsPlanChanged;
 
         if (shouldRecreateMealPlan) {
-            planOrchestrator.updatePlan(request.getStartDate(), userId);
+            mealPlanDayService.updatePlanForOneDay(request.getStartDate(), userId);
+            LocalDate tomorrow = request.getStartDate().plusDays(1);
+            mealPlanDayService.removeFromDate(tomorrow, userId);
         }
     }
 }

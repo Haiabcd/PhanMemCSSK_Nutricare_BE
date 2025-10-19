@@ -10,10 +10,10 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.MealPlanDayMapper;
+import com.hn.nutricarebe.orchestrator.ProfileOrchestrator;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanDayService;
 import com.hn.nutricarebe.service.NutritionRuleService;
-import com.hn.nutricarebe.service.ProfileService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
@@ -39,9 +39,8 @@ import static java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR;
 public class MealPlanDayServiceImpl implements MealPlanDayService {
     MealPlanDayRepository mealPlanDayRepository;
     MealPlanDayMapper mealPlanDayMapper;
-
+    ProfileOrchestrator profileOrchestrator;
     NutritionRuleService nutritionRuleService;
-    ProfileService profileService;
     FoodRepository foodRepository;
     MealPlanItemRepository mealPlanItemRepository;
     PlanLogRepository planLogRepository;
@@ -474,7 +473,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         final double WATER_ML_PER_KG = 35.0;
 
         // ===== 1) Profile + rules + day target =====
-        ProfileCreationRequest pReq = profileService.findByUserId_request(userId);
+        ProfileCreationRequest pReq = profileOrchestrator.getByUserId_request(userId);
 
         int weight = Math.max(1, pReq.getWeightKg());
         List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
