@@ -55,34 +55,38 @@ public class UserConditionServiceImpl implements UserConditionService {
 
     @Transactional
     @Override
-    public void updateUserConditions(UUID userId, Set<UUID> conditionIds) {
-        if (conditionIds == null || conditionIds.isEmpty()) {
-            userConditionRepository.deleteAllByUserId(userId);
-            return;
-        }
+    public boolean updateUserConditions(UUID userId, Set<UUID> conditionIds) {
+        Set<UUID> newIds = (conditionIds == null)
+                ? Collections.emptySet()
+                : new LinkedHashSet<>(conditionIds);
 
         List<UserCondition> current = userConditionRepository.findByUser_Id(userId);
         Set<UUID> currentIds = current.stream()
                 .map(uc -> uc.getCondition().getId())
-                .collect(Collectors.toSet());
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        Set<UUID> toAdd = new LinkedHashSet<>(conditionIds);
-        toAdd.removeAll(currentIds);
+        if (Objects.equals(currentIds, newIds)) {
+            return false;
+        }
+
+        if (newIds.isEmpty()) {
+            userConditionRepository.deleteAllByUserId(userId);
+            return true;
+        }
 
         Set<UUID> toRemove = new LinkedHashSet<>(currentIds);
-        toRemove.removeAll(conditionIds);
+        toRemove.removeAll(newIds);
 
-        if (toAdd.isEmpty() && toRemove.isEmpty()) {
-            return;
-        }
+        Set<UUID> toAdd = new LinkedHashSet<>(newIds);
+        toAdd.removeAll(currentIds);
 
         if (!toRemove.isEmpty()) {
             userConditionRepository.deleteByUserIdAndConditionIdIn(userId, toRemove);
         }
 
         if (!toAdd.isEmpty()) {
-            List<Condition> conditionsToAdd = conditionRepository.findAllById(toAdd);
-            List<UserCondition> newLinks = conditionsToAdd.stream()
+            List<Condition> addEntities = conditionRepository.findAllById(toAdd);
+            List<UserCondition> newLinks = addEntities.stream()
                     .map(c -> UserCondition.builder()
                             .user(User.builder().id(userId).build())
                             .condition(c)
@@ -90,6 +94,8 @@ public class UserConditionServiceImpl implements UserConditionService {
                     .collect(Collectors.toList());
             userConditionRepository.saveAll(newLinks);
         }
+        return true;
     }
+
 }
 

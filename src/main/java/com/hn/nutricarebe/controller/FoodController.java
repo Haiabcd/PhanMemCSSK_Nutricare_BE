@@ -18,6 +18,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -102,6 +104,18 @@ public class FoodController {
         return ApiResponse.<FoodResponse>builder()
                 .message("Cập nhật món ăn thành công")
                 .data(data)
+                .build();
+    }
+
+
+    @GetMapping("/autocomplete")
+    public ApiResponse<List<FoodResponse>> autocomplete(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ApiResponse.<List<FoodResponse>>builder()
+                .message("Gợi ý món ăn")
+                .data(foodService.autocompleteFoods(keyword, limit))
                 .build();
     }
 }

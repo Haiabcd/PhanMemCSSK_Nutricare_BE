@@ -17,6 +17,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -76,6 +77,17 @@ public class IngredientController {
         return ApiResponse.<Slice<IngredientResponse>>builder()
                 .message("Tìm kiếm nguyên liệu thành công")
                 .data(ing)
+                .build();
+    }
+
+    @GetMapping("/autocomplete")
+    public ApiResponse<List<IngredientResponse>> autocomplete(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ApiResponse.<List<IngredientResponse>>builder()
+                .message("Gợi ý món ăn")
+                .data(ingredientService.autocompleteIngredients(keyword, limit))
                 .build();
     }
 }

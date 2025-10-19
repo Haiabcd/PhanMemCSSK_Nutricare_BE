@@ -1,17 +1,17 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.LogResponse;
 import com.hn.nutricarebe.dto.response.NutritionResponse;
-import com.hn.nutricarebe.entity.PlanLog;
-import com.hn.nutricarebe.entity.MealPlanItem;
-import com.hn.nutricarebe.entity.Nutrition;
-import com.hn.nutricarebe.entity.User;
+import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.LogSource;
 import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
+import com.hn.nutricarebe.mapper.NutritionMapper;
 import com.hn.nutricarebe.mapper.PlanLogMapper;
+import com.hn.nutricarebe.repository.PlanLogIngredientRepository;
 import com.hn.nutricarebe.repository.PlanLogRepository;
 import com.hn.nutricarebe.repository.MealPlanItemRepository;
 import com.hn.nutricarebe.service.PlanLogService;
@@ -37,6 +37,8 @@ import static com.hn.nutricarebe.helper.PlanLogHelper.aggregateActual;
 public class PlanLogServiceImpl implements PlanLogService {
     MealPlanItemRepository mealPlanItemRepository;
     PlanLogRepository logRepository;
+    PlanLogIngredientRepository planLogIngredientRepository;
+    NutritionMapper nutritionMapper;
     PlanLogMapper logMapper;
 
     @Override
@@ -108,7 +110,7 @@ public class PlanLogServiceImpl implements PlanLogService {
         logRepository.deleteById(id);
     }
 
-     @Override
+    @Override
     public NutritionResponse getNutritionLogByDate(LocalDate date) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
@@ -120,4 +122,38 @@ public class PlanLogServiceImpl implements PlanLogService {
     }
 
 
+
+    @Override
+    public void savePlanLog_Manual( PlanLogManualRequest req){
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UUID userId = UUID.fromString(auth.getName());
+
+        PlanLog log = PlanLog.builder()
+                .user(User.builder().id(userId).build())
+                .date(req.getDate())
+                .mealSlot(req.getMealSlot())
+                .food(req.getFoodId() != null ?  Food.builder().id(req.getFoodId()).build() : null)
+                .nameFood(req.getNameFood())
+                .servingSizeGram(BigDecimal.ZERO)
+                .planItem(null)
+                .source(LogSource.MANUAL)
+                .portion(req.getConsumedServings())
+                .actualNutrition(nutritionMapper.toNutrition(req.getTotalNutrition()))
+                .build();
+
+        log =  logRepository.save(log);
+        if(req.getIngredients() != null){
+            for(PlanLogManualRequest.IngredientEntryDTO ingredientDTO : req.getIngredients()){
+                PlanLogIngredient pli = PlanLogIngredient.builder()
+                        .planLog(log)
+                        .ingredient(Ingredient.builder().id(ingredientDTO.getId()).build())
+                        .quantity(ingredientDTO.getQty())
+                        .build();
+                planLogIngredientRepository.save(pli);
+            }
+        }
+    }
 }

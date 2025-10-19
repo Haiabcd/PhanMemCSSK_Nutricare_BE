@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Map;
 
@@ -64,7 +63,6 @@ public class AuthController {
     }
     // ===========================Google OAuth2================================= //
 
-    // ===========================Refresh token================================= //
     @PostMapping("/refresh")
     public ApiResponse<TokenPairResponse> refresh(@Valid @RequestBody RefreshRequest req) {
         var tokens = authService.refresh(req.getRefreshToken());
@@ -73,7 +71,14 @@ public class AuthController {
                 .data(tokens)
                 .build();
     }
-    // ===========================Refresh token================================= //
+
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(@Valid @RequestBody RefreshRequest req) {
+        authService.logout(req.getRefreshToken());
+        return ApiResponse.<Void>builder()
+                .message("Đăng xuất thành công")
+                .build();
+    }
 
 
 }

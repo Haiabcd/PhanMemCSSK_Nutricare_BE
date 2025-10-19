@@ -5,12 +5,15 @@ import com.hn.nutricarebe.dto.request.OnboardingRequest;
 import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
 import com.hn.nutricarebe.dto.request.UserConditionCreationRequest;
 import com.hn.nutricarebe.dto.response.*;
+import com.hn.nutricarebe.entity.Profile;
 import com.hn.nutricarebe.entity.RefreshToken;
 import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.*;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.helper.GoogleLoginHelper;
+import com.hn.nutricarebe.mapper.ProfileMapper;
+import com.hn.nutricarebe.repository.ProfileRepository;
 import com.hn.nutricarebe.service.*;
 import com.hn.nutricarebe.utils.PkceStore;
 import com.hn.nutricarebe.utils.PkceUtil;
@@ -45,7 +48,9 @@ import java.util.*;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class AuthServiceImpl implements AuthService {
-    ProfileService profileService;
+    ProfileMapper profileMapper;
+    ProfileRepository profileRepository;
+
     UserAllergyService userAllergyService;
     MealPlanDayService mealPlanDayService;
     UserConditionService userConditionService;
@@ -84,7 +89,9 @@ public class AuthServiceImpl implements AuthService {
         //B1: Lưu user
         User savedUser = userService.saveOnboarding(request.getDeviceId());
         //B2: Lưu profile
-        profileService.save(request.getProfile(), savedUser);
+        Profile profile = profileMapper.toProfile(request.getProfile());
+        profile.setUser(savedUser);
+        profileRepository.save(profile);
         //B3: Lưu bệnh nền
         Set<UUID> conditionIds = request.getConditions();
         if(conditionIds != null && !conditionIds.isEmpty()){
@@ -259,7 +266,11 @@ public class AuthServiceImpl implements AuthService {
                 if (user.getEmail() == null || user.getEmail().isBlank() || user.getEmail().equalsIgnoreCase(gp.getEmail())) {
                         user.setEmail((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null);
                 }
-                profileService.updateAvatarAndName(gp.getAvatar(), gp.getName(), user.getId());
+                Profile profile = profileRepository.findByUser_Id(user.getId())
+                        .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+                profile.setName(gp.getName());
+                profile.setAvatarUrl(gp.getAvatar());
+                profileRepository.save(profile);
             }
         }
         userService.saveGG(user);
@@ -309,7 +320,6 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
 
-
         // 2. Kiểm tra token trong DB và phát hiện reuse
         RefreshToken tokenOld = refreshTokenService.findById(jti);
 
@@ -356,29 +366,23 @@ public class AuthServiceImpl implements AuthService {
     }
     //============================ Cấp token ============================//
 
-    //============================ Get id by token ======================//
+
+    //============================ Logout ============================//
     @Override
-    public UUID extractUserIdFromAccessToken(String accessToken) {
-        String raw = accessToken;
-        if (raw != null && raw.startsWith("Bearer ")) {
-            raw = raw.substring("Bearer ".length());
-        }
-        if (raw == null || raw.isBlank()) {
-            throw new AppException(ErrorCode.INVALID_TOKEN);
-        }
-
-        SignedJWT jwt = parseAndVerify(raw);
+    @Transactional
+    public void logout(String refreshTokenRaw) {
+        SignedJWT jwt = parseAndVerify(refreshTokenRaw);
         JWTClaimsSet claims = getClaims(jwt);
-        validateAccessClaims(claims);
-
-        // Trả về UUID trong subject (đã set bằng user.getId().toString())
-        try {
-            return UUID.fromString(claims.getSubject());
-        } catch (IllegalArgumentException ex) {
-            throw new AppException(ErrorCode.INVALID_TOKEN);
+        validateRefreshClaims(claims);
+        String jti = claims.getJWTID();
+        RefreshToken token = refreshTokenService.findById(jti);
+        if (token.isRevoked() || token.isRotated()) {
+            return;
         }
+        token.setRevoked(true);
+        refreshTokenService.saveAll(List.of(token));
     }
-    //============================ Get id by token ======================//
+    //============================ Logout ============================//
 
 
     /* ------------------------- Helper methods -------------------------*/
@@ -395,25 +399,6 @@ public class AuthServiceImpl implements AuthService {
             Instant exp = claims.getExpirationTime().toInstant();
             if (Instant.now().isAfter(exp.plusSeconds(60))) {
                 throw new AppException(ErrorCode.EXPIRED_REFRESH_TOKEN);
-            }
-        } catch (java.text.ParseException e) {
-            throw new AppException(ErrorCode.INVALID_TOKEN);
-        }
-    }
-
-    private void validateAccessClaims(JWTClaimsSet claims) {
-        try {
-            if (!"nutricare.com".equals(claims.getIssuer()) ||
-                    !"access".equals(claims.getStringClaim("typ")) ||
-                    claims.getJWTID() == null ||
-                    claims.getSubject() == null) {
-                throw new AppException(ErrorCode.INVALID_TOKEN);
-            }
-
-            Instant exp = claims.getExpirationTime().toInstant();
-            // Cho phép lệch clock nhẹ, không bắt buộc:
-            if (Instant.now().isAfter(exp.plusSeconds(60))) {
-                throw new AppException(ErrorCode.EXPIRED_ACCESS_TOKEN);
             }
         } catch (java.text.ParseException e) {
             throw new AppException(ErrorCode.INVALID_TOKEN);

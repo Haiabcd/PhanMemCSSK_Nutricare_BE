@@ -10,6 +10,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -72,6 +74,10 @@ public class PlanLog {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_item_id", foreignKey = @ForeignKey(name = "fk_foodlogs_plan_item"))
     MealPlanItem planItem;
+
+    @OneToMany(mappedBy = "planLog", fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = true)
+    Set<PlanLogIngredient> ingredients = new HashSet<>();
 
     @Column(name = "serving_size_gram", precision = 10, scale = 2) // 1 khẩu phần từ scan
     BigDecimal servingSizeGram;

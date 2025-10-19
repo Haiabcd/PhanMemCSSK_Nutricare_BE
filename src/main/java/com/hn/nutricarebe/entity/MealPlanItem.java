@@ -54,7 +54,7 @@ public class MealPlanItem {
     boolean used;
 
     @Column(name = "is_swap", nullable = false)
-    boolean swapped;
+    boolean swapped;  //đã bị đổi khi nhập thủ công hay AI
 
     @Embedded
     @AttributeOverrides({

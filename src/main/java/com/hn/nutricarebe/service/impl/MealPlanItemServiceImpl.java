@@ -1,20 +1,21 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.dto.request.MealPlanItemCreationRequest;
+
+import com.hn.nutricarebe.dto.TagDirectives;
+import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
+import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
 import com.hn.nutricarebe.dto.response.FoodResponse;
-import com.hn.nutricarebe.dto.response.MealPlanItemResponse;
-import com.hn.nutricarebe.entity.Food;
-import com.hn.nutricarebe.entity.MealPlanItem;
-import com.hn.nutricarebe.entity.Nutrition;
+import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.helper.MealPlanHelper;
 import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.FoodMapper;
-import com.hn.nutricarebe.repository.FoodRepository;
-import com.hn.nutricarebe.repository.MealPlanItemRepository;
+import com.hn.nutricarebe.mapper.ProfileMapper;
+import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanItemService;
+import com.hn.nutricarebe.service.NutritionRuleService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -22,8 +23,9 @@ import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDate;
-import java.util.UUID;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 
@@ -32,29 +34,13 @@ import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class MealPlanItemServiceImpl implements MealPlanItemService {
+    MealPlanItemRepository mealPlanItemRepository;
+    NutritionRuleService nutritionRuleService;
+    ProfileRepository profileRepository;
+    FoodRepository foodRepository;
+    ProfileMapper profileMapper;
     FoodMapper foodMapper;
     CdnHelper cdnHelper;
-    MealPlanItemRepository mealPlanItemRepository;
-    FoodRepository foodRepository;
-
-    @Override
-    public MealPlanItemResponse createMealPlanItems(MealPlanItemCreationRequest request) {
-        return null;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Slice<FoodResponse> getUpcomingFoods(int page, int size) {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated())
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        UUID userId = UUID.fromString(auth.getName());
-        LocalDate today = LocalDate.now();
-        // Sort đã viết trong JPQL -> không cần sort ở đây
-        Pageable pageable = PageRequest.of(page, size);
-        Slice<Food> foods = mealPlanItemRepository.findFoodsFromDate(userId, today, pageable);
-        return foods.map(f -> foodMapper.toFoodResponse(f, cdnHelper));
-    }
 
 
     @Override
@@ -126,6 +112,80 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         item.setNutrition(scaleNutrition(best.food.getNutrition(), best.portion));
 
         mealPlanItemRepository.save(item);
+    }
+
+    @Override
+    @Transactional
+    public List<FoodResponse> suggestAllowedFoodsInternal(MealSlot slot, int limit) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
+        UUID userId = UUID.fromString(auth.getName());
+
+        Profile profile = profileRepository.findByUser_Id(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+        ProfileCreationRequest pReq = profileMapper.toProfileCreationRequest(profile);
+        MealPlanCreationRequest req = MealPlanCreationRequest.builder()
+                .userId(userId)
+                .profile(pReq)
+                .build();
+
+        List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
+
+        TagDirectives tagDir = buildTagDirectives(rules, req);
+
+        // 3) Pool món rộng (theo slot nếu có)
+        final int CANDIDATE_LIMIT = Math.max(limit * 6, 200);
+        final int MIN_KCAL = 20, MAX_KCAL = 2000, PIVOT = 500;
+
+        List<Food> pool;
+        if (slot != null) {
+            pool = foodRepository.selectCandidatesBySlotAndKcalWindow(
+                    slot.name(), MIN_KCAL, MAX_KCAL, PIVOT, CANDIDATE_LIMIT
+            );
+        } else {
+            pool = new ArrayList<>();
+            for (MealSlot s : MealSlot.values()) {
+                pool.addAll(
+                        foodRepository.selectCandidatesBySlotAndKcalWindow(
+                                s.name(), MIN_KCAL, MAX_KCAL, PIVOT, CANDIDATE_LIMIT / 4
+                        )
+                );
+            }
+        }
+        if (pool == null) pool = Collections.emptyList();
+
+        pool = pool.stream()
+                .filter(f -> Collections.disjoint(tagsOf(f), tagDir.getAvoid()))
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        List<Food> allowed = new ArrayList<>(pool.size());
+        for (Food f : pool) {
+            Nutrition base = f.getNutrition();
+            if (base == null) continue;
+
+            boolean pass = false;
+            double portion = 1.0;
+            Nutrition snap = scaleNutrition(base, portion);
+
+            if (passesItemRules(rules, f, snap, req)) {
+                pass = true;
+            } else {
+                var step = stepDown(portion);
+                while (step.isPresent()) {
+                    double p2 = step.getAsDouble();
+                    Nutrition s2 = scaleNutrition(base, p2);
+                    if (passesItemRules(rules, f, s2, req)) { pass = true; break; }
+                    step = stepDown(p2);
+                }
+            }
+            if (pass) allowed.add(f);
+        }
+        LinkedHashMap<UUID, Food> dedup = new LinkedHashMap<>();
+        for (Food f : allowed) dedup.putIfAbsent(f.getId(), f);
+        List<Food> dsFood =  dedup.values().stream().limit(limit).collect(Collectors.toList());
+        return dsFood.stream()
+                .map(f -> foodMapper.toFoodResponse(f, cdnHelper))
+                .collect(Collectors.toList());
     }
 
     /* ==================== Helpers cho smartSwap ==================== */

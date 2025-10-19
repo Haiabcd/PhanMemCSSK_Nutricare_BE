@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.controller;
 
+import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.LogResponse;
@@ -52,15 +53,6 @@ public class MealLogController {
                 .data(data)
                 .build();
     }
-          
-    
-//    @DeleteMapping("/plan")
-//    public ApiResponse<Void> deletePlanLog(@RequestBody @Valid SaveLogRequest req) {
-//        logService.deletePlanLog(req);
-//        return ApiResponse.<Void>builder()
-//                .message("Xoá log theo kế hoạch thành công")
-//                .build();
-//    }
 
     @GetMapping("/nutriLog")
     public ApiResponse<NutritionResponse> getNutritionLogByDate(
@@ -80,4 +72,13 @@ public class MealLogController {
                 .build();
     }
 
+    @PostMapping("/save/manual")
+    public ApiResponse<Void> create(
+            @Valid @RequestBody PlanLogManualRequest request
+    ) {
+        logService.savePlanLog_Manual(request);
+        return ApiResponse.<Void>builder()
+                .message("Tạo log thủ công thành công")
+                .build();
+    }
 }

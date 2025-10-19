@@ -8,11 +8,7 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
-import com.hn.nutricarebe.repository.UserRepository;
-import com.hn.nutricarebe.service.MealPlanDayService;
-import com.hn.nutricarebe.service.ProfileService;
-import com.hn.nutricarebe.service.UserAllergyService;
-import com.hn.nutricarebe.service.UserConditionService;
+import com.hn.nutricarebe.service.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -20,15 +16,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Set;
+import java.time.LocalDate;
+import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Consumer;
+
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
 @Service
 public class ProfileServiceImpl implements ProfileService {
-
     ProfileRepository profileRepository;
     ProfileMapper profileMapper;
     UserAllergyService userAllergyService;
@@ -51,15 +47,11 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
     @Override
-    public void updateAvatarAndName(String avatarUrl, String name, UUID userId) {
+    public ProfileCreationRequest findByUserId_request(UUID userId) {
         Profile profile = profileRepository.findByUser_Id(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
-        profile.setName(name);
-        profile.setAvatarUrl(avatarUrl);
-
-        profileRepository.save(profile);
+        return profileMapper.toProfileCreationRequest(profile);
     }
-
 
     @Override
     @Transactional
@@ -74,39 +66,60 @@ public class ProfileServiceImpl implements ProfileService {
 
         Profile profile = profileRepository.findById(profileRequest.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+
+        // 1) Cập nhật allergies/conditions và biết chúng có thay đổi không
+        boolean allergyUpdated = userAllergyService.updateUserAllergys(userId, request.getAllergies());
+        boolean conditionUpdated = userConditionService.updateUserConditions(userId, request.getConditions());
+
+        // 2) Tính toán giá trị "kỳ vọng" cho các field ảnh hưởng meal plan từ request
+        Integer expectedTargetDeltaKg;
+        Integer expectedTargetDurationWeeks;
+
+        switch (profileRequest.getGoal()) {
+            case LOSE -> {
+                expectedTargetDeltaKg = -Math.abs(profileRequest.getTargetWeightDeltaKg());
+                expectedTargetDurationWeeks = profileRequest.getTargetDurationWeeks();
+            }
+            case MAINTAIN -> {
+                expectedTargetDeltaKg = 0;
+                expectedTargetDurationWeeks = 0;
+            }
+            default -> {
+                expectedTargetDeltaKg = Math.abs(profileRequest.getTargetWeightDeltaKg());
+                expectedTargetDurationWeeks = profileRequest.getTargetDurationWeeks();
+            }
+        }
+
+        // 3) Kiểm tra các thay đổi "có ý nghĩa" đối với meal plan (bỏ qua name)
+        boolean profileAffectsPlanChanged =
+                !Objects.equals(profile.getHeightCm(),       profileRequest.getHeightCm()) ||
+                        !Objects.equals(profile.getWeightKg(),       profileRequest.getWeightKg()) ||
+                        !Objects.equals(profile.getGender(),         profileRequest.getGender())   ||
+                        !Objects.equals(profile.getBirthYear(),      profileRequest.getBirthYear())||
+                        !Objects.equals(profile.getGoal(),           profileRequest.getGoal())     ||
+                        !Objects.equals(profile.getActivityLevel(),  profileRequest.getActivityLevel()) ||
+                        !Objects.equals(profile.getTargetWeightDeltaKg(), expectedTargetDeltaKg) ||
+                        !Objects.equals(profile.getTargetDurationWeeks(), expectedTargetDurationWeeks);
+
+        // 4) Gán cập nhật vào profile (bao gồm name)
         profile.setHeightCm(profileRequest.getHeightCm());
         profile.setWeightKg(profileRequest.getWeightKg());
         profile.setGender(profileRequest.getGender());
         profile.setBirthYear(profileRequest.getBirthYear());
         profile.setGoal(profileRequest.getGoal());
-        switch (profileRequest.getGoal()) {
-            case LOSE -> {
-                profile.setTargetWeightDeltaKg(-Math.abs(profileRequest.getTargetWeightDeltaKg()));
-                profile.setTargetDurationWeeks(profileRequest.getTargetDurationWeeks());
-            }
-            case MAINTAIN -> {
-                profile.setTargetWeightDeltaKg(0);
-                profile.setTargetDurationWeeks(0);
-            }
-            default -> {
-                profile.setTargetWeightDeltaKg(Math.abs(profileRequest.getTargetWeightDeltaKg()));
-                profile.setTargetDurationWeeks(profileRequest.getTargetDurationWeeks());
-            }
-        }
         profile.setActivityLevel(profileRequest.getActivityLevel());
         profile.setName(profileRequest.getName());
-        Profile profileSave =  profileRepository.save(profile);
-        userAllergyService.updateUserAllergys(userId, request.getAllergies());
-        userConditionService.updateUserConditions(userId, request.getConditions());
-        mealPlanDayService.removeFromDate(request.getStartDate(), userId);
+        profile.setTargetWeightDeltaKg(expectedTargetDeltaKg);
+        profile.setTargetDurationWeeks(expectedTargetDurationWeeks);
 
-        ProfileCreationRequest profileCreationRequest = profileMapper.toProfileCreationRequest(profileSave);
-        MealPlanCreationRequest mealPlanCreationRequest = MealPlanCreationRequest.builder()
-                .userId(userId)
-                .profile(profileCreationRequest)
-                .build();
-        mealPlanDayService.createPlan(mealPlanCreationRequest, 7);
+        profileRepository.save(profile);
+
+        boolean shouldRecreateMealPlan = allergyUpdated || conditionUpdated || profileAffectsPlanChanged;
+
+        if (shouldRecreateMealPlan) {
+            mealPlanDayService.updatePlanForOneDay(request.getStartDate(), userId);
+            LocalDate tomorrow = request.getStartDate().plusDays(1);
+            mealPlanDayService.removeFromDate(tomorrow, userId);
+        }
     }
-
-
 }

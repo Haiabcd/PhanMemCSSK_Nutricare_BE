@@ -39,6 +39,7 @@ public class SecurityConfig {
             "/allergies/save",
             "/nutrition-rules/save",
             "/auths/refresh",
+            "/auths/logout",
             "/meallog-ai/analyze-url",
     };
 
@@ -47,7 +48,9 @@ public class SecurityConfig {
             "/auths/google/callback",
             "/foods/**",
             "/foods/search/**",
+            "/foods/autocomplete/**",
             "/ingredients/**",
+            "/ingredients/autocomplete/**",
             "/foods/all/**",
             "/ingredients/all/**",
             "/conditions/all/**",
@@ -117,6 +120,7 @@ public class SecurityConfig {
             if (path.startsWith("/auths/refresh")
                     || path.startsWith("/auths/onboarding")
                     || path.startsWith("/meallog-ai/analyze-url")
+                    ||path.startsWith("/auths/logout")
             ) {
                 return null;
             }

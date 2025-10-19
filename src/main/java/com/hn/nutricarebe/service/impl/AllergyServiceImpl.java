@@ -2,9 +2,7 @@ package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.AllergyCreationRequest;
 import com.hn.nutricarebe.dto.response.AllergyResponse;
-import com.hn.nutricarebe.dto.response.ConditionResponse;
 import com.hn.nutricarebe.entity.Allergy;
-import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.AllergyMapper;
@@ -16,7 +14,6 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
-import java.util.List;
 import java.util.UUID;
 
 @Service
