@@ -8,6 +8,7 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
+import com.hn.nutricarebe.service.PlanOrchestrator;
 import com.hn.nutricarebe.service.ProfileService;
 import com.hn.nutricarebe.service.UserAllergyService;
 import com.hn.nutricarebe.service.UserConditionService;
@@ -30,6 +31,7 @@ public class ProfileServiceImpl implements ProfileService {
     ProfileMapper profileMapper;
     UserAllergyService userAllergyService;
     UserConditionService userConditionService;
+    PlanOrchestrator planOrchestrator;
 
 
     @Override
@@ -112,23 +114,12 @@ public class ProfileServiceImpl implements ProfileService {
         profile.setTargetWeightDeltaKg(expectedTargetDeltaKg);
         profile.setTargetDurationWeeks(expectedTargetDurationWeeks);
 
-        Profile profileSave = profileRepository.save(profile);
+        profileRepository.save(profile);
 
         boolean shouldRecreateMealPlan = allergyUpdated || conditionUpdated || profileAffectsPlanChanged;
 
-//        if (shouldRecreateMealPlan) {
-//            mealPlanDayService.removeFromDate(request.getStartDate(), userId);
-//
-//            ProfileCreationRequest profileCreationRequest = profileMapper.toProfileCreationRequest(profileSave);
-//            MealPlanCreationRequest mealPlanCreationRequest = MealPlanCreationRequest.builder()
-//                    .userId(userId)
-//                    .profile(profileCreationRequest)
-//                    .build();
-//            mealPlanDayService.createPlan(mealPlanCreationRequest, 7);
-//        }
-//        Orchestrator
+        if (shouldRecreateMealPlan) {
+            planOrchestrator.updatePlan(request.getStartDate(), userId);
+        }
     }
-
-
-
 }

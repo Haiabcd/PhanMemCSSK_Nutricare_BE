@@ -463,6 +463,12 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     }
 
 
+    @Override
+    @Transactional
+    public MealPlanResponse updatePlanForOneDay(LocalDate date, UUID userId) {
+        return  createOrUpdatePlanForOneDay(date, userId);
+    }
+
 
     public MealPlanResponse createOrUpdatePlanForOneDay(LocalDate date, UUID userId) {
         final double WATER_ML_PER_KG = 35.0;
