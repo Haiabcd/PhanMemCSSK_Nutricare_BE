@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.controller;
 
 import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
+import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.LogResponse;
@@ -79,6 +80,17 @@ public class MealLogController {
         logService.savePlanLog_Manual(request);
         return ApiResponse.<Void>builder()
                 .message("Tạo log thủ công thành công")
+                .build();
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<Void> updatePlanLog(
+            @PathVariable("id") UUID planLogId,
+            @Valid @RequestBody PlanLogUpdateRequest req
+    ) {
+        logService.updatePlanLog(req, planLogId);
+        return ApiResponse.<Void>builder()
+                .message("Cập nhật PlanLog thành công")
                 .build();
     }
 }
