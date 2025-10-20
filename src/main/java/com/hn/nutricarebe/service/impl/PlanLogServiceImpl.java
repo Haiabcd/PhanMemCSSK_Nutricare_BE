@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
+import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.LogResponse;
 import com.hn.nutricarebe.dto.response.NutritionResponse;
@@ -9,6 +10,7 @@ import com.hn.nutricarebe.enums.LogSource;
 import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
+import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.NutritionMapper;
 import com.hn.nutricarebe.mapper.PlanLogMapper;
 import com.hn.nutricarebe.repository.PlanLogIngredientRepository;
@@ -40,6 +42,7 @@ public class PlanLogServiceImpl implements PlanLogService {
     PlanLogIngredientRepository planLogIngredientRepository;
     NutritionMapper nutritionMapper;
     PlanLogMapper logMapper;
+    CdnHelper cdnHelper;
 
     @Override
     @Transactional
@@ -88,8 +91,11 @@ public class PlanLogServiceImpl implements PlanLogService {
         UUID userId = UUID.fromString(auth.getName());
 
         List<PlanLog> logs = logRepository.findByUser_IdAndDateAndMealSlot(userId, date, mealSlot);
+
         return logs.stream()
-                .map(logMapper::toLogResponse)
+                .map(log -> {
+                    return logMapper.toLogResponse(log, cdnHelper);
+                })
                 .toList();
     }
 
@@ -155,5 +161,52 @@ public class PlanLogServiceImpl implements PlanLogService {
                 planLogIngredientRepository.save(pli);
             }
         }
+    }
+
+
+    @Transactional
+    @Override
+    public void updatePlanLog(PlanLogUpdateRequest req, UUID id) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UUID userId = UUID.fromString(auth.getName());
+
+        PlanLog logOld = logRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND_PLAN_LOG));
+
+        if (logOld.getUser() == null || !userId.equals(logOld.getUser().getId())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        // ==== Cập nhật field đơn ====
+        logOld.setMealSlot(req.getMealSlot());
+        logOld.setFood(req.getFoodId() != null ? Food.builder().id(req.getFoodId()).build() : null);
+        logOld.setNameFood(req.getNameFood());
+        logOld.setPortion(req.getConsumedServings());
+        logOld.setActualNutrition(nutritionMapper.toNutrition(req.getTotalNutrition()));
+
+
+        logOld.getIngredients().size();
+
+        for (PlanLogIngredient child : new java.util.HashSet<>(logOld.getIngredients())) {
+            child.setPlanLog(null);
+        }
+        logOld.getIngredients().clear();
+        logRepository.flush();
+
+        // ==== Thêm ingredient mới ====
+        if (req.getIngredients() != null) {
+            for (PlanLogManualRequest.IngredientEntryDTO dto : req.getIngredients()) {
+                PlanLogIngredient pli = PlanLogIngredient.builder()
+                        .ingredient(Ingredient.builder().id(dto.getId()).build())
+                        .quantity(dto.getQty()) // BigDecimal
+                        .build();
+                pli.setPlanLog(logOld);
+                logOld.getIngredients().add(pli);
+            }
+        }
+        logRepository.saveAndFlush(logOld);
     }
 }

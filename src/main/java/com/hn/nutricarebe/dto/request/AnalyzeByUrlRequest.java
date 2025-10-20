@@ -14,5 +14,4 @@ import org.springframework.web.multipart.MultipartFile;
 public class AnalyzeByUrlRequest {
     @NotNull(message = "Ảnh món ăn là bắt buộc")
     MultipartFile image;
-//    String mealSlot;
 }
