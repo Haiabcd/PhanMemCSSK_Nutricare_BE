@@ -1,5 +1,6 @@
 server:
   port: 8080
+  address: 0.0.0.0
 spring:
   application:
     name: NutriCareBE
@@ -43,7 +44,7 @@ supabase:
   host: "https://ewyeishkixdcfhnzxprj.supabase.co"
   anon-key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3eWVpc2hraXhkY2Zobnp4cHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMDMxMDgsImV4cCI6MjA3MTY3OTEwOH0.E9oUPHv6OmpWXTylXCHSF2ULWxxUM_GBLuPCh3BbOl0"
 oauth:
-  callback-url: "http://localhost:8080/auths/google/callback"
+  callback-url: "http://192.168.110.253:8080/auths/google/callback"
 logmeal:
   base-url: "https://api.logmeal.com"
   key: "1c3ca8708971979495ba8e1f4d8df37399afe9f4"

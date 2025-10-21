@@ -72,9 +72,6 @@ public class User {
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<UserCondition> userConditions = new HashSet<>();
 
-    @OneToMany(mappedBy = "createdBy",fetch = FetchType.LAZY)
-    Set<Food> foods = new HashSet<>();
-
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<PlanLog> foodLogs = new HashSet<>();
 
