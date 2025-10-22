@@ -49,7 +49,6 @@ public class FoodServiceImpl implements FoodService {
         }
         Food food = foodMapper.toFood(request);
         food.setName(normalizedName);
-        food.setCreatedBy(userResolver.getUserByToken());
 
         String objectKey = null;
         try {

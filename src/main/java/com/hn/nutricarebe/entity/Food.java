@@ -65,13 +65,6 @@ public class Food {
     @Column(name = "is_ingredient", nullable = false)
     boolean isIngredient;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-            name = "created_by", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_foods_created_by_users")
-    )
-    User createdBy;
-
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "food_meal_slots",

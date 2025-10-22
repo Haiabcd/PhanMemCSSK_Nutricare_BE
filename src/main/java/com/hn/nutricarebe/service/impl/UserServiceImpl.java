@@ -37,6 +37,11 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User saveOnboarding(String device) {
+        User userOld = userRepository.findTopByDeviceIdAndStatusOrderByCreatedAtDesc(device, UserStatus.ACTIVE).orElse(null);
+        if (userOld != null) {
+            userOld.setStatus(UserStatus.DELETED);
+            userRepository.save(userOld);
+        }
         User user = User.builder()
                 .deviceId(device)
                 .role(Role.GUEST)
@@ -65,7 +70,7 @@ public class UserServiceImpl implements UserService {
 
         // Nếu vẫn chưa, thử theo device
         if (user == null && device != null && !device.isBlank()) {
-            user = userRepository.findByDeviceId(device).orElse(null);
+            user = userRepository.findTopByDeviceIdAndStatusOrderByCreatedAtDesc(device, UserStatus.ACTIVE).orElse(null);
         }
         return user;
     }

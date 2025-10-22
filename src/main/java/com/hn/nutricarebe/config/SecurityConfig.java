@@ -31,7 +31,6 @@ public class SecurityConfig {
     private final String[] PUBLIC_POST_ENDPOINTS = {
             "/auths/onboarding",
             "/auths/google/start/**",
-            "/auths/google/callback",
             "/ai/plan",
             "/foods/save",
             "/ingredients/save",
@@ -40,7 +39,6 @@ public class SecurityConfig {
             "/nutrition-rules/save",
             "/auths/refresh",
             "/auths/logout",
-            "/meallog-ai/analyze-url",
     };
 
 
@@ -117,9 +115,11 @@ public class SecurityConfig {
         DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
         return request -> {
             String path = request.getRequestURI();
+//            String path = request.getServletPath();
             if (path.startsWith("/auths/refresh")
                     || path.startsWith("/auths/onboarding")
-                    || path.startsWith("/meallog-ai/analyze-url")
+                    || path.startsWith("/auths/google/callback")
+                    || path.startsWith("/auths/google/start")
                     ||path.startsWith("/auths/logout")
             ) {
                 return null;
