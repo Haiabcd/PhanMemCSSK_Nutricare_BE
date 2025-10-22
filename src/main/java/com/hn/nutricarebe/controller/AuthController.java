@@ -9,7 +9,13 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -41,26 +47,59 @@ public class AuthController {
                 .build();
     }
 
+//    @GetMapping("/google/callback")
+//    public ApiResponse<LoginProviderResponse> googleCallback(
+//            @RequestParam String code, // Mã xác thực từ Google trả về
+//            @RequestParam("app_state") String appState,
+//            @RequestParam("device") String device,
+//            @RequestParam(required = false) String error,  // Lỗi (nếu có)
+//            @RequestParam(name = "error_description", required = false) String errorDesc // Mô tả lỗi
+//    ) {
+//        if (error != null) {
+//            return ApiResponse.<LoginProviderResponse>builder()
+//                    .code(4000)
+//                    .message("OAuth error: " + error)
+//                    .errors(Map.of("supabase", List.of(errorDesc != null ? errorDesc : "unknown")))
+//                    .build();
+//        }
+//        return ApiResponse.<LoginProviderResponse>builder()
+//                .message("Đăng nhập GOOGLE thành công")
+//                .data(authService.googleCallback(code, appState, device))
+//                .build();
+//    }
+
+
+
     @GetMapping("/google/callback")
-    public ApiResponse<LoginProviderResponse> googleCallback(
-            @RequestParam String code, // Mã xác thực từ Google trả về
+    public ResponseEntity<Void> googleCallback(
+            @RequestParam String code,
             @RequestParam("app_state") String appState,
             @RequestParam("device") String device,
-            @RequestParam(required = false) String error,  // Lỗi (nếu có)
-            @RequestParam(name = "error_description", required = false) String errorDesc // Mô tả lỗi
+            @RequestParam(required = false) String error,
+            @RequestParam(name = "error_description", required = false) String errorDesc,
+            @RequestParam(name = "return_to", required = false) String returnTo
     ) {
-        if (error != null) {
-            return ApiResponse.<LoginProviderResponse>builder()
-                    .code(4000)
-                    .message("OAuth error: " + error)
-                    .errors(Map.of("supabase", List.of(errorDesc != null ? errorDesc : "unknown")))
-                    .build();
+        final String DEFAULT_SUCCESS = "nutricare://oauth/success";
+        final String DEFAULT_ERROR   = "nutricare://oauth/error";
+
+        // Chống open-redirect: chỉ cho phép scheme của app
+        if (returnTo == null || returnTo.isBlank() || !returnTo.startsWith("nutricare://")) {
+            returnTo = DEFAULT_SUCCESS;
         }
-        return ApiResponse.<LoginProviderResponse>builder()
-                .message("Đăng nhập GOOGLE thành công")
-                .data(authService.googleCallback(code, appState, device))
-                .build();
+
+        if (error != null) {
+            String reason = URLEncoder.encode(errorDesc != null ? errorDesc : error, StandardCharsets.UTF_8);
+            URI fail = URI.create(DEFAULT_ERROR + "?reason=" + reason);
+            return ResponseEntity.status(HttpStatus.FOUND).location(fail).build();
+        }
+        // Gọi service để hoàn tất login (tạo user, lưu token refresh vào DB, v.v.)
+        authService.googleCallback(code, appState, device);
+
+        // Thành công: 302 về deep link (không trả body JSON)
+        URI success = URI.create(returnTo);
+        return ResponseEntity.status(HttpStatus.FOUND).location(success).build();
     }
+
     // ===========================Google OAuth2================================= //
 
     @PostMapping("/refresh")

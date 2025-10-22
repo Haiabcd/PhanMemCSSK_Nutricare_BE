@@ -4,6 +4,7 @@ import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
 import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 
+import com.hn.nutricarebe.dto.response.KcalWarningResponse;
 import com.hn.nutricarebe.dto.response.LogResponse;
 import com.hn.nutricarebe.dto.response.NutritionResponse;
 import com.hn.nutricarebe.enums.MealSlot;
@@ -17,6 +18,6 @@ public interface PlanLogService {
     List<LogResponse> getLog(LocalDate date, MealSlot mealSlot);
     void deleteById(UUID id);
     NutritionResponse getNutritionLogByDate(LocalDate date);
-    void savePlanLog_Manual( PlanLogManualRequest req);
-    void updatePlanLog( PlanLogUpdateRequest req, UUID id);
+    KcalWarningResponse savePlanLog_Manual(PlanLogManualRequest req);
+    KcalWarningResponse updatePlanLog( PlanLogUpdateRequest req, UUID id);
 }
