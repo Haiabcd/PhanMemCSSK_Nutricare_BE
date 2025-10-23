@@ -87,8 +87,8 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         Optional<Profile> p = profileRepository.findByUser_Id(userId);
 
-        List<UserAllergy> la =  userAllergyRepository.findByUser_Id(userId);
-        List<UserCondition> lc =  userConditionRepository.findByUser_Id(userId);
+        List<UserAllergy> la = userAllergyRepository.findByUser_Id(userId);
+        List<UserCondition> lc = userConditionRepository.findByUser_Id(userId);
 
         List<String> allergyNames = la.stream()
                 .map(ua -> ua.getAllergy() != null ? ua.getAllergy().getName() : null)
@@ -106,7 +106,6 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .distinct()
                 .collect(Collectors.toList());
 
-
         ProfileDto profile = p.map(pr -> ProfileDto.builder()
                         .goal(mapGoalToString(pr.getGoal()))
                         .activity(mapActivityToString(pr.getActivityLevel()))
@@ -121,100 +120,201 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         int lim = clampLimit(limit);
 
-        List<RecoItemDto> items = new ArrayList<RecoItemDto>();
+        // ==== Thu thập dữ liệu thô ====
+        List<RecoItemDto> items = new ArrayList<>();
         String q = buildQuery(profile);
-        List<String> keywords = buildKeywords(profile); // đã lower-case & lọc rỗng
+        List<String> positiveKeywords = buildKeywords(profile);  // đã lower-case, unique
+        List<String> negativeKeywords = buildNegativeKeywords(profile); // dị ứng, cần loại trừ
 
-        /*
-        // 1) RSS bài viết
         for (String rss : ARTICLE_FEEDS) {
             try {
                 items.addAll(fetchRssArticles(rss));
-            } catch (Exception ignore) {}
-        }
-
-        // 2) YouTube (RSS)
-        try { items.addAll(fetchYoutubeVideos(q)); } catch (Exception ignore) {}
-
-        // 3) PubMed
-        try { items.addAll(fetchPubMed(q)); } catch (Exception ignore) {}
-
-         */
-
-        for (String rss : ARTICLE_FEEDS) {
-            try {
-                List<RecoItemDto> a = fetchRssArticles(rss);
-                System.out.println("[RSS OK] " + rss + " -> " + a.size());
-                items.addAll(a);
             } catch (Exception e) {
                 System.err.println("[RSS ERR] " + rss + " -> " + e.getMessage());
             }
         }
-//        try {
-//            List<RecoItemDto> y = fetchYoutubeVideos(q);
-//            System.out.println("[YT OK] -> " + y.size());
-//            items.addAll(y);
-//        } catch (Exception e) {
-//            System.err.println("[YT ERR] " + e.getMessage());
-//        }
         try {
-            List<RecoItemDto> pm = fetchPubMed(q);
-            System.out.println("[PM OK] -> " + pm.size());
-            items.addAll(pm);
+            items.addAll(fetchPubMed(q));
         } catch (Exception e) {
             System.err.println("[PM ERR] " + e.getMessage());
         }
-        System.out.println("[TOTAL ITEMS BEFORE FILTER] " + items.size());
 
+        // ==== Dedupe sớm theo url|title ====
+        items = dedupeArticles(items);
 
-        // 4) Lọc theo keywords + chấm điểm (an toàn null)
-        List<RecoItemDto> filtered = new ArrayList<>();
-        boolean noKw = keywords.isEmpty();
+        // ==== Loại trừ theo dị ứng (negative keywords) ====
+        if (!negativeKeywords.isEmpty()) {
+            items = items.stream()
+                    .filter(it -> {
+                        String hay = (safeLower(it.getTitle()) + " " + safeLower(it.getSource())).trim();
+                        return !containsAny(hay, negativeKeywords);
+                    })
+                    .collect(Collectors.toList());
+        }
 
-// Record tạm cho dễ sort
-        record Scored(RecoItemDto it, int score) {}
+        // ==== Tính điểm liên quan + boost ====
+        record Scored(RecoItemDto it, double score) {}
+        List<Scored> scored = new ArrayList<>();
+        boolean noPositive = positiveKeywords.isEmpty();
 
-        List<Scored> scoredList = new ArrayList<>();
         for (RecoItemDto it : items) {
-            String t = safeLower(it.getTitle());
-            String s = safeLower(it.getSource());
-            String hay = (t + " " + s).trim();
+            String hay = (safeLower(it.getTitle()) + " " + safeLower(it.getSource())).trim();
 
-            int score = noKw ? 1 : relevanceScore(hay, keywords);
-            if (score > 0) {
-                scoredList.add(new Scored(it, score));
-            }
+            // điểm từ khóa (nếu không có positiveKeywords thì coi như điểm nền = 1)
+            int kwScore = noPositive ? 1 : relevanceScore(hay, positiveKeywords);
+
+            // bỏ qua bài không match gì khi có positiveKeywords
+            if (!noPositive && kwScore <= 0) continue;
+
+            double s = kwScore;
+            s += domainBoost(it.getSource());     // + uy tín domain
+            s += recencyBoost(it.getPublished()); // + độ mới (0..3)
+
+            if (s > 0) scored.add(new Scored(it, s));
         }
 
-        int relaxThreshold = Math.max(3, lim / 2);
-        if (!noKw && filtered.size() < relaxThreshold) {
-            System.out.println("[FILTER] too few matches (" + filtered.size() + "), relax filter -> return unfiltered");
-            filtered = new ArrayList<>(items); // bỏ lọc từ khóa để đảm bảo có dữ liệu
+        // ==== Nới lọc nếu quá ít kết quả ====
+        int relaxThreshold = Math.max(6, lim); // cần ít nhất lim kết quả trước khi cắt
+        List<RecoItemDto> result;
+        if (scored.size() < relaxThreshold) {
+            // fallback: vẫn giữ blocklist dị ứng, nhưng bỏ bắt buộc match positive
+            // sort: recency (desc) + domain boost
+            result = items.stream()
+                    .sorted((a, b) -> {
+                        int cmpRecency = comparePublishedDesc(a.getPublished(), b.getPublished());
+                        if (cmpRecency != 0) return cmpRecency;
+                        // tie-break theo domain boost
+                        double db = Double.compare(domainBoost(b.getSource()), domainBoost(a.getSource()));
+                        if (db != 0) return (int) Math.signum(db);
+                        return 0;
+                    })
+                    .collect(Collectors.toList());
+        } else {
+            // sort theo score desc, tie-break theo published desc
+            result = scored.stream()
+                    .sorted((x, y) -> {
+                        int c = Double.compare(y.score, x.score);
+                        if (c != 0) return c;
+                        return comparePublishedDesc(x.it.getPublished(), y.it.getPublished());
+                    })
+                    .map(Scored::it)
+                    .collect(Collectors.toList());
         }
 
-        // 5) Sort theo thời gian (mới nhất trước), null published cho xuống cuối
-        filtered.sort(new java.util.Comparator<RecoItemDto>() {
-            @Override
-            public int compare(RecoItemDto a, RecoItemDto b) {
-                Instant pa = a.getPublished();
-                Instant pb = b.getPublished();
-                if (pa == null && pb == null) return 0;
-                if (pa == null) return 1;   // a xuống dưới
-                if (pb == null) return -1;  // b xuống dưới
-                // desc
-                return pb.compareTo(pa);
-            }
-        });
-
-
-        // 6) Cắt limit
-        if (filtered.size() > lim) {
-            return new ArrayList<RecoItemDto>(filtered.subList(0, lim));
+        // ==== Cắt limit ====
+        if (result.size() > lim) {
+            result = new ArrayList<>(result.subList(0, lim));
         }
-        return filtered;
+        return result;
     }
 
-    /* ============================ Helpers ============================ */
+    /* ============================ Helpers new ============================ */
+    /** Tạo từ khoá âm (blocklist) từ dị ứng của user, có thêm bản EN cơ bản */
+    private static List<String> buildNegativeKeywords(ProfileDto p) {
+        List<String> neg = new ArrayList<>();
+        if (p != null && p.getAllergies() != null) {
+            for (String a : p.getAllergies()) {
+                if (isBlank(a)) continue;
+                String vi = a.trim().toLowerCase(Locale.ROOT);
+                if (!neg.contains(vi)) neg.add(vi);
+                String en = viToEn(a);
+                if (en != null) {
+                    en = en.toLowerCase(Locale.ROOT);
+                    if (!neg.contains(en)) neg.add(en);
+                }
+                // Một vài synonym phổ biến (tuỳ DB bạn mở rộng thêm):
+                if (vi.contains("sữa")) {    // dairy
+                    Collections.addAll(neg, "sữa","dairy","milk","lactose","casein","whey");
+                } else if (vi.contains("trứng")) {
+                    Collections.addAll(neg, "trứng","egg","albumen");
+                } else if (vi.contains("đậu nành") || vi.contains("đậu tương")) {
+                    Collections.addAll(neg, "đậu nành","đậu tương","soy","soya");
+                } else if (vi.contains("đậu phộng") || vi.contains("lạc")) {
+                    Collections.addAll(neg, "đậu phộng","lạc","peanut","peanuts");
+                } else if (vi.contains("hải sản") || vi.contains("tôm") || vi.contains("cua")) {
+                    Collections.addAll(neg, "hải sản","tôm","cua","shellfish","shrimp","crab");
+                } else if (vi.contains("mè") || vi.contains("vừng") || vi.contains("sesame")) {
+                    Collections.addAll(neg, "mè","vừng","sesame");
+                } else if (vi.contains("gluten")) {
+                    Collections.addAll(neg, "gluten","wheat","lúa mì","bột mì");
+                }
+            }
+        }
+        // chuẩn hoá + distinct
+        List<String> uniq = new ArrayList<>();
+        for (String k : neg) {
+            if (k == null) continue;
+            String t = k.trim().toLowerCase(Locale.ROOT);
+            if (!t.isEmpty() && !uniq.contains(t)) uniq.add(t);
+        }
+        return uniq;
+    }
+
+    /** Kiểm tra xem haystack có chứa bất kỳ từ khoá trong list không */
+    private static boolean containsAny(String haystack, List<String> kws) {
+        if (isBlank(haystack) || kws == null || kws.isEmpty()) return false;
+        String s = haystack.toLowerCase(Locale.ROOT);
+        for (String k : kws) {
+            if (k == null) continue;
+            String t = k.toLowerCase(Locale.ROOT).trim();
+            if (!t.isEmpty() && s.contains(t)) return true;
+        }
+        return false;
+    }
+
+    /** Boost theo domain uy tín (tuỳ bạn hiệu chỉnh trọng số) */
+    private static double domainBoost(String host) {
+        if (host == null) return 0;
+        String h = host.toLowerCase(Locale.ROOT);
+        if (h.contains("vnexpress")) return 2.0;
+        if (h.contains("tuoitre"))   return 1.5;
+        if (h.contains("znews") || h.contains("zing")) return 1.2;
+        if (h.contains("vtc"))       return 1.0;
+        if (h.contains("phunuvietnam")) return 0.8;
+        if (h.contains("pubmed"))    return 2.5; // nghiên cứu
+        return 0.0;
+    }
+
+    /** Boost theo độ mới: 0..~3 tuỳ tuổi bài (mới hơn thì cao hơn) */
+    private static double recencyBoost(Instant published) {
+        if (published == null) return 0;
+        long days = Math.max(0, (java.time.Duration.between(published, Instant.now()).toDays()));
+        // <7d: +3 ; <30d: +2 ; <90d: +1 ; còn lại +0.3
+        if (days <= 7)  return 3.0;
+        if (days <= 30) return 2.0;
+        if (days <= 90) return 1.0;
+        return 0.3;
+    }
+
+    /** So sánh thời gian xuất bản (desc) */
+    private static int comparePublishedDesc(Instant a, Instant b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return 1;
+        if (b == null) return -1;
+        return b.compareTo(a);
+    }
+
+    /** Dedupe: ưu tiên bài mới hơn nếu trùng url hoặc title */
+    private static List<RecoItemDto> dedupeArticles(List<RecoItemDto> list) {
+        Map<String, RecoItemDto> byKey = new LinkedHashMap<>();
+        for (RecoItemDto it : list) {
+            String key = (safeLower(it.getUrl()) + "|" + safeLower(it.getTitle())).trim();
+            RecoItemDto old = byKey.get(key);
+            if (old == null) {
+                byKey.put(key, it);
+            } else {
+                // giữ bài mới hơn
+                if (comparePublishedDesc(it.getPublished(), old.getPublished()) < 0) {
+                    // old newer => keep old
+                } else {
+                    byKey.put(key, it);
+                }
+            }
+        }
+        return new ArrayList<>(byKey.values());
+    }
+
+    /* =========================== Helpers =========================== */
 
     private Integer calcAge(Integer birthYear) {
         if (birthYear == null) return null;
