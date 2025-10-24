@@ -17,7 +17,6 @@ public interface PlanLogService {
     NutritionResponse getNutritionLogByDate(LocalDate date);
     KcalWarningResponse savePlanLog_Manual(PlanLogManualRequest req);
     KcalWarningResponse updatePlanLog( PlanLogUpdateRequest req, UUID id);
-
     List<TopFoodDto> getTopFoods(UUID userId, LocalDate start, LocalDate end, int limit);
     List<DailyNutritionDto> getDailyNutrition(UUID userId, LocalDate start, LocalDate end, boolean fillMissingDays);
     Map<MealSlot, Map<String, Long>> getMealSlotSummary(UUID userId, LocalDate start, LocalDate end);
