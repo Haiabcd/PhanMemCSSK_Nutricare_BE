@@ -5,10 +5,16 @@ spring:
   application:
     name: NutriCareBE
   datasource:
-    url: jdbc:postgresql://aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require
+    url: jdbc:postgresql://aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0&preferQueryMode=simple
     username: postgres.ewyeishkixdcfhnzxprj
     password: "nutricareqdrhd@#$"
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5     # 5–10 là hợp lý với dự án nhỏ
+      minimum-idle: 1
+      idle-timeout: 60000      # 60s
+      max-lifetime: 1800000    # 30m
+      connection-timeout: 30000
   jpa:
     hibernate:
       ddl-auto: update

@@ -1,9 +1,10 @@
 package com.hn.nutricarebe.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import java.util.UUID;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -11,8 +12,10 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class ConditionResponse {
-    UUID id;
-    String name;
+public class DailyNutritionDto {
+    LocalDate date;
+    BigDecimal proteinG;
+    BigDecimal carbG;
+    BigDecimal fatG;
+    BigDecimal fiberG;
 }

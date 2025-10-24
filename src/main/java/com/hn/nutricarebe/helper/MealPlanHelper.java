@@ -3,13 +3,14 @@ package com.hn.nutricarebe.helper;
 
 import com.hn.nutricarebe.dto.TagDirectives;
 import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
+import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
 import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.entity.Nutrition;
 import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.enums.*;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Year;
 import java.util.*;
 
 
@@ -26,6 +27,47 @@ public final class MealPlanHelper {
     }
 
     public static String safeStr(String s){ return s==null? "" : s.trim(); }
+
+    //Tính BMI
+    public static double caculateBMI(ProfileCreationRequest profile) {
+        int currentYear = Year.now().getValue();
+        int age    = Math.max(0, currentYear - profile.getBirthYear());
+        int weight = Math.max(1, profile.getWeightKg());
+        int height = Math.max(50, profile.getHeightCm());
+
+        // 1) BMR: Mifflin–St Jeor
+        double bmr = switch (profile.getGender()) {
+            case MALE   -> 10 * weight + 6.25 * height - 5 * age + 5;
+            case FEMALE -> 10 * weight + 6.25 * height - 5 * age - 161;
+            case OTHER  -> 10 * weight + 6.25 * height - 5 * age;
+        };
+
+        // 2) TDEE theo mức độ hoạt động
+        ActivityLevel al = profile.getActivityLevel() != null ? profile.getActivityLevel() : ActivityLevel.SEDENTARY;
+        double activityFactor = switch (al) {
+            case SEDENTARY         -> 1.2;
+            case LIGHTLY_ACTIVE    -> 1.375;
+            case MODERATELY_ACTIVE -> 1.55;
+            case VERY_ACTIVE       -> 1.725;
+            case EXTRA_ACTIVE      -> 1.9;
+        };
+        return bmr * activityFactor;
+    }
+
+    //Cộng 2 chất dinh dưỡng
+    public static Nutrition addNut(Nutrition a, Nutrition b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return Nutrition.builder()
+                .kcal(     bd(safeDouble(a.getKcal())     + safeDouble(b.getKcal()), 2))
+                .proteinG( bd(safeDouble(a.getProteinG()) + safeDouble(b.getProteinG()), 2))
+                .carbG(    bd(safeDouble(a.getCarbG())    + safeDouble(b.getCarbG()), 2))
+                .fatG(     bd(safeDouble(a.getFatG())     + safeDouble(b.getFatG()), 2))
+                .fiberG(   bd(safeDouble(a.getFiberG())   + safeDouble(b.getFiberG()), 2))
+                .sodiumMg( bd(safeDouble(a.getSodiumMg()) + safeDouble(b.getSodiumMg()), 2))
+                .sugarMg(  bd(safeDouble(a.getSugarMg())  + safeDouble(b.getSugarMg()), 2))
+                .build();
+    }
 
     // Kiểm tra rule về độ tuổi, giới tính
     public static boolean isApplicableToDemographics(NutritionRule r, MealPlanCreationRequest request) {

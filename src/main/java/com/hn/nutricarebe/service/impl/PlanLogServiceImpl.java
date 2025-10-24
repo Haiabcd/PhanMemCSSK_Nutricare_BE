@@ -3,9 +3,7 @@ package com.hn.nutricarebe.service.impl;
 import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
 import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
-import com.hn.nutricarebe.dto.response.KcalWarningResponse;
-import com.hn.nutricarebe.dto.response.LogResponse;
-import com.hn.nutricarebe.dto.response.NutritionResponse;
+import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.LogSource;
 import com.hn.nutricarebe.enums.MealSlot;
@@ -24,15 +22,18 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-
+import java.time.temporal.ChronoUnit;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
+import static com.hn.nutricarebe.helper.MealPlanHelper.addNut;
 import static com.hn.nutricarebe.helper.PlanLogHelper.aggregateActual;
+import static com.hn.nutricarebe.helper.PlanLogHelper.resolveActualOrFallback;
 
 @Slf4j
 @Service
@@ -271,5 +272,92 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .diff(diff)
                 .status(status)
                 .build();
+    }
+
+    @Override
+    public List<TopFoodDto> getTopFoods(UUID userId, LocalDate start, LocalDate end, int limit) {
+        return logRepository.findTopFoodsOfUserBetween(
+                userId, start, end, PageRequest.of(0, limit)
+        );
+    }
+
+    @Override
+    public List<DailyNutritionDto> getDailyNutrition(UUID userId,
+                                                     LocalDate start,
+                                                     LocalDate end,
+                                                     boolean fillMissingDays) {
+        List<DailyNutritionDto> rows =
+                logRepository.sumDailyNutritionByDateBetween(userId, start, end);
+
+        if (!fillMissingDays) return rows;
+        // Map theo ngày để fill ngày trống = 0
+        Map<LocalDate, DailyNutritionDto> byDate = rows.stream()
+                .collect(Collectors.toMap(DailyNutritionDto::getDate, x -> x));
+        List<DailyNutritionDto> filled = new ArrayList<>();
+        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
+            DailyNutritionDto dto = byDate.get(d);
+            if (dto == null) {
+                dto = new DailyNutritionDto(d, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+            }
+            filled.add(dto);
+        }
+        return filled;
+    }
+
+
+    @Override
+    @Transactional
+    public Map<MealSlot, Map<String, Long>> getMealSlotSummary(UUID userId, LocalDate start, LocalDate end) {
+
+        long totalDays = ChronoUnit.DAYS.between(start, end) + 1;
+
+        // Lấy các cặp (date, slot) đã có log
+        List<DateSlotProjection> logs = logRepository.findDistinctDateAndSlotByUserAndDateBetween(userId, start, end);
+
+        // Gom theo slot
+        Map<MealSlot, Set<LocalDate>> slotToDates = new EnumMap<>(MealSlot.class);
+        for (MealSlot slot : MealSlot.values()) {
+            slotToDates.put(slot, new HashSet<>());
+        }
+        for (DateSlotProjection row : logs) {
+            slotToDates.get(row.getMealSlot()).add(row.getDate());
+        }
+
+        // Kết quả: Map<MealSlot, {loggedDays, missedDays}>
+        return Arrays.stream(MealSlot.values())
+                .collect(Collectors.toMap(
+                        slot -> slot,
+                        slot -> {
+                            long logged = slotToDates.get(slot).size();
+                            long missed = Math.max(0, totalDays - logged);
+                            Map<String, Long> stat = new LinkedHashMap<>();
+                            stat.put("loggedDays", logged);
+                            stat.put("missedDays", missed);
+                            stat.put("totalDays", totalDays);
+                            return stat;
+                        },
+                        (a, b) -> a,
+                        () -> new EnumMap<>(MealSlot.class)
+                ));
+    }
+
+    @Override
+    @Transactional
+    public List<DayConsumedTotal> getConsumedTotalsBetween(LocalDate from, LocalDate to, UUID userId) {
+        List<PlanLog> logs = logRepository.findByUser_IdAndDateBetween(userId, from, to);
+        if (logs.isEmpty()) return List.of();
+
+        Map<LocalDate, Nutrition> totalByDate = new TreeMap<>();
+        for (PlanLog l : logs) {
+            LocalDate d = l.getDate();
+            Nutrition add = resolveActualOrFallback(l);
+            if (add == null) continue;
+
+            Nutrition cur = totalByDate.get(d);
+            totalByDate.put(d, (cur == null) ? add : addNut(cur, add));
+        }
+        return totalByDate.entrySet().stream()
+                .map(e -> new DayConsumedTotal(e.getKey(), e.getValue()))
+                .toList();
     }
 }

@@ -3,6 +3,7 @@ package com.hn.nutricarebe.service.impl;
 import com.hn.nutricarebe.dto.TagDirectives;
 import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
 import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
+import com.hn.nutricarebe.dto.response.DayTarget;
 import com.hn.nutricarebe.dto.response.MealPlanResponse;
 import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.*;
@@ -25,7 +26,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.Year;
 import java.util.*;
 import java.util.Comparator;
 import java.util.stream.Collectors;
@@ -391,6 +391,17 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     }
 
 
+    @Override
+    @Transactional
+    public List<DayTarget> getDayTargetsBetween(LocalDate from, LocalDate to, UUID userId) {
+        List<MealPlanDay> days = mealPlanDayRepository
+                .findByUser_IdAndDateBetweenOrderByDateAsc(userId, from, to);
+        return days.stream()
+                .map(d -> new DayTarget(d.getDate(), d.getTargetNutrition()))
+                .toList();
+    }
+
+
 
     public MealPlanResponse createOrUpdatePlanForOneDay(LocalDate date, UUID userId) {
         final double WATER_ML_PER_KG = 35.0;
@@ -583,31 +594,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     }
 
     /* ===================== HÀM PHỤ TRỢ ===================== */
-    //Tính BMI
-    public double caculateBMI(ProfileCreationRequest profile) {
-        int currentYear = Year.now().getValue();
-        int age    = Math.max(0, currentYear - profile.getBirthYear());
-        int weight = Math.max(1, profile.getWeightKg());
-        int height = Math.max(50, profile.getHeightCm());
 
-        // 1) BMR: Mifflin–St Jeor
-        double bmr = switch (profile.getGender()) {
-            case MALE   -> 10 * weight + 6.25 * height - 5 * age + 5;
-            case FEMALE -> 10 * weight + 6.25 * height - 5 * age - 161;
-            case OTHER  -> 10 * weight + 6.25 * height - 5 * age;
-        };
-
-        // 2) TDEE theo mức độ hoạt động
-        ActivityLevel al = profile.getActivityLevel() != null ? profile.getActivityLevel() : ActivityLevel.SEDENTARY;
-        double activityFactor = switch (al) {
-            case SEDENTARY         -> 1.2;
-            case LIGHTLY_ACTIVE    -> 1.375;
-            case MODERATELY_ACTIVE -> 1.55;
-            case VERY_ACTIVE       -> 1.725;
-            case EXTRA_ACTIVE      -> 1.9;
-        };
-        return bmr * activityFactor;
-    }
 
     //Tính kcal mục tiêu / ngày
     public double calculateTargetKcal(double tdee, ProfileCreationRequest profile) {
@@ -706,21 +693,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 safeDouble(n.getFiberG())   <= EPS_FIBER  &&
                 safeDouble(n.getSodiumMg()) <= EPS_SODIUM &&
                 safeDouble(n.getSugarMg())  <= EPS_SUGAR;
-    }
-
-    //Cộng 2 chất dinh dưỡng
-    private Nutrition addNut(Nutrition a, Nutrition b) {
-        if (a == null) return b;
-        if (b == null) return a;
-        return Nutrition.builder()
-                .kcal(     bd(safeDouble(a.getKcal())     + safeDouble(b.getKcal()), 2))
-                .proteinG( bd(safeDouble(a.getProteinG()) + safeDouble(b.getProteinG()), 2))
-                .carbG(    bd(safeDouble(a.getCarbG())    + safeDouble(b.getCarbG()), 2))
-                .fatG(     bd(safeDouble(a.getFatG())     + safeDouble(b.getFatG()), 2))
-                .fiberG(   bd(safeDouble(a.getFiberG())   + safeDouble(b.getFiberG()), 2))
-                .sodiumMg( bd(safeDouble(a.getSodiumMg()) + safeDouble(b.getSodiumMg()), 2))
-                .sugarMg(  bd(safeDouble(a.getSugarMg())  + safeDouble(b.getSugarMg()), 2))
-                .build();
     }
 
     // remaining = max(0, target - consumed)
@@ -1026,7 +998,4 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     private BigDecimal minOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.min(b); }
     //trả về giá trị lớn hơn (ưu tiên đảm bảo cho chất cần thiết)
     private BigDecimal maxOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.max(b); }
-
-
-
 }
