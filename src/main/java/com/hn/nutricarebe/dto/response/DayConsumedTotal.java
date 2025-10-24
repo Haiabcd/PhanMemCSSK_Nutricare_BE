@@ -1,21 +1,18 @@
 package com.hn.nutricarebe.dto.response;
 
+import com.hn.nutricarebe.entity.Nutrition;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter
 @Setter
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE)
-public class DailyNutritionDto {
+@Builder
+@FieldDefaults(level = lombok.AccessLevel.PRIVATE)
+public class DayConsumedTotal {
     LocalDate date;
-    BigDecimal proteinG;
-    BigDecimal carbG;
-    BigDecimal fatG;
-    BigDecimal fiberG;
+    Nutrition total;
 }

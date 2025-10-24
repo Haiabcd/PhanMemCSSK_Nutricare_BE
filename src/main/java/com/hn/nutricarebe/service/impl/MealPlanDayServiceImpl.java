@@ -3,6 +3,7 @@ package com.hn.nutricarebe.service.impl;
 import com.hn.nutricarebe.dto.TagDirectives;
 import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
 import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
+import com.hn.nutricarebe.dto.response.DayTarget;
 import com.hn.nutricarebe.dto.response.MealPlanResponse;
 import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.*;
@@ -48,88 +49,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
 
     @PersistenceContext
     EntityManager entityManager;
-
-
-    //Tính kcal mục tiêu / ngày
-    public double calculateTargetKcal(double tdee, ProfileCreationRequest profile) {
-        final double MAX_DAILY_ADJ   = 1000.0;    // ±1000 kcal/ngày
-        final double MIN_KCAL_FEMALE = 1200.0;
-        final double MIN_KCAL_MALE   = 1500.0;
-
-        Integer deltaKg = profile.getTargetWeightDeltaKg();
-        Integer weeks   = profile.getTargetDurationWeeks();
-
-        double dailyAdj = 0.0;  // Số kcal cần tăng/giảm mỗi ngày
-        boolean hasDelta = (deltaKg != null && deltaKg != 0) && (weeks != null && weeks > 0);
-        if (hasDelta && profile.getGoal() != GoalType.MAINTAIN) {
-            dailyAdj = (deltaKg * 7700.0) / (weeks * 7.0);
-            dailyAdj = Math.max(-MAX_DAILY_ADJ, Math.min(MAX_DAILY_ADJ, dailyAdj));
-        }
-
-        // Nếu MAINTAIN, bỏ qua delta
-        double targetCalories = (profile.getGoal() == GoalType.MAINTAIN) ? tdee : (tdee + dailyAdj);
-
-        // Mức kcal tối thiểu theo giới tính
-        targetCalories = switch (profile.getGender()){
-            case FEMALE -> Math.max(MIN_KCAL_FEMALE, targetCalories);
-            case MALE   -> Math.max(MIN_KCAL_MALE,   targetCalories);
-            case OTHER  -> Math.max(MIN_KCAL_FEMALE, targetCalories);
-        };
-        return targetCalories;
-    }
-
-    //Tính nutrtion cho ngày
-    public Nutrition caculateNutrition(MealPlanCreationRequest request,AggregateConstraints agg){
-        final double FAT_PCT = 0.30;              // WHO: chat beo ≤30%
-        final double FREE_SUGAR_PCT_MAX = 0.10;   // WHO: <10%
-        final int    SODIUM_MG_LIMIT = 2000;      // WHO: <2000 mg natri/ngày
-
-        var profile = request.getProfile();
-        int weight = Math.max(1, profile.getWeightKg());
-
-        //1) Tính TDEE
-        double tdee = caculateBMI(profile);
-
-        //2) Tính kcal mục tiêu / ngày
-        double targetCalories = calculateTargetKcal(tdee, profile);
-
-        //3.1) Protein (Đạm) theo g/kg
-        double proteinPerKg = switch (profile.getGoal()) {
-            case MAINTAIN -> 0.8;
-            case LOSE     -> 1.0;
-            case GAIN     -> 1.2;
-        };
-        double proteinG = weight * proteinPerKg;
-        double proteinKcal = proteinG * 4.0;
-
-        //3.2) Fat: 30% năng lượng (NẾU BÉO PHÌ NHỎ HƠN 30%)
-        double fatKcal = targetCalories * FAT_PCT;
-        double fatG = fatKcal / 9.0;
-
-        //3.3) Carb = phần còn lại
-        double carbKcal = Math.max(0.0, targetCalories - proteinKcal - fatKcal);
-        double carbG = carbKcal / 4.0;
-
-        //3.4) Fiber: tối thiểu 25g (nâng theo 14g/1000kcal nếu cần)
-        double fiberG = Math.max(25.0, 14.0 * (targetCalories / 1000.0));
-
-        //3.5) Free sugar trần <10% năng lượng → g → mg
-        double sugarGMax = (targetCalories * FREE_SUGAR_PCT_MAX) / 4.0;
-        double sugarMg = sugarGMax * 1000.0;
-
-        // Target dinh dưỡng ngày
-        Nutrition target = Nutrition.builder()
-                .kcal(bd(targetCalories, 2))
-                .proteinG(bd(proteinG, 2))
-                .carbG(bd(carbG, 2))
-                .fatG(bd(fatG, 2))
-                .fiberG(bd(fiberG, 2))
-                .sodiumMg(bd(SODIUM_MG_LIMIT, 2))
-                .sugarMg(bd(sugarMg, 2))
-                .build();
-
-        return applyAggregateConstraintsToDayTarget(target, agg);
-    }
 
 
     @Override
@@ -443,6 +362,48 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     }
 
 
+    @Override
+    @Transactional
+    public double getMealTargetKcal(UUID userId, MealSlot slot) {
+        // ===== 1) Lấy profile + rules =====
+        ProfileCreationRequest profile = profileOrchestrator.getByUserId_request(userId);
+        int weight = Math.max(1, profile.getWeightKg());
+        List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
+        AggregateConstraints agg = deriveAggregateConstraintsFromRules(rules, weight);
+        // ===== 2) Tính target dinh dưỡng ngày =====
+        MealPlanCreationRequest req = MealPlanCreationRequest.builder()
+                .userId(userId)
+                .profile(profile)
+                .build();
+        Nutrition dayTarget = caculateNutrition(req, agg);
+        // ===== 3) Xác định % kcal theo slot =====
+        Map<MealSlot, Double> slotKcalPct = Map.of(
+                MealSlot.BREAKFAST, 0.25,
+                MealSlot.LUNCH,     0.30,
+                MealSlot.DINNER,    0.30,
+                MealSlot.SNACK,     0.15
+        );
+        double pct = slotKcalPct.getOrDefault(slot, 0.0);
+        if (pct <= 0) return 0.0;
+        // ===== 4) Tính target dinh dưỡng cho bữa đó =====
+        Nutrition mealTarget = approxMacroTargetForMeal(dayTarget, pct, rules, weight, req);
+        // ===== 5) Trả về kcal mục tiêu của bữa =====
+        return safeDouble(mealTarget.getKcal());
+    }
+
+
+    @Override
+    @Transactional
+    public List<DayTarget> getDayTargetsBetween(LocalDate from, LocalDate to, UUID userId) {
+        List<MealPlanDay> days = mealPlanDayRepository
+                .findByUser_IdAndDateBetweenOrderByDateAsc(userId, from, to);
+        return days.stream()
+                .map(d -> new DayTarget(d.getDate(), d.getTargetNutrition()))
+                .toList();
+    }
+
+
+
     public MealPlanResponse createOrUpdatePlanForOneDay(LocalDate date, UUID userId) {
         final double WATER_ML_PER_KG = 35.0;
 
@@ -635,6 +596,88 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
 
     /* ===================== HÀM PHỤ TRỢ ===================== */
 
+
+    //Tính kcal mục tiêu / ngày
+    public double calculateTargetKcal(double tdee, ProfileCreationRequest profile) {
+        final double MAX_DAILY_ADJ   = 1000.0;    // ±1000 kcal/ngày
+        final double MIN_KCAL_FEMALE = 1200.0;
+        final double MIN_KCAL_MALE   = 1500.0;
+
+        Integer deltaKg = profile.getTargetWeightDeltaKg();
+        Integer weeks   = profile.getTargetDurationWeeks();
+
+        double dailyAdj = 0.0;  // Số kcal cần tăng/giảm mỗi ngày
+        boolean hasDelta = (deltaKg != null && deltaKg != 0) && (weeks != null && weeks > 0);
+        if (hasDelta && profile.getGoal() != GoalType.MAINTAIN) {
+            dailyAdj = (deltaKg * 7700.0) / (weeks * 7.0);
+            dailyAdj = Math.max(-MAX_DAILY_ADJ, Math.min(MAX_DAILY_ADJ, dailyAdj));
+        }
+
+        // Nếu MAINTAIN, bỏ qua delta
+        double targetCalories = (profile.getGoal() == GoalType.MAINTAIN) ? tdee : (tdee + dailyAdj);
+
+        // Mức kcal tối thiểu theo giới tính
+        targetCalories = switch (profile.getGender()){
+            case FEMALE -> Math.max(MIN_KCAL_FEMALE, targetCalories);
+            case MALE   -> Math.max(MIN_KCAL_MALE,   targetCalories);
+            case OTHER  -> Math.max(MIN_KCAL_FEMALE, targetCalories);
+        };
+        return targetCalories;
+    }
+
+    //Tính nutrtion cho ngày
+    public Nutrition caculateNutrition(MealPlanCreationRequest request,AggregateConstraints agg){
+        final double FAT_PCT = 0.30;              // WHO: chat beo ≤30%
+        final double FREE_SUGAR_PCT_MAX = 0.10;   // WHO: <10%
+        final int    SODIUM_MG_LIMIT = 2000;      // WHO: <2000 mg natri/ngày
+
+        var profile = request.getProfile();
+        int weight = Math.max(1, profile.getWeightKg());
+
+        //1) Tính TDEE
+        double tdee = caculateBMI(profile);
+
+        //2) Tính kcal mục tiêu / ngày
+        double targetCalories = calculateTargetKcal(tdee, profile);
+
+        //3.1) Protein (Đạm) theo g/kg
+        double proteinPerKg = switch (profile.getGoal()) {
+            case MAINTAIN -> 0.8;
+            case LOSE     -> 1.0;
+            case GAIN     -> 1.2;
+        };
+        double proteinG = weight * proteinPerKg;
+        double proteinKcal = proteinG * 4.0;
+
+        //3.2) Fat: 30% năng lượng (NẾU BÉO PHÌ NHỎ HƠN 30%)
+        double fatKcal = targetCalories * FAT_PCT;
+        double fatG = fatKcal / 9.0;
+
+        //3.3) Carb = phần còn lại
+        double carbKcal = Math.max(0.0, targetCalories - proteinKcal - fatKcal);
+        double carbG = carbKcal / 4.0;
+
+        //3.4) Fiber: tối thiểu 25g (nâng theo 14g/1000kcal nếu cần)
+        double fiberG = Math.max(25.0, 14.0 * (targetCalories / 1000.0));
+
+        //3.5) Free sugar trần <10% năng lượng → g → mg
+        double sugarGMax = (targetCalories * FREE_SUGAR_PCT_MAX) / 4.0;
+        double sugarMg = sugarGMax * 1000.0;
+
+        // Target dinh dưỡng ngày
+        Nutrition target = Nutrition.builder()
+                .kcal(bd(targetCalories, 2))
+                .proteinG(bd(proteinG, 2))
+                .carbG(bd(carbG, 2))
+                .fatG(bd(fatG, 2))
+                .fiberG(bd(fiberG, 2))
+                .sodiumMg(bd(SODIUM_MG_LIMIT, 2))
+                .sugarMg(bd(sugarMg, 2))
+                .build();
+
+        return applyAggregateConstraintsToDayTarget(target, agg);
+    }
+
     private static final double EPS_KCAL   = 40.0;
     private static final double EPS_PROT   = 3.0;
     private static final double EPS_CARB   = 6.0;
@@ -651,21 +694,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                 safeDouble(n.getFiberG())   <= EPS_FIBER  &&
                 safeDouble(n.getSodiumMg()) <= EPS_SODIUM &&
                 safeDouble(n.getSugarMg())  <= EPS_SUGAR;
-    }
-
-    //Cộng 2 chất dinh dưỡng
-    private Nutrition addNut(Nutrition a, Nutrition b) {
-        if (a == null) return b;
-        if (b == null) return a;
-        return Nutrition.builder()
-                .kcal(     bd(safeDouble(a.getKcal())     + safeDouble(b.getKcal()), 2))
-                .proteinG( bd(safeDouble(a.getProteinG()) + safeDouble(b.getProteinG()), 2))
-                .carbG(    bd(safeDouble(a.getCarbG())    + safeDouble(b.getCarbG()), 2))
-                .fatG(     bd(safeDouble(a.getFatG())     + safeDouble(b.getFatG()), 2))
-                .fiberG(   bd(safeDouble(a.getFiberG())   + safeDouble(b.getFiberG()), 2))
-                .sodiumMg( bd(safeDouble(a.getSodiumMg()) + safeDouble(b.getSodiumMg()), 2))
-                .sugarMg(  bd(safeDouble(a.getSugarMg())  + safeDouble(b.getSugarMg()), 2))
-                .build();
     }
 
     // remaining = max(0, target - consumed)
@@ -971,7 +999,4 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     private BigDecimal minOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.min(b); }
     //trả về giá trị lớn hơn (ưu tiên đảm bảo cho chất cần thiết)
     private BigDecimal maxOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.max(b); }
-
-
-
 }

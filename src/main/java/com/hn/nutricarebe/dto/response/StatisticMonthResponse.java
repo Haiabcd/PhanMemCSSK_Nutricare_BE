@@ -4,7 +4,6 @@ import com.hn.nutricarebe.enums.GoalType;
 import com.hn.nutricarebe.enums.MealSlot;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -13,13 +12,14 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class StatisticWeekResponse {
+public class StatisticMonthResponse {
     Integer weightKg;
     String bmiClassification;
     double bmi;
     List<TopFoodDto> topFoods;
-    List<DailyNutritionDto> dailyNutrition;
+    List<MonthlyWeeklyNutritionDto> weeklyNutrition;
     Map<MealSlot, Map<String, Long>> mealSlotSummary;
-    List<DailyWaterTotalDto> dailyWaterTotals;
+    List<MonthlyWeeklyWaterTotalDto> weeklyWaterTotals;
+    // danh sách các câu cảnh báo
     List<String> warnings;
 }

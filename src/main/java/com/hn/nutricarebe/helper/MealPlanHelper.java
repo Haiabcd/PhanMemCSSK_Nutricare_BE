@@ -8,7 +8,6 @@ import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.entity.Nutrition;
 import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.enums.*;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Year;
@@ -53,6 +52,21 @@ public final class MealPlanHelper {
             case EXTRA_ACTIVE      -> 1.9;
         };
         return bmr * activityFactor;
+    }
+
+    //Cộng 2 chất dinh dưỡng
+    public static Nutrition addNut(Nutrition a, Nutrition b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return Nutrition.builder()
+                .kcal(     bd(safeDouble(a.getKcal())     + safeDouble(b.getKcal()), 2))
+                .proteinG( bd(safeDouble(a.getProteinG()) + safeDouble(b.getProteinG()), 2))
+                .carbG(    bd(safeDouble(a.getCarbG())    + safeDouble(b.getCarbG()), 2))
+                .fatG(     bd(safeDouble(a.getFatG())     + safeDouble(b.getFatG()), 2))
+                .fiberG(   bd(safeDouble(a.getFiberG())   + safeDouble(b.getFiberG()), 2))
+                .sodiumMg( bd(safeDouble(a.getSodiumMg()) + safeDouble(b.getSodiumMg()), 2))
+                .sugarMg(  bd(safeDouble(a.getSugarMg())  + safeDouble(b.getSugarMg()), 2))
+                .build();
     }
 
     // Kiểm tra rule về độ tuổi, giới tính

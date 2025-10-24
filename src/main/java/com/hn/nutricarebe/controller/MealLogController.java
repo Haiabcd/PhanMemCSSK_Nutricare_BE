@@ -4,8 +4,8 @@ import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
 import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
+import com.hn.nutricarebe.dto.response.KcalWarningResponse;
 import com.hn.nutricarebe.dto.response.LogResponse;
-import com.hn.nutricarebe.entity.PlanLog;
 import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.dto.response.NutritionResponse;
 import com.hn.nutricarebe.service.PlanLogService;
@@ -14,12 +14,9 @@ import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -74,23 +71,24 @@ public class MealLogController {
     }
 
     @PostMapping("/save/manual")
-    public ApiResponse<Void> create(
+    public ApiResponse<KcalWarningResponse> create(
             @Valid @RequestBody PlanLogManualRequest request
     ) {
-        logService.savePlanLog_Manual(request);
-        return ApiResponse.<Void>builder()
-                .message("Tạo log thủ công thành công")
+
+        return ApiResponse.<KcalWarningResponse>builder()
+                .message("Ghi log thủ công thành công")
+                .data(logService.savePlanLog_Manual(request))
                 .build();
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<Void> updatePlanLog(
+    public ApiResponse<KcalWarningResponse> updatePlanLog(
             @PathVariable("id") UUID planLogId,
             @Valid @RequestBody PlanLogUpdateRequest req
     ) {
-        logService.updatePlanLog(req, planLogId);
-        return ApiResponse.<Void>builder()
+        return ApiResponse.<KcalWarningResponse>builder()
                 .message("Cập nhật PlanLog thành công")
+                .data(logService.updatePlanLog(req, planLogId))
                 .build();
     }
 }

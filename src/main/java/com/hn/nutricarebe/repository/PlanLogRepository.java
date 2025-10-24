@@ -23,7 +23,6 @@ public interface PlanLogRepository extends JpaRepository<PlanLog, UUID> {
 
     List<PlanLog> findByUser_IdAndDateBetween(UUID userId, LocalDate start, LocalDate end);
 
-
     @Query("""
         select new com.hn.nutricarebe.dto.response.TopFoodDto(
             min(coalesce(pl.nameFood, f.name)),
