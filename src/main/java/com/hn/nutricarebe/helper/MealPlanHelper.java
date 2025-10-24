@@ -19,6 +19,23 @@ public final class MealPlanHelper {
 
     public static final double[] PORTION_STEPS = {1.5, 1.0, 0.5};
 
+    public static final Map<MealSlot, Double> SLOT_KCAL_PCT =
+            Collections.unmodifiableMap(new EnumMap<>(Map.of(
+                    MealSlot.BREAKFAST, 0.25,
+                    MealSlot.LUNCH,     0.30,
+                    MealSlot.DINNER,    0.30,
+                    MealSlot.SNACK,     0.15
+            )));
+
+    public static final Map<MealSlot, Integer> SLOT_ITEM_COUNTS =
+            Collections.unmodifiableMap(new EnumMap<>(Map.of(
+                    MealSlot.BREAKFAST, 2,
+                    MealSlot.LUNCH,     3,
+                    MealSlot.DINNER,    3,
+                    MealSlot.SNACK,     1
+            )));
+
+
     public static BigDecimal bd(double value, int scale) {
         return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP);
     }
@@ -28,19 +45,21 @@ public final class MealPlanHelper {
 
     public static String safeStr(String s){ return s==null? "" : s.trim(); }
 
-    //Tính BMI
-    public static double caculateBMI(ProfileCreationRequest profile) {
+    //Tính TDEE
+    public static double caculateTDEE(ProfileCreationRequest profile) {
         int currentYear = Year.now().getValue();
         int age    = Math.max(0, currentYear - profile.getBirthYear());
         int weight = Math.max(1, profile.getWeightKg());
         int height = Math.max(50, profile.getHeightCm());
 
         // 1) BMR: Mifflin–St Jeor
-        double bmr = switch (profile.getGender()) {
-            case MALE   -> 10 * weight + 6.25 * height - 5 * age + 5;
-            case FEMALE -> 10 * weight + 6.25 * height - 5 * age - 161;
-            case OTHER  -> 10 * weight + 6.25 * height - 5 * age;
+        double base = 10 * weight + 6.25 * height - 5 * age;
+        double sexAdj = switch (profile.getGender()) {
+            case MALE   -> 5;
+            case FEMALE -> -161;
+            case OTHER  -> 0;
         };
+        double bmr = base + sexAdj;
 
         // 2) TDEE theo mức độ hoạt động
         ActivityLevel al = profile.getActivityLevel() != null ? profile.getActivityLevel() : ActivityLevel.SEDENTARY;
@@ -72,18 +91,17 @@ public final class MealPlanHelper {
     // Kiểm tra rule về độ tuổi, giới tính
     public static boolean isApplicableToDemographics(NutritionRule r, MealPlanCreationRequest request) {
         var p = request.getProfile();
-        // Giới tính
         Gender ruleSex = r.getApplicableSex();
-        if (ruleSex != null) {
-            if (p.getGender() == null || p.getGender() != ruleSex) return true;
-        }
-        // Độ tuổi
+        boolean genderOk = (ruleSex == null) || (p.getGender() != null && p.getGender() == ruleSex);
         int currentYear = java.time.Year.now().getValue();
         int age = Math.max(0, currentYear - p.getBirthYear());
-        if (r.getAgeMin() != null && age < r.getAgeMin()) return true;
-        if (r.getAgeMax() != null && age > r.getAgeMax()) return true;
-        return false;
+        Integer min = r.getAgeMin();
+        Integer max = r.getAgeMax();
+        boolean ageOk = (min == null || age >= min) && (max == null || age <= max);
+        return genderOk && ageOk;
     }
+
+
 
     // Lấy tập tag của món, tránh null
     public static Set<FoodTag> tagsOf(Food f) {
@@ -113,7 +131,7 @@ public final class MealPlanHelper {
         for (NutritionRule r : rules) {
             if (r.getTargetType() != TargetType.FOOD_TAG) continue;
             if (r.getScope() != RuleScope.ITEM) continue;
-            if (isApplicableToDemographics(r, request)) continue;
+            if (!isApplicableToDemographics(r, request)) continue;
 
             Set<FoodTag> tags = r.getFoodTags();
             if (tags == null || tags.isEmpty()) continue;
@@ -132,26 +150,28 @@ public final class MealPlanHelper {
     }
 
     /* ===== KIỂM TRA LẠI MÓN ĐƯỢC CHỌN ===== */
-    public static boolean passesItemRules(List<NutritionRule> rules, Food food, Nutrition snap, MealPlanCreationRequest request) {
+    private static BigDecimal nutrientValueOf(String code, Nutrition n) {
+        if (n == null) return null;
+        return switch (safeStr(code).toUpperCase()) {
+            case "KCAL"    -> n.getKcal();
+            case "PROTEIN" -> n.getProteinG();
+            case "CARB"    -> n.getCarbG();
+            case "FAT"     -> n.getFatG();
+            case "FIBER"   -> n.getFiberG();
+            case "SODIUM"  -> n.getSodiumMg();
+            case "SUGAR"   -> n.getSugarMg();
+            default        -> null;
+        };
+    }
+    public static boolean passesItemRules(List<NutritionRule> rules, Nutrition snap, MealPlanCreationRequest request) {
         if (rules == null || rules.isEmpty()) return true;
         for (NutritionRule r : rules) {
             // Bỏ qua nếu rule không phải là từng món
             if (r.getScope() != RuleScope.ITEM) continue;
-            if (isApplicableToDemographics(r, request)) continue;
+            if (!isApplicableToDemographics(r, request)) continue;
 
             if (r.getTargetType() == TargetType.NUTRIENT) {
-                String code = safeStr(r.getTargetCode());
-                //Lấy chất dinh dưỡng theo mã code
-                BigDecimal value = switch (code){
-                    case "KCAL" -> snap.getKcal();
-                    case "PROTEIN"        -> snap.getProteinG();
-                    case "CARB"           -> snap.getCarbG();
-                    case "FAT"            -> snap.getFatG();
-                    case "FIBER"          -> snap.getFiberG();
-                    case "SODIUM"         -> snap.getSodiumMg();
-                    case "SUGAR"          -> snap.getSugarMg();
-                    default               -> null;
-                };
+                BigDecimal value = nutrientValueOf(r.getTargetCode(), snap);
                 if (value == null) break;
 
                 BigDecimal min = r.getThresholdMin();
@@ -163,15 +183,17 @@ public final class MealPlanHelper {
                     if (max != null) max = max.multiply(BigDecimal.valueOf(weight));
                 }
 
-                switch (r.getComparator()) {
-                    case LT:      return max != null && value.compareTo(max) < 0;
-                    case LTE:     return max != null && value.compareTo(max) <= 0;
-                    case GT:      return min != null && value.compareTo(min) > 0;
-                    case GTE:     return min != null && value.compareTo(min) >= 0;
-                    case EQ:      return (min != null) && value.compareTo(min) == 0;
-                    case BETWEEN: return (min != null && max != null) && value.compareTo(min) >= 0 && value.compareTo(max) <= 0;
-                    default: return true;
-                }
+                return switch (r.getComparator()) {
+                    case LT      -> (max != null) && value.compareTo(max) < 0;
+                    case LTE     -> (max != null) && value.compareTo(max) <= 0;
+                    case GT      -> (min != null) && value.compareTo(min) > 0;
+                    case GTE     -> (min != null) && value.compareTo(min) >= 0;
+                    case EQ      -> (min != null) && value.compareTo(min) == 0;
+                    case BETWEEN -> (min != null && max != null)
+                            && value.compareTo(min) >= 0
+                            && value.compareTo(max) <= 0;
+                    default      -> true;
+                };
             }
         }
         return true;
@@ -179,7 +201,6 @@ public final class MealPlanHelper {
     /* ===== KIỂM TRA LẠI MÓN ĐƯỢC CHỌN ===== */
 
     /* ===== CHỌN KHẨU PHẦN ===== */
-
     public static double pickPortionStep(double kcalRemain, double foodKcal) {
         if (foodKcal <= 0) return 1.0;
         double best = PORTION_STEPS[0];
