@@ -14,6 +14,7 @@ import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.helper.GoogleLoginHelper;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
+import com.hn.nutricarebe.repository.UserRepository;
 import com.hn.nutricarebe.service.*;
 import com.hn.nutricarebe.utils.PkceStore;
 import com.hn.nutricarebe.utils.PkceUtil;
@@ -50,6 +51,7 @@ import java.util.*;
 public class AuthServiceImpl implements AuthService {
     ProfileMapper profileMapper;
     ProfileRepository profileRepository;
+    UserRepository userRepository;
 
     UserAllergyService userAllergyService;
     MealPlanDayService mealPlanDayService;
@@ -91,6 +93,9 @@ public class AuthServiceImpl implements AuthService {
         //B2: Lưu profile
         Profile profile = profileMapper.toProfile(request.getProfile());
         profile.setUser(savedUser);
+        if(savedUser.getProvider() == Provider.SUPABASE_GOOGLE){
+            profile.setAvatarUrl(savedUser.getProviderImageUrl());
+        }
         profileRepository.save(profile);
         //B3: Lưu bệnh nền
         Set<UUID> conditionIds = request.getConditions();
@@ -108,17 +113,15 @@ public class AuthServiceImpl implements AuthService {
                     .allergyIds(allergyIds)
                     .build());
         }
-        //B5: Lập kế hoạch tuần (MealPlanDay - 7 ngày)
+        //B5: Lập kế hoạch(7 ngày)
         mealPlanDayService.createPlan(
                 MealPlanCreationRequest.builder()
                         .userId(savedUser.getId())
                         .profile(request.getProfile())
                         .build(), 7
         );
-        //B6: Lập kế hoạch chi tiết (MealPlanItem)
 
-
-        //B7: Tạo token
+        //B6: Tạo token
         String familyId = UUID.randomUUID().toString();
 
         String access  = createAccessToken(savedUser);
@@ -138,7 +141,6 @@ public class AuthServiceImpl implements AuthService {
 
         //Lưu refresh token vào DB
         saveRefreshRecord(savedUser.getId(), refresh);
-
 
         //Trả về
         return OnboardingResponse.builder()
@@ -214,8 +216,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public LoginProviderResponse googleCallback(String code, String state,String device) {
-
+    public GoogleCallbackResponse googleCallback(String code, String state,String device) {
         String verifier = pkceStore.consume(state);
         if (verifier == null) {
             throw new AppException(ErrorCode.INVALID_OR_EXPIRED_STATE);
@@ -236,25 +237,19 @@ public class AuthServiceImpl implements AuthService {
         if (gp.getProviderUserId().isBlank()) {
             throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
         }
+        User user = userRepository.findByProviderUserId(gp.getProviderUserId()).orElse(null);
 
-        boolean isNewUser = false;
+        AuthFlowOutcome outcome = null;
+        String familyId = UUID.randomUUID().toString();
+        String access = null;
+        String refresh = null;
+        long accessExp = 0;
+        long refreshExp = 0;
 
-        User user = userService.getUserByProvider(gp.getProviderUserId(), device);
 
         if (user == null) {
-            // Tạo mới user
-            user = User.builder()
-                    .deviceId((device != null && !device.isBlank()) ? device : null)
-                    .email((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null)
-                    .providerUserId(gp.getProviderUserId())
-                    .provider(Provider.SUPABASE_GOOGLE)
-                    .role(Role.USER)
-                    .status(UserStatus.ACTIVE)
-                    .build();
-            isNewUser = true;
-        } else {
-            // Đã có user
-            if (user.getRole() == Role.GUEST) {
+            Optional<User> userDevice = userRepository.findTopByDeviceIdAndStatusOrderByCreatedAtDesc(device, UserStatus.ACTIVE);
+            if(userDevice.isPresent() && userDevice.get().getRole() == Role.GUEST){
                 user.setRole(Role.USER);
                 user.setProviderUserId(gp.getProviderUserId());
                 user.setProvider(Provider.SUPABASE_GOOGLE);
@@ -262,29 +257,45 @@ public class AuthServiceImpl implements AuthService {
                 if ((user.getDeviceId() == null || user.getDeviceId().isBlank()) && device != null && !device.isBlank()) {
                     user.setDeviceId(device);
                 }
-
                 if (user.getEmail() == null || user.getEmail().isBlank() || user.getEmail().equalsIgnoreCase(gp.getEmail())) {
-                        user.setEmail((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null);
+                    user.setEmail((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null);
                 }
                 Profile profile = profileRepository.findByUser_Id(user.getId())
                         .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
                 profile.setName(gp.getName());
                 profile.setAvatarUrl(gp.getAvatar());
                 profileRepository.save(profile);
+                outcome = AuthFlowOutcome.GUEST_UPGRADE;
+            }else{
+                user = User.builder()
+                        .deviceId((device != null && !device.isBlank()) ? device : null)
+                        .email((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null)
+                        .providerUserId(gp.getProviderUserId())
+                        .provider(Provider.SUPABASE_GOOGLE)
+                        .role(Role.USER)
+                        .providerImageUrl(gp.getAvatar())
+                        .status(UserStatus.ACTIVE)
+                        .build();
+                outcome = AuthFlowOutcome.FIRST_TIME_GOOGLE;
+            }
+        } else {
+            if(user.getRole() == Role.USER && !user.getDeviceId().equals(device)) {
+                Profile profile = profileRepository.findByUser_Id(user.getId()).orElse(null);
+                if (profile != null) {
+                    outcome = AuthFlowOutcome.RETURNING_GOOGLE;
+                    access = createAccessToken(user);
+                    refresh = createRefreshToken(user, familyId);
+                    accessExp = getClaims(parseJwt(access)).getExpirationTime().toInstant().getEpochSecond();
+                    refreshExp = getClaims(parseJwt(refresh)).getExpirationTime().toInstant().getEpochSecond();
+                    saveRefreshRecord(user.getId(), refresh);
+                } else {
+                    outcome = AuthFlowOutcome.FIRST_TIME_GOOGLE;
+                }
+            }else if(user.getRole() == Role.USER && user.getDeviceId().equals(device)){
+                throw new AppException(ErrorCode.PROVIDER_ALREADY_LINKED);
             }
         }
         userService.saveGG(user);
-
-        String familyId = UUID.randomUUID().toString();
-
-        String access  = createAccessToken(user);
-        String refresh = createRefreshToken(user, familyId);
-
-        long accessExp = getClaims(parseJwt(access)).getExpirationTime().toInstant().getEpochSecond();
-        long refreshExp = getClaims(parseJwt(refresh)).getExpirationTime().toInstant().getEpochSecond();
-
-        // Lưu refresh token vào DB
-        saveRefreshRecord(user.getId(), refresh);
 
         TokenPairResponse tokenPair = TokenPairResponse.builder()
                 .tokenType("Bearer")
@@ -294,11 +305,9 @@ public class AuthServiceImpl implements AuthService {
                 .refreshExpiresAt(refreshExp)
                 .build();
 
-        return LoginProviderResponse.builder()
+        return GoogleCallbackResponse.builder()
+                .outcome(outcome)
                 .tokenResponse(tokenPair)
-                .isNewUser(isNewUser)
-                .name(gp.getName())
-                .urlAvatar(gp.getAvatar())
                 .build();
     }
     //============================ Auth GG ==============================//
@@ -380,6 +389,11 @@ public class AuthServiceImpl implements AuthService {
             return;
         }
         token.setRevoked(true);
+        User user = userService.getUserById(UUID.fromString(claims.getSubject()));
+        if(user.getRole() == Role.USER){
+            user.setDeviceId(null);
+            userRepository.save(user);
+        }
         refreshTokenService.saveAll(List.of(token));
     }
     //============================ Logout ============================//

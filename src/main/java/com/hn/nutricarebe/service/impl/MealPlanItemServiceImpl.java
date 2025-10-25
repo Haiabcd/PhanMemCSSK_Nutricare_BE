@@ -167,14 +167,14 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
             double portion = 1.0;
             Nutrition snap = scaleNutrition(base, portion);
 
-            if (passesItemRules(rules, f, snap, req)) {
+            if (passesItemRules(rules, snap, req)) {
                 pass = true;
             } else {
                 var step = stepDown(portion);
                 while (step.isPresent()) {
                     double p2 = step.getAsDouble();
                     Nutrition s2 = scaleNutrition(base, p2);
-                    if (passesItemRules(rules, f, s2, req)) { pass = true; break; }
+                    if (passesItemRules(rules, s2, req)) { pass = true; break; }
                     step = stepDown(p2);
                 }
             }

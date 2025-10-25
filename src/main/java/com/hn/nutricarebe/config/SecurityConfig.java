@@ -21,7 +21,9 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
-
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.filter.CorsFilter;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import javax.crypto.spec.SecretKeySpec;
 
 @Configuration
@@ -44,6 +46,7 @@ public class SecurityConfig {
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
             "/auths/google/callback",
+            "/auths/google/redeem",
             "/foods/**",
             "/foods/search/**",
             "/foods/autocomplete/**",
@@ -97,6 +100,20 @@ public class SecurityConfig {
         return httpSecurity.build();
     }
 
+    @Bean
+    public CorsFilter corsFilter(){
+        CorsConfiguration corsConfiguration = new CorsConfiguration();
+
+        corsConfiguration.addAllowedOrigin("*");
+        corsConfiguration.addAllowedMethod("*");
+        corsConfiguration.addAllowedHeader("*");
+
+        UrlBasedCorsConfigurationSource urlBasedCorsConfigurationSource = new UrlBasedCorsConfigurationSource();
+        urlBasedCorsConfigurationSource.registerCorsConfiguration("/**", corsConfiguration);
+
+        return new CorsFilter(urlBasedCorsConfigurationSource);
+    }
+
 
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
@@ -121,6 +138,7 @@ public class SecurityConfig {
                     || path.startsWith("/auths/google/callback")
                     || path.startsWith("/auths/google/start")
                     ||path.startsWith("/auths/logout")
+                    || path.startsWith("/auths/google/redeem")
             ) {
                 return null;
             }

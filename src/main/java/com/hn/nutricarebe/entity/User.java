@@ -43,6 +43,9 @@ public class User {
     @Column(name = "provider_user_id", unique = true)
     String providerUserId;
 
+    @Column(name = "provider_image_url")
+    String providerImageUrl;
+
     @Column(name = "device_id")
     String deviceId;
 
