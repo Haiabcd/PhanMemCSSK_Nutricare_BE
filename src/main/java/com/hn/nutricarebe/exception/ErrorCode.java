@@ -62,6 +62,7 @@ public enum ErrorCode {
     MEAL_PLAN_ITEM_USED(10002, "Món ăn trong kế hoạch đã được sử dụng", HttpStatus.BAD_REQUEST),
 
     THIRD_PARTY_ERROR(10005, "LogMeal: missing imageId", HttpStatus.BAD_REQUEST),
+    PROVIDER_ALREADY_LINKED(11001, "Tài khoản google đã được liên kết với tài khoản khác", HttpStatus.CONFLICT)
     ;
     int code;
     String message;

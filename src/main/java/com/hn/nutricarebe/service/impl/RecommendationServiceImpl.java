@@ -39,39 +39,60 @@ public class RecommendationServiceImpl implements RecommendationService {
     UserAllergyRepository userAllergyRepository;
     UserConditionRepository userConditionRepository;
 
-    /* ====== Nguồn uy tín (FREE) ====== */
+    /* ====== Một số nguồn RSS VN ổn định (bổ sung cho Google News) ====== */
     private static final List<String> ARTICLE_FEEDS = Arrays.asList(
-            // 🇻🇳 Việt Nam
-            "https://vnexpress.net/rss/mon-ngon.rss",
-            "https://vnexpress.net/rss/suc-khoe/van-dong.rss",
             "https://vnexpress.net/rss/suc-khoe/dinh-duong.rss",
-            "https://tuoitre.vn/rss/dinh-duong.rss",
-            "https://phunuvietnam.vn/rss/dinh-duong.rss",
-            "https://kenh14.vn/rss.chn",
-            "https://vtc.vn/rss/song-khoe.rss",
+            "https://vnexpress.net/rss/suc-khoe/van-dong.rss",
+            "https://tuoitre.vn/rss/suc-khoe.rss",
             "https://znews.vn/rss/suc-khoe.rss",
-            "https://tuoitre.vn/rss/suc-khoe.rss"
-            /*
-            // 🌍 Quốc tế
-            "https://www.health.harvard.edu/blog/category/nutrition/feed",
-            "https://newsnetwork.mayoclinic.org/category/nutrition/feed/",
-            "https://www.nutrition.gov/rss.xml",
-            "https://newsinhealth.nih.gov/rss",
-            "https://www.menshealth.com/fitness/rss"
-
-                */
+            "https://vtc.vn/rss/song-khoe.rss",
+            "https://phunuvietnam.vn/rss/dinh-duong.rss"
     );
 
-    private static String youtubeSearchRss(String query) {
-        // chuẩn hoá: gộp khoảng trắng, cắt 120 ký tự, encode 1 lần
-        String q = Optional.ofNullable(query).orElse("")
-                .trim().replaceAll("\\s+", " ");
-        if (q.length() > 120) q = q.substring(0, 120);
+    /* ========================= Google News RSS ========================= */
+    private static String googleNewsRssUrl(String query, String lang, String country) {
+        String q = Optional.ofNullable(query).orElse("").trim().replaceAll("\\s+", " ");
+        if (q.length() > 200) q = q.substring(0, 200);
         String enc = URLEncoder.encode(q, StandardCharsets.UTF_8);
-        return "https://www.youtube.com/feeds/videos.xml?channel_id=UC07qJE1XtXyUo8SSfZPe7Tg" + enc;
+        String hl = (lang == null || lang.isEmpty()) ? "vi" : lang;
+        String gl = (country == null || country.isEmpty()) ? "VN" : country;
+        String ceid = gl + ":" + hl;
+        return "https://news.google.com/rss/search?q=" + enc + "&hl=" + hl + "&gl=" + gl + "&ceid=" + ceid;
     }
 
+    private List<RecoItemDto> fetchGoogleNews(String query) throws Exception {
+        String url = googleNewsRssUrl(query, "vi", "VN");
+        Document doc = fetchDoc(url);
 
+        List<Element> items = doc.select("item");
+        List<RecoItemDto> out = new ArrayList<>();
+
+        for (Element it : items) {
+            String title = text(it, "title");
+            String link  = text(it, "link");
+            String pub   = text(it, "pubDate");
+            Element src  = it.selectFirst("source");
+            String sourceName = (src != null) ? src.text() : hostOf(link);
+            String img   = firstImgFromHtml(text(it, "description"));
+
+            if (isBlank(link) || isBlank(title)) continue;
+
+            // BỎ các link video/clip
+            if (isVideoLike(link, sourceName, title)) continue;
+
+            RecoItemDto dto = new RecoItemDto();
+            dto.setType("article");
+            dto.setTitle(title);
+            dto.setUrl(link);
+            dto.setSource(sourceName);
+            dto.setImageUrl(img);
+            dto.setPublished(parsePub(pub));
+            out.add(dto);
+        }
+        return out;
+    }
+
+    /* ========================= PubMed (tin nghiên cứu) ========================= */
     private static String pubmedSearchUrl(String query) {
         return "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi" +
                 "?db=pubmed&retmode=json&retmax=10&term=" +
@@ -87,6 +108,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         Optional<Profile> p = profileRepository.findByUser_Id(userId);
 
+        // vẫn đọc allergy/condition từ DB nhưng KHÔNG dùng allergy để chặn tin
         List<UserAllergy> la = userAllergyRepository.findByUser_Id(userId);
         List<UserCondition> lc = userConditionRepository.findByUser_Id(userId);
 
@@ -116,16 +138,26 @@ public class RecommendationServiceImpl implements RecommendationService {
                         .allergies(allergyNames)
                         .locale("vi")
                         .build())
-                .orElseThrow(() -> new IllegalArgumentException("Profile not found for userId=" + userId));
+                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
 
         int lim = clampLimit(limit);
 
-        // ==== Thu thập dữ liệu thô ====
+        /* ===================== Thu thập dữ liệu thô ===================== */
         List<RecoItemDto> items = new ArrayList<>();
-        String q = buildQuery(profile);
-        List<String> positiveKeywords = buildKeywords(profile);  // đã lower-case, unique
-        List<String> negativeKeywords = buildNegativeKeywords(profile); // dị ứng, cần loại trừ
 
+        // Query cho tin tức
+        String generalQuery = buildGeneralNewsQuery(profile);
+        String goalQuery    = buildGoalNewsQuery(profile);
+        List<String> condQueries = buildConditionNewsQueries(profile);
+
+        // 1) Google News theo goal + conditions + general
+        try { items.addAll(fetchGoogleNews(goalQuery)); } catch (Exception e) { System.err.println("[GN goal] " + e.getMessage()); }
+        for (String q : condQueries) {
+            try { items.addAll(fetchGoogleNews(q)); } catch (Exception e) { System.err.println("[GN cond] " + e.getMessage()); }
+        }
+        try { items.addAll(fetchGoogleNews(generalQuery)); } catch (Exception e) { System.err.println("[GN general] " + e.getMessage()); }
+
+        // 2) RSS báo VN (bổ sung coverage)
         for (String rss : ARTICLE_FEEDS) {
             try {
                 items.addAll(fetchRssArticles(rss));
@@ -133,237 +165,224 @@ public class RecommendationServiceImpl implements RecommendationService {
                 System.err.println("[RSS ERR] " + rss + " -> " + e.getMessage());
             }
         }
+
+        // 3) PubMed (tin nghiên cứu/khuyến cáo khoa học) với query tiếng Anh
         try {
-            items.addAll(fetchPubMed(q));
+            items.addAll(fetchPubMed(buildEnglishQuery(profile)));
         } catch (Exception e) {
             System.err.println("[PM ERR] " + e.getMessage());
         }
 
-        // ==== Dedupe sớm theo url|title ====
+        /* ===================== Lọc nội dung & Dedupe ===================== */
+        List<String> nutritionKeywords = nutritionKeywords();
+        List<String> banned = sensitiveKeywords();
+
+        items = items.stream()
+                // 1) phải liên quan dinh dưỡng/sức khỏe
+                .filter(it -> {
+                    String hay = (safeLower(it.getTitle()) + " " + safeLower(it.getSource())).trim();
+                    return containsAny(hay, nutritionKeywords);
+                })
+                // 2) loại bài có từ nhạy cảm (vd: giòi, ấu trùng…)
+                .filter(it -> !containsAny(safeLower(it.getTitle()), banned))
+                .collect(Collectors.toList());
+
+        // dedupe
         items = dedupeArticles(items);
 
-        // ==== Loại trừ theo dị ứng (negative keywords) ====
-        if (!negativeKeywords.isEmpty()) {
-            items = items.stream()
-                    .filter(it -> {
-                        String hay = (safeLower(it.getTitle()) + " " + safeLower(it.getSource())).trim();
-                        return !containsAny(hay, negativeKeywords);
-                    })
-                    .collect(Collectors.toList());
-        }
+        /* ===================== ƯU TIÊN: goal/conditions ===================== */
+        List<String> goalBoostKws = goalBoostKeywords(profile);
+        List<String> condBoostKws = conditionBoostKeywords(profile);
 
-        // ==== Tính điểm liên quan + boost ====
-        record Scored(RecoItemDto it, double score) {}
-        List<Scored> scored = new ArrayList<>();
-        boolean noPositive = positiveKeywords.isEmpty();
+        List<RecoItemDto> priority = new ArrayList<>();
+        List<RecoItemDto> others = new ArrayList<>();
 
         for (RecoItemDto it : items) {
             String hay = (safeLower(it.getTitle()) + " " + safeLower(it.getSource())).trim();
-
-            // điểm từ khóa (nếu không có positiveKeywords thì coi như điểm nền = 1)
-            int kwScore = noPositive ? 1 : relevanceScore(hay, positiveKeywords);
-
-            // bỏ qua bài không match gì khi có positiveKeywords
-            if (!noPositive && kwScore <= 0) continue;
-
-            double s = kwScore;
-            s += domainBoost(it.getSource());     // + uy tín domain
-            s += recencyBoost(it.getPublished()); // + độ mới (0..3)
-
-            if (s > 0) scored.add(new Scored(it, s));
+            boolean hitGoal = containsAny(hay, goalBoostKws);
+            boolean hitCond = containsAny(hay, condBoostKws);
+            if (hitGoal || hitCond) {
+                priority.add(it);
+            } else {
+                others.add(it);
+            }
         }
 
-        // ==== Nới lọc nếu quá ít kết quả ====
-        int relaxThreshold = Math.max(6, lim); // cần ít nhất lim kết quả trước khi cắt
-        List<RecoItemDto> result;
-        if (scored.size() < relaxThreshold) {
-            // fallback: vẫn giữ blocklist dị ứng, nhưng bỏ bắt buộc match positive
-            // sort: recency (desc) + domain boost
-            result = items.stream()
-                    .sorted((a, b) -> {
-                        int cmpRecency = comparePublishedDesc(a.getPublished(), b.getPublished());
-                        if (cmpRecency != 0) return cmpRecency;
-                        // tie-break theo domain boost
-                        double db = Double.compare(domainBoost(b.getSource()), domainBoost(a.getSource()));
-                        if (db != 0) return (int) Math.signum(db);
-                        return 0;
-                    })
-                    .collect(Collectors.toList());
-        } else {
-            // sort theo score desc, tie-break theo published desc
-            result = scored.stream()
-                    .sorted((x, y) -> {
-                        int c = Double.compare(y.score, x.score);
-                        if (c != 0) return c;
-                        return comparePublishedDesc(x.it.getPublished(), y.it.getPublished());
-                    })
-                    .map(Scored::it)
-                    .collect(Collectors.toList());
-        }
+        /* ===================== Scoring & Sorting ===================== */
+        Comparator<RecoItemDto> priorityCmp = (a, b) -> {
+            double sa = 1.3 * recencyBoost(a.getPublished())
+                    + 1.0 * domainBoost(a.getSource())
+                    + 0.8 * relevanceScore(safeLower(a.getTitle()), merge(goalBoostKws, condBoostKws));
+            double sb = 1.3 * recencyBoost(b.getPublished())
+                    + 1.0 * domainBoost(b.getSource())
+                    + 0.8 * relevanceScore(safeLower(b.getTitle()), merge(goalBoostKws, condBoostKws));
+            int c = Double.compare(sb, sa);
+            if (c != 0) return c;
+            return comparePublishedDesc(a.getPublished(), b.getPublished());
+        };
 
-        // ==== Cắt limit ====
-        if (result.size() > lim) {
-            result = new ArrayList<>(result.subList(0, lim));
+        Comparator<RecoItemDto> othersCmp = (a, b) -> {
+            double sa = 1.2 * recencyBoost(a.getPublished())
+                    + 1.0 * domainBoost(a.getSource())
+                    + 0.3 * relevanceScore(safeLower(a.getTitle()), nutritionKeywords);
+            double sb = 1.2 * recencyBoost(b.getPublished())
+                    + 1.0 * domainBoost(b.getSource())
+                    + 0.3 * relevanceScore(safeLower(b.getTitle()), nutritionKeywords);
+            int c = Double.compare(sb, sa);
+            if (c != 0) return c;
+            return comparePublishedDesc(a.getPublished(), b.getPublished());
+        };
+
+        priority.sort(priorityCmp);
+        others.sort(othersCmp);
+
+        /* ===================== Gộp kết quả ===================== */
+        List<RecoItemDto> result = new ArrayList<>(lim);
+        for (RecoItemDto it : priority) {
+            if (result.size() >= lim) break;
+            result.add(it);
+        }
+        if (result.size() < lim) {
+            for (RecoItemDto it : others) {
+                if (result.size() >= lim) break;
+                if (!containsKey(result, keyOf(it))) result.add(it);
+            }
         }
         return result;
     }
 
-    /* ============================ Helpers new ============================ */
-    /** Tạo từ khoá âm (blocklist) từ dị ứng của user, có thêm bản EN cơ bản */
-    private static List<String> buildNegativeKeywords(ProfileDto p) {
-        List<String> neg = new ArrayList<>();
-        if (p != null && p.getAllergies() != null) {
-            for (String a : p.getAllergies()) {
-                if (isBlank(a)) continue;
-                String vi = a.trim().toLowerCase(Locale.ROOT);
-                if (!neg.contains(vi)) neg.add(vi);
-                String en = viToEn(a);
-                if (en != null) {
-                    en = en.toLowerCase(Locale.ROOT);
-                    if (!neg.contains(en)) neg.add(en);
-                }
-                // Một vài synonym phổ biến (tuỳ DB bạn mở rộng thêm):
-                if (vi.contains("sữa")) {    // dairy
-                    Collections.addAll(neg, "sữa","dairy","milk","lactose","casein","whey");
-                } else if (vi.contains("trứng")) {
-                    Collections.addAll(neg, "trứng","egg","albumen");
-                } else if (vi.contains("đậu nành") || vi.contains("đậu tương")) {
-                    Collections.addAll(neg, "đậu nành","đậu tương","soy","soya");
-                } else if (vi.contains("đậu phộng") || vi.contains("lạc")) {
-                    Collections.addAll(neg, "đậu phộng","lạc","peanut","peanuts");
-                } else if (vi.contains("hải sản") || vi.contains("tôm") || vi.contains("cua")) {
-                    Collections.addAll(neg, "hải sản","tôm","cua","shellfish","shrimp","crab");
-                } else if (vi.contains("mè") || vi.contains("vừng") || vi.contains("sesame")) {
-                    Collections.addAll(neg, "mè","vừng","sesame");
-                } else if (vi.contains("gluten")) {
-                    Collections.addAll(neg, "gluten","wheat","lúa mì","bột mì");
-                }
-            }
-        }
-        // chuẩn hoá + distinct
-        List<String> uniq = new ArrayList<>();
-        for (String k : neg) {
-            if (k == null) continue;
-            String t = k.trim().toLowerCase(Locale.ROOT);
-            if (!t.isEmpty() && !uniq.contains(t)) uniq.add(t);
-        }
-        return uniq;
+    /* ============================ Helpers dành cho NEWS ============================ */
+
+    /** Query chung về dinh dưỡng/sức khỏe để lấp đầy */
+    private static String buildGeneralNewsQuery(ProfileDto p) {
+        List<String> parts = new ArrayList<>();
+        parts.addAll(Arrays.asList(
+                "dinh dưỡng", "sức khỏe", "khuyến cáo", "cảnh báo",
+                "ăn kiêng", "thực phẩm", "chế độ ăn", "bác sĩ", "viện dinh dưỡng", "WHO"
+        ));
+        return join(parts, " ");
     }
 
-    /** Kiểm tra xem haystack có chứa bất kỳ từ khoá trong list không */
+    /** Query tập trung mục tiêu */
+    private static String buildGoalNewsQuery(ProfileDto p) {
+        List<String> parts = new ArrayList<>();
+        if (p != null && !isBlank(p.getGoal())) parts.add(p.getGoal());
+        parts.addAll(Arrays.asList("dinh dưỡng", "sức khỏe", "thực phẩm", "chế độ ăn", "ăn kiêng"));
+        return join(parts, " ");
+    }
+
+    /** Gộp danh sách từ khóa, bỏ trùng */
+    private static List<String> merge(List<String> a, List<String> b) {
+        LinkedHashSet<String> set = new LinkedHashSet<>();
+        if (a != null) {
+            for (String s : a) {
+                if (s == null) continue;
+                String t = s.trim().toLowerCase(Locale.ROOT);
+                if (!t.isEmpty()) set.add(t);
+            }
+        }
+        if (b != null) {
+            for (String s : b) {
+                if (s == null) continue;
+                String t = s.trim().toLowerCase(Locale.ROOT);
+                if (!t.isEmpty()) set.add(t);
+            }
+        }
+        return new ArrayList<>(set);
+    }
+
+    /** haystack có chứa BẤT KỲ từ khóa nào? */
     private static boolean containsAny(String haystack, List<String> kws) {
-        if (isBlank(haystack) || kws == null || kws.isEmpty()) return false;
+        if (haystack == null || haystack.trim().isEmpty() || kws == null || kws.isEmpty()) return false;
         String s = haystack.toLowerCase(Locale.ROOT);
         for (String k : kws) {
             if (k == null) continue;
-            String t = k.toLowerCase(Locale.ROOT).trim();
+            String t = k.trim().toLowerCase(Locale.ROOT);
             if (!t.isEmpty() && s.contains(t)) return true;
         }
         return false;
     }
 
-    /** Boost theo domain uy tín (tuỳ bạn hiệu chỉnh trọng số) */
-    private static double domainBoost(String host) {
-        if (host == null) return 0;
-        String h = host.toLowerCase(Locale.ROOT);
-        if (h.contains("vnexpress")) return 2.0;
-        if (h.contains("tuoitre"))   return 1.5;
-        if (h.contains("znews") || h.contains("zing")) return 1.2;
-        if (h.contains("vtc"))       return 1.0;
-        if (h.contains("phunuvietnam")) return 0.8;
-        if (h.contains("pubmed"))    return 2.5; // nghiên cứu
-        return 0.0;
+    /** Mỗi bệnh nền thành một query riêng */
+    private static List<String> buildConditionNewsQueries(ProfileDto p) {
+        if (p == null || p.getConditions() == null || p.getConditions().isEmpty()) return Collections.emptyList();
+        List<String> out = new ArrayList<>();
+        for (String c : p.getConditions()) {
+            if (isBlank(c)) continue;
+            out.add(join(Arrays.asList(c, "dinh dưỡng", "sức khỏe", "thực phẩm", "chế độ ăn"), " "));
+        }
+        return out;
     }
 
-    /** Boost theo độ mới: 0..~3 tuỳ tuổi bài (mới hơn thì cao hơn) */
-    private static double recencyBoost(Instant published) {
-        if (published == null) return 0;
-        long days = Math.max(0, (java.time.Duration.between(published, Instant.now()).toDays()));
-        // <7d: +3 ; <30d: +2 ; <90d: +1 ; còn lại +0.3
-        if (days <= 7)  return 3.0;
-        if (days <= 30) return 2.0;
-        if (days <= 90) return 1.0;
-        return 0.3;
+    /** Từ khóa xác định tin dinh dưỡng/sức khỏe */
+    private static List<String> nutritionKeywords() {
+        return Arrays.asList(
+                // VI
+                "dinh dưỡng","sức khỏe","thực phẩm","ăn kiêng","chế độ ăn",
+                "khuyến cáo","cảnh báo","bác sĩ","bệnh viện","viện dinh dưỡng",
+                "vitamin","khoáng chất","đạm","protein","carb","chất béo","cholesterol",
+                "đái tháo đường","tiểu đường","huyết áp","mỡ máu","tim mạch","béo phì",
+                // EN
+                "nutrition","diet","healthy","meal","intake","nutrient","vitamin","mineral",
+                "cholesterol","hypertension","diabetes","obesity","cardio","heart"
+        );
     }
 
-    /** So sánh thời gian xuất bản (desc) */
-    private static int comparePublishedDesc(Instant a, Instant b) {
-        if (a == null && b == null) return 0;
-        if (a == null) return 1;
-        if (b == null) return -1;
-        return b.compareTo(a);
+    /** TỪ NHẠY CẢM cần lọc bỏ (VD: “giòi”) */
+    private static List<String> sensitiveKeywords() {
+        return Arrays.asList(
+                "con dòi","giòi","dòi","ấu trùng","bọ gậy","thối rữa","ruồi bọ"
+        );
     }
 
-    /** Dedupe: ưu tiên bài mới hơn nếu trùng url hoặc title */
-    private static List<RecoItemDto> dedupeArticles(List<RecoItemDto> list) {
-        Map<String, RecoItemDto> byKey = new LinkedHashMap<>();
-        for (RecoItemDto it : list) {
-            String key = (safeLower(it.getUrl()) + "|" + safeLower(it.getTitle())).trim();
-            RecoItemDto old = byKey.get(key);
-            if (old == null) {
-                byKey.put(key, it);
-            } else {
-                // giữ bài mới hơn
-                if (comparePublishedDesc(it.getPublished(), old.getPublished()) < 0) {
-                    // old newer => keep old
-                } else {
-                    byKey.put(key, it);
-                }
+    /** Tạo boost keywords theo goal */
+    private static List<String> goalBoostKeywords(ProfileDto p) {
+        List<String> out = new ArrayList<>();
+        if (p == null || isBlank(p.getGoal())) return out;
+        String g = p.getGoal().toLowerCase(Locale.ROOT);
+        if (g.contains("tăng cơ") || g.contains("tăng cân")) {
+            Collections.addAll(out, "tăng cân","tăng cơ","hypertrophy","build muscle","muscle","protein cao","high protein","lean mass");
+        } else if (g.contains("giảm")) {
+            Collections.addAll(out, "giảm cân","giảm mỡ","đốt mỡ","weight loss","fat loss","low calorie","calo thấp","calorie deficit");
+        } else if (g.contains("giữ cân")) {
+            Collections.addAll(out, "giữ cân","duy trì","balanced diet","cân bằng","maintenance");
+        } else {
+            out.add(g);
+        }
+        return out;
+    }
+
+    /** Tạo boost keywords theo bệnh nền */
+    private static List<String> conditionBoostKeywords(ProfileDto p) {
+        List<String> out = new ArrayList<>();
+        if (p == null || p.getConditions() == null) return out;
+        for (String c : p.getConditions()) {
+            String lc = c == null ? "" : c.toLowerCase(Locale.ROOT);
+            if (lc.contains("tiểu đường") || lc.contains("đái tháo đường") || lc.contains("diabetes")) {
+                Collections.addAll(out, "tiểu đường","đái tháo đường","diabetes","đường huyết","glycemic","low glycemic","insulin");
+            } else if (lc.contains("huyết áp") || lc.contains("hypertension")) {
+                Collections.addAll(out, "huyết áp","hypertension","ít muối","tim mạch","heart","sodium");
+            } else if (lc.contains("mỡ máu") || lc.contains("cholesterol") || lc.contains("dyslipidemia")) {
+                Collections.addAll(out, "cholesterol","mỡ máu","hdl","ldl","triglyceride","ít chất béo bão hòa","statin","heart");
+            } else if (!isBlank(c)) {
+                out.add(c);
             }
         }
-        return new ArrayList<>(byKey.values());
+        return out;
     }
 
-    /* =========================== Helpers =========================== */
-
-    private Integer calcAge(Integer birthYear) {
-        if (birthYear == null) return null;
-        int nowYear = Year.now().getValue();
-        int age = nowYear - birthYear;
-        return age >= 0 ? age : null;
-    }
-
-    private String mapGoalToString(com.hn.nutricarebe.enums.GoalType goal) {
-        if (goal == null) return null;
-        switch (goal) {
-            case LOSE:    return "giảm cân";
-            case GAIN:    return "tăng cơ";
-            case MAINTAIN:return "giữ cân";
-            default: return goal.name().toLowerCase();
-        }
-    }
-
-    private String mapActivityToString(com.hn.nutricarebe.enums.ActivityLevel act) {
-        if (act == null) return null;
-        switch (act) {
-            case SEDENTARY: return "Ít vận động";
-            case LIGHTLY_ACTIVE:     return "Vận động nhẹ";
-            case MODERATELY_ACTIVE:  return "Vận động vừa phải";
-            case VERY_ACTIVE:    return "Vận động nhiều";
-            case EXTRA_ACTIVE: return "Vận động rất nhiều";
-            default:        return act.name().toLowerCase();
-        }
-    }
-
+    /* ========================= Fetchers & Common utils ========================= */
 
     private List<RecoItemDto> fetchRssArticles(String rssUrl) throws Exception {
         Document doc = fetchDoc(rssUrl);
         List<RecoItemDto> out = new ArrayList<>();
 
-        // Thử RSS trước
         List<Element> items = doc.select("item");
         boolean isAtom = false;
         if (items.isEmpty()) {
             items = doc.select("entry");
             isAtom = !items.isEmpty();
         }
-
-        // Các từ khóa bắt buộc phải có để lọc (liên quan dinh dưỡng - thực phẩm)
-        List<String> foodKeywords = Arrays.asList(
-                "ăn", "món", "thực phẩm", "dinh dưỡng", "thực đơn",
-                "ăn kiêng", "giảm cân", "tăng cân", "tăng cơ", "calo",
-                "bữa sáng", "bữa trưa", "bữa tối", "chế độ ăn", "chất béo", "protein", "carb", "nước", "bổ sung"
-        );
 
         for (Element it : items) {
             String title, link, pub, img = null, source;
@@ -388,10 +407,8 @@ public class RecommendationServiceImpl implements RecommendationService {
 
             if (link == null || link.trim().isEmpty()) continue;
 
-            // Lọc bài không liên quan đến ăn uống
-            String lowerTitle = title == null ? "" : title.toLowerCase(Locale.ROOT);
-            boolean related = foodKeywords.stream().anyMatch(lowerTitle::contains);
-            if (!related) continue; // bỏ qua bài không liên quan
+            // BỎ các bài mang tính "video/clip"
+            if (isVideoLike(link, hostOf(link), title)) continue;
 
             source = hostOf(link);
             Instant published = parsePub(pub);
@@ -409,14 +426,8 @@ public class RecommendationServiceImpl implements RecommendationService {
         return out;
     }
 
-
-    private List<RecoItemDto> fetchYoutubeVideos(String query) {
-        return Collections.emptyList();
-    }
-
     @SuppressWarnings("unchecked")
     private List<RecoItemDto> fetchPubMed(String query) throws Exception {
-        // 1) esearch -> ids
         Document d1 = fetchDoc(pubmedSearchUrl(query));
         org.json.JSONObject search = new org.json.JSONObject(d1.text());
         org.json.JSONObject esr = search.optJSONObject("esearchresult");
@@ -430,7 +441,6 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
         String ids = join(idsArr, ",");
 
-        // 2) esummary theo ids
         String sumUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi" +
                 "?db=pubmed&retmode=json&id=" + ids;
         Document d2 = fetchDoc(sumUrl);
@@ -460,7 +470,6 @@ public class RecommendationServiceImpl implements RecommendationService {
         return out;
     }
 
-    /* ===== Doc fetch (User-Agent trình duyệt, tránh 403) ===== */
     private Document fetchDoc(String url) throws Exception {
         return Jsoup.connect(url)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
@@ -474,7 +483,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .get();
     }
 
-    /* ================== tiny utils (Java 8 friendly) ================== */
+    /* ================== tiny utils ================== */
 
     private static int clampLimit(int limit) {
         if (limit < 1) return 12;
@@ -514,136 +523,19 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     private static String firstImgFromHtml(String html) {
         if (html == null || html.isEmpty()) return null;
-        Element img = Jsoup.parse(html).selectFirst("img");
+        Element img = org.jsoup.Jsoup.parse(html).selectFirst("img");
         if (img == null) return null;
         String src = img.absUrl("src");
         return (src != null && !src.isEmpty()) ? src : null;
     }
 
-    private static String buildQuery(ProfileDto p) {
-        List<String> parts = new ArrayList<String>();
-        if (p != null) {
-            if (!isBlank(p.getGoal())) parts.add(p.getGoal());
-            if (p.getConditions() != null)
-                for (String c : p.getConditions()) if (!isBlank(c)) parts.add(c);
-            if (p.getAllergies() != null)
-                for (String a : p.getAllergies()) if (!isBlank(a)) parts.add(a);
-
-            if ("vi".equalsIgnoreCase(p.getLocale())) {
-                parts.add("dinh dưỡng");
-                parts.add("thực đơn");
-                parts.add("giảm cân");
-                parts.add("dị ứng");
-                parts.add("bệnh nền");
-            } else {
-                parts.add("nutrition");
-                parts.add("diet");
-                parts.add("meal plan");
-            }
-        }
-        return join(parts, " ");
+    private static boolean isBlank(String s) {
+        return (s == null || s.trim().isEmpty());
     }
-
-    private static List<String> buildKeywords(ProfileDto p) {
-        List<String> ks = new ArrayList<>();
-
-        // ==== Từ khóa nền luôn có (VI) ====
-        String[] baseVi = new String[]{
-                "dinh dưỡng","thực phẩm","món ăn","công thức","nấu ăn",
-                "thực đơn","ăn kiêng","giảm cân","tăng cơ",
-                "tập luyện","bài tập","thể dục","vận động","calo","protein","carb","chất béo"
-        };
-        // ==== Bản EN cơ bản ====
-        String[] baseEn = new String[]{
-                "nutrition","food","recipe","diet","meal plan","healthy",
-                "weight loss","muscle gain","workout","exercise","training","calorie","protein","carb","fat"
-        };
-        ks.addAll(Arrays.asList(baseVi));
-        ks.addAll(Arrays.asList(baseEn));
-
-        if (p != null) {
-            // goal -> thêm từ khóa đặc thù
-            if (!isBlank(p.getGoal())) {
-                addWithEnglish(ks, p.getGoal());
-                String g = p.getGoal().toLowerCase(Locale.ROOT);
-                if (g.contains("giảm")) {
-                    Collections.addAll(ks, "đốt mỡ","low calorie","calo thấp","ăn kiêng lành mạnh","giảm mỡ","cardio");
-                } else if (g.contains("tăng cơ") || g.contains("tăng")) {
-                    Collections.addAll(ks, "high protein","protein cao","tăng cân lành mạnh","luyện tập sức mạnh","strength training");
-                } else if (g.contains("giữ cân")) {
-                    Collections.addAll(ks, "cân bằng","balanced diet","duy trì");
-                }
-            }
-
-            // conditions
-            if (p.getConditions() != null) {
-                for (String c : p.getConditions()) {
-                    addWithEnglish(ks, c);
-                    String lc = c == null ? "" : c.toLowerCase(Locale.ROOT);
-                    if (lc.contains("tiểu đường") || lc.contains("đái tháo đường") || lc.contains("diabetes")) {
-                        Collections.addAll(ks, "đường huyết","glycemic","low glycemic","ít đường");
-                    } else if (lc.contains("huyết áp") || lc.contains("hypertension")) {
-                        Collections.addAll(ks, "ít muối","huyết áp","tim mạch","heart healthy");
-                    } else if (lc.contains("mỡ máu") || lc.contains("cholesterol") || lc.contains("dyslipidemia")) {
-                        Collections.addAll(ks, "ít chất béo bão hòa","hdl","ldl","triglyceride");
-                    }
-                }
-            }
-
-            // allergies
-            if (p.getAllergies() != null) {
-                for (String a : p.getAllergies()) {
-                    addWithEnglish(ks, a);
-                    // VD: dị ứng sữa, trứng -> bài viết hay có từ này
-                }
-            }
-
-            // ưu tiên VI nếu locale 'vi'
-            if (!"vi".equalsIgnoreCase(p.getLocale())) {
-                // nếu không phải vi, đảm bảo có EN cơ bản
-                for (String s : baseEn) if (!ks.contains(s)) ks.add(s);
-            }
-        }
-
-        // distinct, normalize
-        List<String> uniq = new ArrayList<>();
-        for (String k : ks) {
-            if (k != null) {
-                String t = k.trim().toLowerCase(Locale.ROOT);
-                if (!t.isEmpty() && !uniq.contains(t)) uniq.add(t);
-            }
-        }
-        return uniq;
-    }
-
-    /* ==== relevance scoring (điểm mức liên quan) ==== */
-    private static int relevanceScore(String haystack, List<String> keywords) {
-        if (haystack == null || haystack.isEmpty() || keywords == null || keywords.isEmpty()) return 0;
-        String s = haystack.toLowerCase(Locale.ROOT);
-        int score = 0;
-        for (String k : keywords) {
-            if (k == null || k.isEmpty()) continue;
-            // đếm số lần xuất hiện đơn giản
-            int idx = 0;
-            while (true) {
-                idx = s.indexOf(k, idx);
-                if (idx < 0) break;
-                score++;
-                idx += k.length();
-            }
-        }
-        return score;
-    }
-
-
 
     private static String safeLower(String s) {
         if (s == null) return "";
         return s.toLowerCase(Locale.ROOT);
-    }
-
-    private static boolean isBlank(String s) {
-        return (s == null || s.trim().isEmpty());
     }
 
     private static String join(List<String> parts, String sep) {
@@ -655,7 +547,57 @@ public class RecommendationServiceImpl implements RecommendationService {
         return sb.toString();
     }
 
-    /** map vi -> en đơn giản cho goal/keywords phổ biến */
+    private static int comparePublishedDesc(Instant a, Instant b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return 1;
+        if (b == null) return -1;
+        return b.compareTo(a);
+    }
+
+    /** Domain uy tín (nhẹ) */
+    private static double domainBoost(String host) {
+        if (host == null) return 0;
+        String h = host.toLowerCase(Locale.ROOT);
+        if (h.contains("vnexpress"))      return 2.0;
+        if (h.contains("tuoitre"))        return 1.6;
+        if (h.contains("znews") || h.contains("zing")) return 1.2;
+        if (h.contains("vtc"))            return 1.0;
+        if (h.contains("phunuvietnam"))   return 0.8;
+        if (h.contains("pubmed"))         return 0.5; // nghiên cứu (không "đè" tin thời sự)
+        if (h.contains("google"))         return 0.5; // news.google.com
+        return 0.0;
+    }
+
+    /** Độ mới ưu tiên cao (0..3) */
+    private static double recencyBoost(Instant published) {
+        if (published == null) return 0;
+        long days = Math.max(0, (java.time.Duration.between(published, Instant.now()).toDays()));
+        if (days <= 7)  return 3.0;
+        if (days <= 30) return 2.0;
+        if (days <= 90) return 1.0;
+        return 0.3;
+    }
+
+    /** Đếm số lần xuất hiện đơn giản */
+    private static int relevanceScore(String haystack, List<String> keywords) {
+        if (haystack == null || haystack.isEmpty() || keywords == null || keywords.isEmpty()) return 0;
+        String s = haystack.toLowerCase(Locale.ROOT);
+        int score = 0;
+        for (String k : keywords) {
+            if (k == null || k.isEmpty()) continue;
+            int idx = 0;
+            String needle = k.toLowerCase(Locale.ROOT);
+            while (true) {
+                idx = s.indexOf(needle, idx);
+                if (idx < 0) break;
+                score++;
+                idx += needle.length();
+            }
+        }
+        return score;
+    }
+
+    /* ======= English query cho PubMed ======= */
     private static String viToEn(String s) {
         if (s == null) return null;
         String t = s.trim().toLowerCase(Locale.ROOT);
@@ -668,7 +610,6 @@ public class RecommendationServiceImpl implements RecommendationService {
             case "thực đơn": return "meal plan";
             case "dị ứng":   return "allergy";
             case "bệnh nền": return "chronic disease";
-            // một số bệnh thường gặp (tuỳ DB của bạn, bổ sung thêm nếu cần):
             case "tiểu đường":
             case "đái tháo đường": return "diabetes";
             case "cao huyết áp":
@@ -676,20 +617,10 @@ public class RecommendationServiceImpl implements RecommendationService {
             case "rối loạn mỡ máu": return "dyslipidemia";
             case "béo phì":         return "obesity";
             case "tim mạch":        return "cardiovascular";
-            default: return null; // không dịch được thì trả null
+            default: return null;
         }
     }
 
-    /** Thêm bản tiếng Anh của từ khóa (nếu có) vào danh sách */
-    private static void addWithEnglish(List<String> bag, String vi) {
-        if (isBlank(vi)) return;
-        String viNorm = vi.toLowerCase(Locale.ROOT).trim();
-        if (!bag.contains(viNorm)) bag.add(viNorm);
-        String en = viToEn(vi);
-        if (en != null && !bag.contains(en)) bag.add(en);
-    }
-
-    /** tạo chuỗi tìm kiếm tiếng Anh cho PubMed */
     private static String buildEnglishQuery(ProfileDto p) {
         List<String> parts = new ArrayList<>();
         if (p != null) {
@@ -703,18 +634,97 @@ public class RecommendationServiceImpl implements RecommendationService {
                     parts.add(en != null ? en : c);
                 }
             }
-            if (p.getAllergies() != null) {
-                for (String a : p.getAllergies()) {
-                    String en = viToEn(a);
-                    parts.add(en != null ? en : a);
-                }
-            }
-            // thêm các từ chung bằng tiếng Anh để tăng recall
-            parts.add("nutrition");
-            parts.add("diet");
-            parts.add("meal plan");
+            parts.addAll(Arrays.asList("nutrition","diet","meal plan","health"));
         }
         return join(parts, " ");
     }
 
+    /* ====== Nhận diện link/video/clip để loại bỏ ====== */
+    private static boolean isVideoLike(String url, String source, String title) {
+        String h = safeLower(hostOf(url));
+        String s = safeLower(source);
+        String t = safeLower(title);
+
+        // Domain phổ biến của video
+        if (h.contains("youtube.com") || h.contains("youtu.be") ||
+                h.contains("vimeo.com") || h.contains("dailymotion.com") ||
+                h.contains("facebook.com") || h.contains("fb.watch") ||
+                h.contains("tiktok.com")) return true;
+
+        // title/source ám chỉ clip
+        if (t.contains("video") || t.contains("clip") || t.contains("livestream") ||
+                t.contains("trực tiếp") || t.contains("phát trực tiếp")) return true;
+        if (s.contains("youtube") || s.contains("tiktok") || s.contains("facebook")) return true;
+
+        return false;
+    }
+
+    /* ========= Misc helpers ========= */
+
+    private static String keyOf(RecoItemDto it) {
+        return (safeLower(it.getUrl()) + "|" + safeLower(it.getTitle())).trim();
+    }
+
+    private static boolean containsKey(List<RecoItemDto> list, String key) {
+        for (RecoItemDto it : list) {
+            if (keyOf(it).equals(key)) return true;
+        }
+        return false;
+    }
+
+    /** Dedupe theo (url|title), giữ bài mới hơn nếu trùng key */
+    private static List<RecoItemDto> dedupeArticles(List<RecoItemDto> list) {
+        if (list == null || list.isEmpty()) return Collections.emptyList();
+        Map<String, RecoItemDto> byKey = new LinkedHashMap<>();
+        for (RecoItemDto it : list) {
+            String key = keyOf(it);
+            RecoItemDto old = byKey.get(key);
+            if (old == null) {
+                byKey.put(key, it);
+            } else {
+                // so published để giữ bài mới hơn
+                Instant a = it.getPublished();
+                Instant b = old.getPublished();
+                int cmp = comparePublishedDesc(a, b); // b - a (desc)
+                if (cmp < 0) {
+                    // old mới hơn -> giữ old
+                } else {
+                    byKey.put(key, it); // it mới hơn (hoặc bằng) -> thay
+                }
+            }
+        }
+        return new ArrayList<>(byKey.values());
+    }
+
+    /** Tính tuổi từ birthYear (null-safe) */
+    private Integer calcAge(Integer birthYear) {
+        if (birthYear == null) return null;
+        int now = Year.now().getValue();
+        int age = now - birthYear;
+        return (age >= 0) ? age : null;
+    }
+
+    /** Map GoalType -> tiếng Việt gọn */
+    private String mapGoalToString(com.hn.nutricarebe.enums.GoalType goal) {
+        if (goal == null) return null;
+        switch (goal) {
+            case LOSE:     return "giảm cân";
+            case GAIN:     return "tăng cân";
+            case MAINTAIN: return "giữ cân";
+            default:       return goal.name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** Map ActivityLevel -> tiếng Việt gọn */
+    private String mapActivityToString(com.hn.nutricarebe.enums.ActivityLevel act) {
+        if (act == null) return null;
+        switch (act) {
+            case SEDENTARY:         return "Ít vận động";
+            case LIGHTLY_ACTIVE:    return "Vận động nhẹ";
+            case MODERATELY_ACTIVE: return "Vận động vừa phải";
+            case VERY_ACTIVE:       return "Vận động nhiều";
+            case EXTRA_ACTIVE:      return "Vận động rất nhiều";
+            default:                return act.name().toLowerCase(Locale.ROOT);
+        }
+    }
 }

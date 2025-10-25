@@ -38,9 +38,11 @@ public class UserServiceImpl implements UserService {
     @Override
     public User saveOnboarding(String device) {
         User userOld = userRepository.findTopByDeviceIdAndStatusOrderByCreatedAtDesc(device, UserStatus.ACTIVE).orElse(null);
-        if (userOld != null) {
+        if (userOld != null && userOld.getProvider() == Provider.NONE) {
             userOld.setStatus(UserStatus.DELETED);
             userRepository.save(userOld);
+        }else if(userOld != null && userOld.getProvider() == Provider.SUPABASE_GOOGLE){
+            return userOld;
         }
         User user = User.builder()
                 .deviceId(device)
@@ -63,17 +65,6 @@ public class UserServiceImpl implements UserService {
         return userMapper.toUserCreationResponse(saved);
     }
 
-    @Override
-    public User getUserByProvider(String providerId, String device) {
-        // Kiểm tra đã liên kết gg chưa
-        User user = userRepository.findByProviderUserId(providerId).orElse(null);
-
-        // Nếu vẫn chưa, thử theo device
-        if (user == null && device != null && !device.isBlank()) {
-            user = userRepository.findTopByDeviceIdAndStatusOrderByCreatedAtDesc(device, UserStatus.ACTIVE).orElse(null);
-        }
-        return user;
-    }
 
     @Override
     public InfoResponse getUserByToken() {
