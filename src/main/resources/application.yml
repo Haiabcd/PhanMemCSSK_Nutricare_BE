@@ -48,11 +48,6 @@ aws:
   s3:
     bucket:
       public: nutricare-public
-
-  cloudfront:
-    domain: dyfgxhmdeg59a.cloudfront.net
-    signing:
-      enabled: false
 cdn:
   base-url: https://dyfgxhmdeg59a.cloudfront.net/
 
@@ -69,7 +64,6 @@ oauth:
 logmeal:
   base-url: "https://api.logmeal.com"
   key: "1c3ca8708971979495ba8e1f4d8df37399afe9f4"
-  algorithm-version: v1.1
 
 logging:
   level:

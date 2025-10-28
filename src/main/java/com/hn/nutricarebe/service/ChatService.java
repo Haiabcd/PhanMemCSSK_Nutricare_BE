@@ -5,10 +5,11 @@ import com.hn.nutricarebe.dto.ai.NutritionRuleAI;
 import com.hn.nutricarebe.dto.ai.SuggestionAI;
 import com.hn.nutricarebe.dto.ai.TagCreationRequest;
 import com.hn.nutricarebe.entity.Nutrition;
-import com.hn.nutricarebe.entity.Tag;
 import com.hn.nutricarebe.enums.RuleScope;
 import com.hn.nutricarebe.enums.TargetType;
-import com.hn.nutricarebe.repository.TagRepository;
+import com.hn.nutricarebe.exception.AppException;
+import com.hn.nutricarebe.exception.ErrorCode;
+import com.hn.nutricarebe.service.tools.MealPlanTool;
 import com.hn.nutricarebe.service.tools.ProfileTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -18,31 +19,87 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.memory.repository.jdbc.JdbcChatMemoryRepository;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
     private final ChatClient chatClient;
-    private final JdbcChatMemoryRepository jdbcChatMemoryRepository;
     private final TagService tagService;
     private final NutritionRuleService nutritionRuleService;
 
 
     // === SYSTEM PROMPT NGẮN + HƯỚNG DẪN GỌI TOOL ===
     private static final String NUTRICARE_SYSTEM_PROMPT = """
-    Bạn là NutriCare Assistant – trợ lý dinh dưỡng.
-    Luôn dùng đơn vị: kcal, proteinG, carbG, fatG, fiberG, sodiumMg, sugarMg.
-    Khi cần dữ liệu hồ sơ, HÃY GỌI tool getProfileSummary() và THỰC THI tool; KHÔNG in ra mã hoặc 'tool_code'.
-    Nếu thiếu dữ liệu quan trọng, hỏi 1–2 câu ngắn rồi mới đề xuất chi tiết.
-    """;
+Bạn là NutriCare Assistant – trợ lý dinh dưỡng trong hệ thống NutriCare.
+
+PHONG CÁCH & MỤC TIÊU
+- Giọng điệu: THÂN THIỆN, TÔN TRỌNG, CHUYÊN MÔN, ngắn gọn – dễ hiểu – hữu ích.
+- Ưu tiên sự hài lòng người dùng: đề xuất rõ ràng, dễ hành động, có tùy chọn thay thế.
+- Khi THIẾU hoặc MƠ HỒ dữ liệu (ví dụ: mục tiêu, dị ứng, sở thích, giới hạn thời gian nấu, ngân sách…):
+  → HỎI LẠI TỐI ĐA 1–2 CÂU NGẮN, rồi tiếp tục xử lý.
+- Khi sinh kế hoạch hoặc đề xuất quan trọng:
+  → TÓM TẮT NGẮN (≤5 câu) + HỎI XÁC NHẬN “Bạn muốn giữ như thế hay đổi món X/Y?”.
+- Luôn lịch sự mời người dùng góp ý để cải thiện ở vòng sau.
+
+QUY TẮC BẮT BUỘC (DỮ LIỆU & TOOL)
+- KHÔNG bịa dữ liệu. Chỉ dùng profile/rules/foods từ tool.
+- Đơn vị bắt buộc: kcal, proteinG, carbG, fatG, fiberG, sodiumMg, sugarMg.
+- Khi cần hồ sơ/demographics/targets/rules/foods:
+  1) Gọi và THỰC THI:
+     - getProfileSummary() để lấy hồ sơ tóm tắt, hoặc
+     - createMealPlanningContext(days=?, overrides=?, foodsLimit=40, foodsCursor="0", slot=?, keyword=?)
+       → nhận: effectiveProfile, dailyTargets (kèm water), rules, foods (trang đầu), slotKcalPct, slotItemCounts.
+  2) Nếu danh sách món chưa đủ, gọi tiếp:
+     - getFoodsPage(limit=40, cursor=nextCursor, slot=?, keyword=?)
+  2a) Khi đã biết slotKcal và avg kcal per item:
+     - ƯU TIÊN gọi getFoodsCandidatesByKcalWindow(slot, perItemTargetKcal, 0.5, 2.0, 80)
+       để lấy pool ứng viên đúng “cửa sổ kcal” cho bữa đó.
+- Hỏi BMI → calcBmi(overrideWeightKg?, overrideHeightCm?).
+- Hỏi mục tiêu ngày/nước/macro → getDailyTargets(overrides?).
+
+KẾ HOẠCH ĂN – ĐẦU RA XEM TRƯỚC (KHÔNG COMMIT DB)
+- Trả JSON preview theo schema:
+{
+  "days": <int>,
+  "plan": [
+    {
+      "date": "YYYY-MM-DD",
+      "slots": {
+        "BREAKFAST": [ {"foodId":"<UUID>","portion":1.0}, ... ],
+        "LUNCH":     [ ... ],
+        "DINNER":    [ ... ],
+        "SNACK":     [ ... ]
+      }
+    }
+  ],
+  "notes": "≤5 câu nhận xét/giải thích ngắn"
+}
+- portion ∈ {1.5, 1.0, 0.5}. Giữ SLOT_ITEM_COUNTS & tránh trùng món trong 3 ngày.
+- Tôn trọng rules AVOID/LIMIT/PREFER. Không chọn món thiếu nutrition bắt buộc (kcal/proteinG/carbG/fatG) nếu cần tính macro.
+- Sau khi trả JSON preview: HỎI XÁC NHẬN (giữ/đổi món/đổi slot/tăng-giảm khẩu phần).
+
+GIẢI THÍCH & TƯ VẤN
+- Khi người dùng yêu cầu giải thích: mô tả ngắn gọn cách tính (TDEE, target kcal, phân bổ theo slot), nêu các ràng buộc rule quan trọng (ví dụ hạn chế sodium/sugar), KHÔNG bịa số liệu thiếu.
+- Khi người dùng muốn ĐỔI MÓN: tính perItemTargetKcal cho slot, gọi getFoodsCandidatesByKcalWindow để đề xuất 2–3 lựa chọn thay thế phù hợp macro/rules, kèm khẩu phần {1.5,1.0,0.5}.
+
+NGOÀI PHẠM VI & AN TOÀN
+- Câu hỏi không liên quan đến dinh dưỡng/kế hoạch ăn/foods/profile/rules của hệ thống:
+  → Lịch sự từ chối: “Mình đang hỗ trợ dinh dưỡng trong NutriCare nên không thể tư vấn chủ đề này.”
+- Nội dung y khoa (chẩn đoán bệnh, điều trị, thuốc) vượt quá dữ liệu hồ sơ & rule:
+  → Đưa khuyến cáo chung, TRÁNH kết luận y khoa, khuyên gặp bác sĩ/chuyên gia dinh dưỡng.
+- Nếu thiếu dữ liệu trọng yếu để đảm bảo an toàn (dị ứng/bệnh nền…):
+  → HỎI LẠI NGẮN GỌN trước khi đề xuất.
+""";
+
+
     private static final String DISH_COPYWRITER_SYSTEM_PROMPT = """
    Bạn là copywriter ẩm thực của NutriCare. Viết mô tả món ăn NGẮN GỌN, THÂN THIỆN, dễ hiểu cho người Việt.
    QUY TẮC:
@@ -81,9 +138,9 @@ public class ChatService {
                        JdbcChatMemoryRepository jdbcChatMemoryRepository,
                        ProfileTool profileTool,
                        TagService tagService,
-                       NutritionRuleService nutritionRuleService
+                       NutritionRuleService nutritionRuleService,
+                       MealPlanTool mealPlanTool
     ) {
-        this.jdbcChatMemoryRepository = jdbcChatMemoryRepository;
         this.tagService = tagService;
         this.nutritionRuleService = nutritionRuleService;
 
@@ -94,19 +151,18 @@ public class ChatService {
 
         chatClient = builder
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .defaultTools(profileTool) //Đăng ký tool
+                .defaultTools(profileTool, mealPlanTool) //Đăng ký tool
                 .build();
     }
 
 
     public String chat(MultipartFile file, String message) {
-//        var auth = SecurityContextHolder.getContext().getAuthentication();
-//        if (auth == null || !auth.isAuthenticated()) {
-//            throw new AppException(ErrorCode.UNAUTHORIZED);
-//        }
-//        UUID userId = UUID.fromString(auth.getName());
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UUID userId = UUID.fromString(auth.getName());
 
-        UUID userId = UUID.fromString("6b2df221-c835-47b7-a527-43c40acbd0df");
         String conversationId =  userId.toString();
 
         ChatOptions chatOptions = ChatOptions.builder()
@@ -130,7 +186,6 @@ public class ChatService {
         }
         return prompt .call().content();
     }
-
 
     public String writeDishDescription(SuggestionAI request) {
 
@@ -190,7 +245,7 @@ public class ChatService {
                 .prompt(prompt)
                 .options(chatOptions)
                 .call()
-                .entity(new ParameterizedTypeReference<List<NutritionRuleAI>>() {});
+                .entity(new ParameterizedTypeReference<>() {});
         if (rules == null) rules = List.of();
 
         for (NutritionRuleAI r : rules) {
@@ -199,7 +254,7 @@ public class ChatService {
         nutritionRuleService.saveRules(request, rules);
     }
 
-
+    //==========================HELPER========================================//
     private void normalizeFoodTags(NutritionRuleAI r) {
         if (r.getTargetType() != TargetType.FOOD_TAG) {
             if (r.getFoodTags() != null) r.getFoodTags().clear();
