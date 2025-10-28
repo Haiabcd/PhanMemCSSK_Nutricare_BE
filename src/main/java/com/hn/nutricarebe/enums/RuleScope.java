@@ -4,6 +4,4 @@ public enum RuleScope {
     ITEM,
     MEAL,
     DAY,
-    WEEK,
-    MONTH
 }

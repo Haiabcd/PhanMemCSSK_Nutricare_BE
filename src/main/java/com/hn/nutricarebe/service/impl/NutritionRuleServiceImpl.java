@@ -1,57 +1,36 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.dto.request.NutritionRuleCreationRequest;
+import com.hn.nutricarebe.dto.ai.CreationRuleAI;
+import com.hn.nutricarebe.dto.ai.NutritionRuleAI;
+import com.hn.nutricarebe.dto.ai.TagCreationRequest;
 import com.hn.nutricarebe.entity.Allergy;
 import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.entity.NutritionRule;
+import com.hn.nutricarebe.entity.Tag;
+import com.hn.nutricarebe.enums.TargetType;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
-import com.hn.nutricarebe.mapper.NutritionRuleMapper;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.NutritionRuleService;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 
+@Log4j2
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
 @Service
 public class NutritionRuleServiceImpl implements NutritionRuleService {
     NutritionRuleRepository nutritionRuleRepository;
-    ConditionRepository conditionRepository;
-    AllergyRepository allergyRepository;
-    NutritionRuleMapper nutritionRuleMapper;
     UserConditionRepository userConditionRepository;
     UserAllergyRepository userAllergyRepository;
-
-
-    @Override
-    @Transactional
-    public boolean save(NutritionRuleCreationRequest request) {
-        NutritionRule entity = nutritionRuleMapper.toNutritionRule(request);
-
-        if (request.getConditionId() != null) {
-            Condition condition = conditionRepository.findById(request.getConditionId()).orElse(null);
-            entity.setCondition(condition);
-        }
-        if (request.getAllergyId() != null) {
-            Allergy allergy = allergyRepository.findById(request.getAllergyId()).orElse(null);
-            entity.setAllergy(allergy);
-        }
-        NutritionRule nr =  nutritionRuleRepository.save(entity);
-        if(nr == null) {
-            return false;
-        }
-        return true;
-    }
+    TagRepository tagRepository;
 
     @Override
     @Transactional
@@ -78,4 +57,59 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
                 conditionIds, allergyIds, conditionIds.isEmpty(), allergyIds.isEmpty()
         );
     }
+
+    @Override
+    @Transactional
+    public void saveRules(CreationRuleAI request, List<NutritionRuleAI> rules) {
+        if (rules == null || rules.isEmpty()) return;
+        List<NutritionRule> saveList = new ArrayList<>();;
+        for (NutritionRuleAI ruleAI : rules) {
+            Set<Tag> tags = new HashSet<>();
+            if(ruleAI.getTargetType() == TargetType.FOOD_TAG){
+                if(ruleAI.getCustomFoodTags() != null && !ruleAI.getCustomFoodTags().isEmpty()){
+                    List<Tag> tagSave = new ArrayList<>();
+                    for(TagCreationRequest t : ruleAI.getCustomFoodTags()){
+                        Tag newTag = Tag.builder()
+                                .nameCode(t.getNameCode())
+                                .description(t.getDescription())
+                                .build();
+                        tagSave.add(newTag);
+                    }
+                    List<Tag> savedTags = tagRepository.saveAllAndFlush(tagSave);
+                    tags.addAll(savedTags);
+                }
+                if(ruleAI.getFoodTags() != null && !ruleAI.getFoodTags().isEmpty()){
+                    Set<Tag> existingTags = tagRepository.findByNameCodeInIgnoreCase(ruleAI.getFoodTags());
+                    tags.addAll(existingTags);
+                };
+            }
+            NutritionRule creationRequest = NutritionRule.builder()
+                    .allergy(request.getAllergyId() != null ?
+                            Allergy.builder().id(request.getAllergyId()).build()
+                            : null)
+                    .condition(request.getConditionId() != null ?
+                            Condition.builder().id(request.getConditionId()).build()
+                            : null)
+                    .active(true)
+                    .comparator(ruleAI.getComparator())
+                    .scope(ruleAI.getScope())
+                    .ruleType(ruleAI.getRuleType())
+                    .targetCode(ruleAI.getTargetCode())
+                    .targetType(ruleAI.getTargetType())
+                    .perKg(ruleAI.getPerKg())
+                    .frequencyPerScope(ruleAI.getFrequencyPerScope())
+                    .thresholdMin(ruleAI.getThresholdMin())
+                    .thresholdMax(ruleAI.getThresholdMax())
+                    .ageMax(ruleAI.getAgeMax())
+                    .ageMin(ruleAI.getAgeMin())
+                    .applicableSex(ruleAI.getApplicableSex())
+                    .tags(tags)
+                    .message(ruleAI.getMessage())
+                    .source(null)
+                    .build();
+            saveList.add(creationRequest);
+        }
+        nutritionRuleRepository.saveAll(saveList);
+    }
+
 }

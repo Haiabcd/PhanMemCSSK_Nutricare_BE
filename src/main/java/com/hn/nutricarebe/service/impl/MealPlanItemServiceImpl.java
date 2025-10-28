@@ -66,7 +66,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         // Dữ liệu tham chiếu cũ
         MealSlot slot = item.getMealSlot();
         var oldFood = item.getFood();
-        var oldTags = nonNullTags(oldFood.getTags());
         var oldSnap = item.getNutrition();
         var oldFoodId = oldFood.getId();
 
@@ -79,7 +78,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
             var slice = foodRepository.findByMealSlot(slot, pageable);
             for (var cand : slice.getContent()) {
                 if (cand.getId().equals(oldFoodId)) continue;
-                if (!tagsEqual(nonNullTags(cand.getTags()), oldTags)) continue;
+                if (!tagsEqual(cand.getTags(), oldFood.getTags())) continue;
 
                 var n = cand.getNutrition();
 
@@ -190,20 +189,20 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
 
     /* ==================== Helpers cho smartSwap ==================== */
 
-    // Chuẩn hoá set tags != null
-    private static java.util.Set<com.hn.nutricarebe.enums.FoodTag> nonNullTags(java.util.Set<com.hn.nutricarebe.enums.FoodTag> in) {
-        return (in == null) ? java.util.Set.of() : in;
-    }
-
     // So sánh "y chang" tập tags (không hơn không kém)
-    private static boolean tagsEqual(
-            java.util.Set<com.hn.nutricarebe.enums.FoodTag> a,
-            java.util.Set<com.hn.nutricarebe.enums.FoodTag> b
-    ) {
+    private static boolean tagsEqual(Set<Tag> a,
+                                     Set<Tag> b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
         if (a.size() != b.size()) return false;
-        return a.containsAll(b) && b.containsAll(a);
+
+        Set<UUID> aIds = a.stream()
+                .map(Tag::getId)
+                .collect(Collectors.toSet());
+        Set<UUID> bIds = b.stream()
+                .map(Tag::getId)
+                .collect(Collectors.toSet());
+        return aIds.equals(bIds);
     }
 
     // Chọn khẩu phần tốt nhất  + điểm chênh lệch so với mục tiêu

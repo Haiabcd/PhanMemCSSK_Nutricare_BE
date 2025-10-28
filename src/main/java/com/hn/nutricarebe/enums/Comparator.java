@@ -7,6 +7,4 @@ public enum Comparator {
     GTE,
     GT,
     BETWEEN,
-    IN_SET,
-    NOT_IN_SET
 }

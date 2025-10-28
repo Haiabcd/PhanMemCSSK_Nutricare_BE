@@ -1,6 +1,5 @@
 package com.hn.nutricarebe.dto;
 
-import com.hn.nutricarebe.enums.FoodTag;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,7 +14,7 @@ import java.util.Set;
 @Setter
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class TagDirectives {
-    Set<FoodTag> avoid = new HashSet<>();
-    Map<FoodTag, Double> preferBonus = new HashMap<>();
-    Map<FoodTag, Double> limitPenalty = new HashMap<>();
+    Set<String> avoid = new HashSet<>();
+    Map<String, Double> preferBonus = new HashMap<>();
+    Map<String, Double> limitPenalty = new HashMap<>();
 }

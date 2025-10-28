@@ -1,6 +1,6 @@
 package com.hn.nutricarebe.dto.request;
 
-import com.hn.nutricarebe.enums.FoodTag;
+import com.hn.nutricarebe.entity.Tag;
 import com.hn.nutricarebe.enums.MealSlot;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Digits;
@@ -45,7 +45,7 @@ public class FoodPatchRequest {
     Boolean isIngredient;
 
     Set<MealSlot> mealSlots;
-    Set<FoodTag> tags;
+    Set<Tag> tags;
 
     MultipartFile image;
 }

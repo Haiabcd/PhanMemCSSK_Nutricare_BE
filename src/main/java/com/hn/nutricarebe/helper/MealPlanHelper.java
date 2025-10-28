@@ -7,11 +7,13 @@ import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
 import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.entity.Nutrition;
 import com.hn.nutricarebe.entity.NutritionRule;
+import com.hn.nutricarebe.entity.Tag;
 import com.hn.nutricarebe.enums.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Year;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 public final class MealPlanHelper {
@@ -104,9 +106,24 @@ public final class MealPlanHelper {
 
 
     // Lấy tập tag của món, tránh null
-    public static Set<FoodTag> tagsOf(Food f) {
-        return f.getTags() == null ? Collections.emptySet() : f.getTags();
+    public static Set<String> tagsOf(Food f) {
+        return (f == null || f.getTags() == null)
+                ? Collections.emptySet()
+                : f.getTags().stream()
+                .map(Tag::getNameCode)
+                .filter(Objects::nonNull)  // Lọc bỏ các giá trị null trong Stream
+                .collect(Collectors.toSet());
     }
+    // Lấy tập tag của nutrition, tránh null
+    public static Set<String> tagsOfNu(Set<Tag> tags) {
+        return (tags == null || tags.isEmpty())
+                ? Collections.emptySet()
+                : tags.stream()
+                .map(Tag::getNameCode)
+                .filter(Objects::nonNull)  // Lọc bỏ các giá trị null trong Stream
+                .collect(Collectors.toSet());
+    }
+
 
 
     /* ===== TÍNH DINH DƯỠNG MÓN ===== */
@@ -133,8 +150,7 @@ public final class MealPlanHelper {
             if (r.getScope() != RuleScope.ITEM) continue;
             if (!isApplicableToDemographics(r, request)) continue;
 
-            Set<FoodTag> tags = r.getFoodTags();
-            if (tags == null || tags.isEmpty()) continue;
+            Set<String> tags = tagsOfNu(r.getTags());
 
             RuleType rt = r.getRuleType();
             if (rt == null) continue;
