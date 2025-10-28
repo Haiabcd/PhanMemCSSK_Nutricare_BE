@@ -2,8 +2,12 @@ package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
+import com.hn.nutricarebe.dto.response.UserAllergyResponse;
+import com.hn.nutricarebe.dto.response.UserConditionResponse;
+import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.entity.Profile;
 import com.hn.nutricarebe.entity.User;
+import com.hn.nutricarebe.enums.GoalType;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ProfileMapper;
@@ -17,8 +21,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
+import static com.hn.nutricarebe.helper.ProfileHelper.buildGoalText;
 
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -122,4 +129,37 @@ public class ProfileServiceImpl implements ProfileService {
             mealPlanDayService.removeFromDate(tomorrow, userId);
         }
     }
+
+
+    @Override
+    public ProfileAiDto getHealthProfile(UUID userId) {
+        List<String> conditions = userConditionService.findByUser_Id(userId)
+                .stream().map(UserConditionResponse::getName).toList();
+
+        List<String> allergies = userAllergyService.findByUser_Id(userId)
+                .stream().map(UserAllergyResponse::getName).toList();
+
+        Profile p = profileRepository.findByUser_Id(userId).orElse(null);
+        if (p == null) {
+            return ProfileAiDto.builder()
+                    .conditions(conditions)
+                    .allergies(allergies)
+                    .build();
+        }
+        // Tính tuổi từ birthYear
+        int currentYear = LocalDate.now().getYear();
+        Integer age = (p.getBirthYear() != null) ? currentYear - p.getBirthYear() : null;
+
+        return ProfileAiDto.builder()
+                .conditions(conditions)
+                .allergies(allergies)
+                .age(age)
+                .heightCm(p.getHeightCm() != null ? p.getHeightCm().doubleValue() : null)
+                .weightKg(p.getWeightKg() != null ? p.getWeightKg().doubleValue() : null)
+                .goal(buildGoalText(p))
+                .build();
+    }
+
+
+
 }

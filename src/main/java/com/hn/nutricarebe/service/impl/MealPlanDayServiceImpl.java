@@ -1052,16 +1052,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             sugarPenalty = sugarMg / (slotTarget.getSugarMg().doubleValue() + 1e-6) * 1.5;
         }
 
-        double tagAdj = 0.0;
-        if (f.getTags() != null) {
-            if (f.getTags().contains(FoodTag.HIGH_FIBER)) tagAdj += 1.0;
-            if (f.getTags().contains(FoodTag.LEAN_PROTEIN)) tagAdj += 1.0;
-            if (f.getTags().contains(FoodTag.FRIED)) tagAdj -= 1.0;
-            if (f.getTags().contains(FoodTag.SUGARY)) tagAdj -= 1.0;
-            if (f.getTags().contains(FoodTag.PROCESSED)) tagAdj -= 0.6;
-        }
-
-        return -ratioPenalty + (kcalDensityScore / 300.0) + (fiberBonus * 0.2) + tagAdj - sodiumPenalty - sugarPenalty;
+        return -ratioPenalty + (kcalDensityScore / 300.0) + (fiberBonus * 0.2)  - sodiumPenalty - sugarPenalty;
     }
 
     private double scoreFoodByLLMIfAny(Food food, MealSlot slot, Nutrition slotTarget) {

@@ -4,17 +4,32 @@ server:
 spring:
   application:
     name: NutriCareBE
+  ai:
+    google:
+      genai:
+        api-key: "AIzaSyCTOfkePn-zVzNzBQvnq2vevWlMDzRcESw"
+        project-id: "projects/344867174515"
+        chat:
+          options:
+            model: gemini-2.0-flash
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never
   datasource:
     url: jdbc:postgresql://aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0&preferQueryMode=simple
     username: postgres.ewyeishkixdcfhnzxprj
     password: "nutricareqdrhd@#$"
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 5     # 5–10 là hợp lý với dự án nhỏ
+      maximum-pool-size: 5
       minimum-idle: 1
-      idle-timeout: 60000      # 60s
-      max-lifetime: 1800000    # 30m
-      connection-timeout: 30000
+      connection-timeout: 30000     # 30s
+      idle-timeout: 60000
+      max-lifetime: 600000          # 2 phút (đỡ xoay vòng quá nhanh)
+      keepalive-time: 300000        # 5 phút
+      leak-detection-threshold: 20000
   jpa:
     hibernate:
       ddl-auto: update

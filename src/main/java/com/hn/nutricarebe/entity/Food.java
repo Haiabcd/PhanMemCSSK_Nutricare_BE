@@ -1,6 +1,5 @@
 package com.hn.nutricarebe.entity;
 
-import com.hn.nutricarebe.enums.FoodTag;
 import com.hn.nutricarebe.enums.MealSlot;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -79,19 +78,16 @@ public class Food {
     Set<MealSlot> mealSlots = new HashSet<>();
 
 
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(
-            name = "food_tags",
-            joinColumns = @JoinColumn(
-                    name = "food_id",
-                    foreignKey = @ForeignKey(name = "fk_food_tags_foods")
-            )
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "food_tag_map",
+            joinColumns = @JoinColumn(name = "food_id",
+                    foreignKey = @ForeignKey(name = "fk_food_tag_food")),
+            inverseJoinColumns = @JoinColumn(name = "tag_id",
+                    foreignKey = @ForeignKey(name = "fk_food_tag_tag"))
     )
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tag", nullable = false, length = 50)
     @Builder.Default
-    Set<FoodTag> tags = new HashSet<>();
-
+    Set<Tag> tags = new HashSet<>();
 
     @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<RecipeIngredient> ingredients = new HashSet<>();

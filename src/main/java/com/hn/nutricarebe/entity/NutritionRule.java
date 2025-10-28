@@ -59,13 +59,12 @@ public class NutritionRule {
     @Column(name = "target_type", nullable = false)
     TargetType targetType;
 
-    // Mã đích: ví dụ "NA" (natri) nếu NUTRIENT; "HIGH_PURINE" nếu FOOD_TAG
-    @Column(name = "target_code", nullable = false, length = 128)
+    @Column(name = "target_code")
     String targetCode;
 
     // ===== So sánh & ngưỡng =====
     @Enumerated(EnumType.STRING)
-    @Column(name = "comparator", nullable = false, length = 16)
+    @Column(name = "comparator")
     Comparator comparator;
 
     @Column(name = "threshold_min", precision = 12, scale = 4)
@@ -74,7 +73,6 @@ public class NutritionRule {
     @Column(name = "threshold_max", precision = 12, scale = 4)
     BigDecimal thresholdMax;
 
-    // Tính theo kg thể trọng (ví dụ: PROTEIN ≥ 1.0 g/kg/day)
     @Builder.Default
     @Column(name = "per_kg", nullable = false)
     Boolean perKg = Boolean.FALSE;
@@ -96,19 +94,16 @@ public class NutritionRule {
     @Column(name = "age_max")
     Integer ageMax;
 
-    // Tag món ăn dùng cho comparator IN_SET/NOT_IN_SET khi targetType = FOOD_TAG
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(
-            name = "nutrition_rule_food_tags",
-            joinColumns = @JoinColumn(
-                    name = "rule_id",
-                    foreignKey = @ForeignKey(name = "fk_rule_food_tags_rule")
-            )
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "nutrition_rule_tag_map",
+            joinColumns = @JoinColumn(name = "rule_id",
+                    foreignKey = @ForeignKey(name = "fk_rule_tag_rule")),
+            inverseJoinColumns = @JoinColumn(name = "tag_id",
+                    foreignKey = @ForeignKey(name = "fk_rule_tag_tag"))
     )
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tag_code", nullable = false, length = 128)
     @Builder.Default
-    Set<FoodTag> foodTags = new HashSet<>();
+    Set<Tag> tags = new HashSet<>();
 
     @Column(name = "message", nullable = false, length = 1000)
     String message;

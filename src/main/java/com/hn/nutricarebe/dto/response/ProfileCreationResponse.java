@@ -29,5 +29,4 @@ public class ProfileCreationResponse {
     Integer targetDurationWeeks;
     Instant createdAt;
     Instant updatedAt;
-
 }

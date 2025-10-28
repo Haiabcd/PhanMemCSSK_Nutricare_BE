@@ -1,6 +1,6 @@
 package com.hn.nutricarebe.dto.request;
 
-import com.hn.nutricarebe.enums.FoodTag;
+import com.hn.nutricarebe.entity.Tag;
 import com.hn.nutricarebe.enums.MealSlot;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -52,7 +52,7 @@ public class FoodCreationRequest {
     Set<MealSlot> mealSlots = new HashSet<>();
 
     @Builder.Default
-    Set<FoodTag> tags= new HashSet<>();
+    Set<Tag> tags= new HashSet<>();
 
     @NotNull(message = "Ảnh món ăn là bắt buộc")
     MultipartFile image;

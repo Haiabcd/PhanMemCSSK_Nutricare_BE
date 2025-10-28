@@ -19,12 +19,10 @@ public interface FoodMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-
     @Mapping(target = "ingredients", ignore = true)
     @Mapping(target = "savedByUsers", ignore = true)
     @Mapping(target = "loggedByUsers", ignore = true)
     @Mapping(target = "inMealPlanItems", ignore = true)
-    @Mapping(target = "createdBy", ignore = true)
     Food toFood(FoodCreationRequest req);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
@@ -42,11 +40,10 @@ public interface FoodMapper {
         }
     }
 
-    // Nếu bạn có CdnHelper là bean/context:
     @Mapping(target = "imageUrl", expression = "java(cdnHelper.buildUrl(food.getImageKey()))")
     @Mapping(target = "tags",
             expression = "java(food.getTags() != null ? " +
-                    "food.getTags().stream().map(Enum::name).collect(Collectors.toSet()) : " +
+                    "food.getTags().stream().map(t -> t.getNameCode()).collect(Collectors.toSet()) : " +
                     "Collections.emptySet())")
     @Mapping(target = "mealSlots",
             expression = "java(food.getMealSlots() != null ? new HashSet<>(food.getMealSlots()) : Collections.emptySet())")
