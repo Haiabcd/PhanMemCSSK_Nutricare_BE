@@ -1,9 +1,7 @@
 package com.hn.nutricarebe.service;
 
-import com.hn.nutricarebe.dto.ai.CreationRuleAI;
-import com.hn.nutricarebe.dto.ai.NutritionRuleAI;
-import com.hn.nutricarebe.dto.ai.SuggestionAI;
-import com.hn.nutricarebe.dto.ai.TagCreationRequest;
+import com.google.genai.errors.ClientException;
+import com.hn.nutricarebe.dto.ai.*;
 import com.hn.nutricarebe.entity.Nutrition;
 import com.hn.nutricarebe.enums.RuleScope;
 import com.hn.nutricarebe.enums.TargetType;
@@ -133,6 +131,17 @@ NGOÀI PHẠM VI & AN TOÀN
    5) ageMin≤ageMax nếu cả hai có.
    6) Nếu nhiều rule chỉ khác về tag/message → gộp (union tag, message đại diện).
    """;
+    private static final String VISION_SYSTEM_PROMPT = """
+   Bạn là chuyên gia ẩm thực NutriCare, PHÂN TÍCH ẢNH MÓN ĂN VIỆT NAM.
+   YÊU CẦU ĐẦU RA (BẮT BUỘC):
+   - TRẢ LỜI 100% BẰNG TIẾNG VIỆT.
+   - Chỉ trả về JSON hợp lệ theo DTO DishVisionResult (không kèm giải thích, không markdown).
+   - Phải có: dishName (tên món, tiếng Việt, ≤60 ký tự; nếu không chắc thì ước đoán gần nhất).
+   - Dinh dưỡng là CHO 1 KHẨU PHẦN; đủ: kcal, proteinG, carbG, fatG, fiberG, sodiumMg, sugarMg.
+   - servingName ngắn gọn (“phần”, “bát”, “đĩa”, “ly”…); servingGram nếu ước tính được (gram).
+   - ingredients: 5–12 nguyên liệu TÊN TIẾNG VIỆT; mỗi item { name, amount (số), unit (GRAM|ML) }.
+   - Nếu không chắc, vẫn phải ước tính hợp lý theo nguồn uy tín của Việt Nam; KHÔNG để null các trường dinh dưỡng.
+   """;
 
     public ChatService(ChatClient.Builder builder,
                        JdbcChatMemoryRepository jdbcChatMemoryRepository,
@@ -146,7 +155,7 @@ NGOÀI PHẠM VI & AN TOÀN
 
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
                 .chatMemoryRepository(jdbcChatMemoryRepository)
-                .maxMessages(30)
+                .maxMessages(15)
                 .build();
 
         chatClient = builder
@@ -175,14 +184,18 @@ NGOÀI PHẠM VI & AN TOÀN
                 .system(NUTRICARE_SYSTEM_PROMPT)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId));
 
+        String safeMsg = (message != null && !message.isBlank())
+                ? message
+                : "Phân tích ảnh/trao đổi theo hướng dẫn hệ thống.";
+
         if (file != null && !file.isEmpty() && file.getContentType() != null) {
             var media = Media.builder()
                     .mimeType(MimeTypeUtils.parseMimeType(file.getContentType()))
                     .data(file.getResource())
                     .build();
-            prompt .user(u -> u.media(media).text(message));
+            prompt.user(u -> u.media(media).text(safeMsg));
         } else {
-            prompt .user(message);
+            prompt .user(safeMsg);
         }
         return prompt .call().content();
     }
@@ -254,7 +267,58 @@ NGOÀI PHẠM VI & AN TOÀN
         nutritionRuleService.saveRules(request, rules);
     }
 
+
+    public DishVisionResult analyzeDishFromImage(MultipartFile image, String hint) {
+        if (image == null || image.isEmpty() || image.getContentType() == null) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED);
+        }
+
+        ChatOptions opts = ChatOptions.builder()
+                .temperature(0D)
+                .build();
+
+        var media = Media.builder()
+                .mimeType(MimeTypeUtils.parseMimeType(image.getContentType()))
+                .data(image.getResource())
+                .build();
+
+        String userText = (hint != null && !hint.isBlank())
+                ? "Gợi ý: " + hint + "\nHãy trả JSON DishVisionResult."
+                : "Phân tích ảnh món ăn và trả JSON DishVisionResult.";
+        try {
+            DishVisionResult result = chatClient
+                    .prompt()
+                    .options(opts)
+                    .system(VISION_SYSTEM_PROMPT)
+                    .user(u -> u.text(userText).media(media))
+                    .call()
+                    .entity(new ParameterizedTypeReference<>() {});
+            ensureNutritionFields(result);
+            ensureDishName(result, hint);
+            return result;
+        } catch (ClientException ex) {
+            if (ex.getMessage() != null && ex.getMessage().contains("429")) {
+                throw new AppException(ErrorCode.AI_SERVICE_ERROR);
+            }
+            throw ex;
+        }
+    }
+
+
     //==========================HELPER========================================//
+    private void ensureDishName(DishVisionResult r, String hint) {
+        if (r == null) return;
+        String name = (r.getDishName() == null) ? "" : r.getDishName().trim();
+        if (!name.isEmpty()) return;
+        if (hint != null && !hint.isBlank()) {
+            r.setDishName(hint.trim());
+            return;
+        }
+        // Fallback cuối
+        r.setDishName("Món ăn không rõ");
+    }
+
+
     private void normalizeFoodTags(NutritionRuleAI r) {
         if (r.getTargetType() != TargetType.FOOD_TAG) {
             if (r.getFoodTags() != null) r.getFoodTags().clear();
@@ -310,6 +374,21 @@ NGOÀI PHẠM VI & AN TOÀN
                 .replaceAll("_+", "_")              // gộp _
                 .replaceAll("^_|_$", "")            // bỏ _ đầu/cuối
                 .toLowerCase();
+    }
+
+    private void ensureNutritionFields(DishVisionResult r) {
+        if( r == null) return;
+        if (r.getNutrition() == null) {
+            r.setNutrition(new Nutrition());
+        }
+        Nutrition n = r.getNutrition();
+        if (n.getKcal() == null) n.setKcal(java.math.BigDecimal.ZERO);
+        if (n.getProteinG() == null) n.setProteinG(java.math.BigDecimal.ZERO);
+        if (n.getCarbG() == null) n.setCarbG(java.math.BigDecimal.ZERO);
+        if (n.getFatG() == null) n.setFatG(java.math.BigDecimal.ZERO);
+        if (n.getFiberG() == null) n.setFiberG(java.math.BigDecimal.ZERO);
+        if (n.getSodiumMg() == null) n.setSodiumMg(java.math.BigDecimal.ZERO);
+        if (n.getSugarMg() == null) n.setSugarMg(java.math.BigDecimal.ZERO);
     }
 
 }

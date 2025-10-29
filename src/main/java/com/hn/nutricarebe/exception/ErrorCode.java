@@ -62,7 +62,10 @@ public enum ErrorCode {
     MEAL_PLAN_ITEM_USED(10002, "Món ăn trong kế hoạch đã được sử dụng", HttpStatus.BAD_REQUEST),
 
     THIRD_PARTY_ERROR(10005, "LogMeal: missing imageId", HttpStatus.BAD_REQUEST),
-    PROVIDER_ALREADY_LINKED(11001, "Tài khoản google đã được liên kết với tài khoản khác", HttpStatus.CONFLICT)
+    PROVIDER_ALREADY_LINKED(11001, "Tài khoản google đã được liên kết với tài khoản khác", HttpStatus.CONFLICT),
+    CONVERSION_REQUIRES_DENSITY(11002,"Không thể quy đổi giữa khối lượng và thể tích khi thiếu mật độ (density).", HttpStatus.BAD_REQUEST),
+    AI_SERVICE_ERROR(12001, "AI đang quá tải. Vui lòng thử lại sau ít phút.", HttpStatus.INTERNAL_SERVER_ERROR),
+
     ;
     int code;
     String message;

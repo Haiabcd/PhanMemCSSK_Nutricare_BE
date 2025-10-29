@@ -49,20 +49,23 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
         userConditionRepository.findByUser_Id(userId)
                 .forEach(uc -> conditionIds.add(uc.getCondition().getId()));
         Set<UUID> allergyIds = new HashSet<>();
-
         userAllergyRepository.findByUser_Id(userId)
                 .forEach(ua -> allergyIds.add(ua.getAllergy().getId()));
-
-        return nutritionRuleRepository.findActiveByConditionsOrAllergies(
-                conditionIds, allergyIds, conditionIds.isEmpty(), allergyIds.isEmpty()
-        );
+        Set<NutritionRule> result = new LinkedHashSet<>();
+        if (!conditionIds.isEmpty()) {
+            result.addAll(nutritionRuleRepository.findByActiveTrueAndCondition_IdIn(conditionIds));
+        }
+        if (!allergyIds.isEmpty()) {
+            result.addAll(nutritionRuleRepository.findByActiveTrueAndAllergy_IdIn(allergyIds));
+        }
+        return new ArrayList<>(result);
     }
 
     @Override
     @Transactional
     public void saveRules(CreationRuleAI request, List<NutritionRuleAI> rules) {
         if (rules == null || rules.isEmpty()) return;
-        List<NutritionRule> saveList = new ArrayList<>();;
+        List<NutritionRule> saveList = new ArrayList<>();
         for (NutritionRuleAI ruleAI : rules) {
             Set<Tag> tags = new HashSet<>();
             if(ruleAI.getTargetType() == TargetType.FOOD_TAG){
@@ -81,7 +84,7 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
                 if(ruleAI.getFoodTags() != null && !ruleAI.getFoodTags().isEmpty()){
                     Set<Tag> existingTags = tagRepository.findByNameCodeInIgnoreCase(ruleAI.getFoodTags());
                     tags.addAll(existingTags);
-                };
+                }
             }
             NutritionRule creationRequest = NutritionRule.builder()
                     .allergy(request.getAllergyId() != null ?

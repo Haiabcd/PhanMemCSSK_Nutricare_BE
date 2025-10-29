@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.controller;
 
 import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
+import com.hn.nutricarebe.dto.request.PlanLogScanRequest;
 import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
@@ -78,6 +79,16 @@ public class MealLogController {
         return ApiResponse.<KcalWarningResponse>builder()
                 .message("Ghi log thủ công thành công")
                 .data(logService.savePlanLog_Manual(request))
+                .build();
+    }
+
+    @PostMapping("/save/scan")
+    public ApiResponse<KcalWarningResponse> createScan(
+            @Valid @RequestBody PlanLogScanRequest request
+    ) {
+        return ApiResponse.<KcalWarningResponse>builder()
+                .message("Ghi log scan thành công")
+                .data(logService.savePlanLog_Scan(request))
                 .build();
     }
 

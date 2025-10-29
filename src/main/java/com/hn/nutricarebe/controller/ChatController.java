@@ -1,14 +1,14 @@
 package com.hn.nutricarebe.controller;
 
-import com.hn.nutricarebe.dto.ai.CreationRuleAI;
-import com.hn.nutricarebe.dto.ai.NutritionRuleAI;
-import com.hn.nutricarebe.dto.ai.SuggestionAI;
-import com.hn.nutricarebe.dto.ai.ChatRequest;
+import com.hn.nutricarebe.dto.ai.*;
 import com.hn.nutricarebe.service.ChatService;
+import com.hn.nutricarebe.service.IngredientService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -19,6 +19,7 @@ import java.util.List;
 @RequestMapping("/ai")
 public class ChatController {
     ChatService chatService;
+    IngredientService ingredientService;
 
 
     @PostMapping("/chat")
@@ -34,5 +35,16 @@ public class ChatController {
     @PostMapping("/add-rule")
     void addRule(@RequestBody CreationRuleAI request) {
         chatService.addRule(request);
+    }
+
+
+    @PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public NutritionAudit audit(
+            @RequestParam("image") MultipartFile image,
+            @RequestParam(value = "hint", required = false) String hint,
+            @RequestParam(value = "strict", defaultValue = "false") boolean strict
+    ) {
+        DishVisionResult vision = chatService.analyzeDishFromImage(image, hint);
+        return ingredientService.audit(vision, strict);
     }
 }

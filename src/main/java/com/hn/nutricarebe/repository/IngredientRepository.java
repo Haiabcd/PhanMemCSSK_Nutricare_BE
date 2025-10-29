@@ -54,4 +54,10 @@ public interface IngredientRepository extends JpaRepository<Ingredient, UUID> {
             nativeQuery = true
     )
     Page<Ingredient> searchByNameOrAlias(@Param("kw") String keyword, Pageable pageable);
+
+
+    Optional<Ingredient> findByNameIgnoreCase(String name);
+
+    @Query("select i from Ingredient i join i.aliases a where lower(a) = lower(:alias)")
+    Optional<Ingredient> findByAliasIgnoreCase(@Param("alias") String alias);
 }
