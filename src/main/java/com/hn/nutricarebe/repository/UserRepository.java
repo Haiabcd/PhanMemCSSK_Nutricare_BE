@@ -12,4 +12,5 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findTopByDeviceIdAndStatusOrderByCreatedAtDesc(String deviceId, UserStatus status);
     Optional<User> findByProviderUserId(String providerUserId);
+    Optional<User> findByUsernameIgnoreCase(String username);
 }

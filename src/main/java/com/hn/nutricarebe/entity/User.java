@@ -21,13 +21,11 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "users")
-@ToString
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, name = "id")
      UUID id;
-
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, name = "role")
@@ -48,6 +46,12 @@ public class User {
 
     @Column(name = "device_id")
     String deviceId;
+
+    @Column(name = "username", unique = true)
+    String username;
+
+    @Column(name = "password_hash")
+    String passwordHash;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")

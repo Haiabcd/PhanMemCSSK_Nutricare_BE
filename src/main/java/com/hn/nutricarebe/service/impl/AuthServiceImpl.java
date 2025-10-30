@@ -1,9 +1,6 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
-import com.hn.nutricarebe.dto.request.OnboardingRequest;
-import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
-import com.hn.nutricarebe.dto.request.UserConditionCreationRequest;
+import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.entity.Profile;
 import com.hn.nutricarebe.entity.RefreshToken;
@@ -32,6 +29,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -122,11 +121,8 @@ public class AuthServiceImpl implements AuthService {
         );
 
         //B6: Tạo token
-        String familyId = UUID.randomUUID().toString();
-
         String access  = createAccessToken(savedUser);
-        String refresh = createRefreshToken(savedUser, familyId);
-
+        String refresh = createRefreshToken(savedUser, UUID.randomUUID().toString());
         long accessExp = getClaims(parseJwt(access)).getExpirationTime().toInstant().getEpochSecond();
         long refreshExp = getClaims(parseJwt(refresh)).getExpirationTime().toInstant().getEpochSecond();
 
@@ -150,7 +146,7 @@ public class AuthServiceImpl implements AuthService {
 
     //============================ Auth GG ============================//
     @Override
-    public Map<String, String> startGoogleOAuth(String device) {
+    public Map<String, String> startGoogleOAuth(String device,Boolean upgrade) {
         String myState = UUID.randomUUID().toString();
         //BKCE
         String verifier = PkceUtil.generateCodeVerifier();
@@ -160,14 +156,16 @@ public class AuthServiceImpl implements AuthService {
 
         // Tạo url callback
         String redirectToWithAppState = UriComponentsBuilder
-                .fromHttpUrl(CALLBACK_URL)
+                .fromUriString(CALLBACK_URL)
                 .queryParam("app_state", myState)
                 .queryParam("device", device)
+                .queryParam("upgrade", upgrade)
                 .build(true)
                 .toUriString();
 
         URI authorize = UriComponentsBuilder
-                .fromHttpUrl(SUPABASE_HOST + "/auth/v1/authorize")
+                .fromUriString(SUPABASE_HOST)
+                .path("/auth/v1/authorize")
                 .queryParam("provider", "google")
                 .queryParam("redirect_to", redirectToWithAppState)
                 .queryParam("code_challenge", challenge)  // Mã bảo mật (khóa công khai)
@@ -216,7 +214,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public GoogleCallbackResponse googleCallback(String code, String state,String device) {
+    public GoogleCallbackResponse googleCallback(String code, String state,String device, Boolean upgrade) {
         String verifier = pkceStore.consume(state);
         if (verifier == null) {
             throw new AppException(ErrorCode.INVALID_OR_EXPIRED_STATE);
@@ -239,7 +237,7 @@ public class AuthServiceImpl implements AuthService {
         }
         User user = userRepository.findByProviderUserId(gp.getProviderUserId()).orElse(null);
 
-        AuthFlowOutcome outcome = null;
+        AuthFlowOutcome outcome;
         String familyId = UUID.randomUUID().toString();
         String access = null;
         String refresh = null;
@@ -250,13 +248,12 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             Optional<User> userDevice = userRepository.findTopByDeviceIdAndStatusOrderByCreatedAtDesc(device, UserStatus.ACTIVE);
             if(userDevice.isPresent() && userDevice.get().getRole() == Role.GUEST){
+                user = new User();
                 user.setRole(Role.USER);
                 user.setProviderUserId(gp.getProviderUserId());
                 user.setProvider(Provider.SUPABASE_GOOGLE);
                 user.setStatus(UserStatus.ACTIVE);
-                if ((user.getDeviceId() == null || user.getDeviceId().isBlank()) && device != null && !device.isBlank()) {
-                    user.setDeviceId(device);
-                }
+                user.setDeviceId(null);
                 if (user.getEmail() == null || user.getEmail().isBlank() || user.getEmail().equalsIgnoreCase(gp.getEmail())) {
                     user.setEmail((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null);
                 }
@@ -268,7 +265,7 @@ public class AuthServiceImpl implements AuthService {
                 outcome = AuthFlowOutcome.GUEST_UPGRADE;
             }else{
                 user = User.builder()
-                        .deviceId((device != null && !device.isBlank()) ? device : null)
+                        .deviceId(null)
                         .email((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null)
                         .providerUserId(gp.getProviderUserId())
                         .provider(Provider.SUPABASE_GOOGLE)
@@ -279,7 +276,7 @@ public class AuthServiceImpl implements AuthService {
                 outcome = AuthFlowOutcome.FIRST_TIME_GOOGLE;
             }
         } else {
-            if(user.getRole() == Role.USER && !user.getDeviceId().equals(device)) {
+            if(user.getRole() == Role.USER && upgrade == Boolean.FALSE) {
                 Profile profile = profileRepository.findByUser_Id(user.getId()).orElse(null);
                 if (profile != null) {
                     outcome = AuthFlowOutcome.RETURNING_GOOGLE;
@@ -291,12 +288,11 @@ public class AuthServiceImpl implements AuthService {
                 } else {
                     outcome = AuthFlowOutcome.FIRST_TIME_GOOGLE;
                 }
-            }else if(user.getRole() == Role.USER && user.getDeviceId().equals(device)){
+            }else{
                 throw new AppException(ErrorCode.PROVIDER_ALREADY_LINKED);
             }
         }
         userService.saveGG(user);
-
         TokenPairResponse tokenPair = TokenPairResponse.builder()
                 .tokenType("Bearer")
                 .accessToken(access)
@@ -397,6 +393,30 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenService.saveAll(List.of(token));
     }
     //============================ Logout ============================//
+
+    @Override
+    public AdminLoginResponse authenticate(AdminLoginRequest request){
+        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
+        var user = userRepository.findByUsernameIgnoreCase(request.getUsername())
+                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+
+        boolean authenticated = passwordEncoder.matches(request.getPasswordHash(), user.getPasswordHash());
+
+        if (!authenticated)
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        String familyId = UUID.randomUUID().toString();
+        String access  = createAccessToken(user);
+        String refresh = createRefreshToken(user, familyId);
+        long accessExp = getClaims(parseJwt(access)).getExpirationTime().toInstant().getEpochSecond();
+        long refreshExp = getClaims(parseJwt(refresh)).getExpirationTime().toInstant().getEpochSecond();
+
+        return AdminLoginResponse.builder()
+                        .accessToken(access)
+                        .accessExpiresAt(accessExp)
+                        .refreshToken(refresh)
+                        .refreshExpiresAt(refreshExp)
+                        .build();
+    }
 
 
     /* ------------------------- Helper methods -------------------------*/
