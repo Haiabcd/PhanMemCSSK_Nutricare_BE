@@ -23,4 +23,12 @@ public interface UserAllergyRepository extends JpaRepository<UserAllergy, UUID> 
     @Modifying
     @Query("delete from UserAllergy ua where ua.user.id = :userId and ua.allergy.id in :allergyIds")
     void deleteByUserIdAndAllergyIdIn(UUID userId, Collection<UUID> allergyIds);
+
+    @Query("""
+        SELECT ua.allergy.name AS name, COUNT(ua) AS total
+        FROM UserAllergy ua
+        GROUP BY ua.allergy.name
+        ORDER BY COUNT(ua) DESC
+    """)
+    List<Object[]> findTopAllergyNames();
 }

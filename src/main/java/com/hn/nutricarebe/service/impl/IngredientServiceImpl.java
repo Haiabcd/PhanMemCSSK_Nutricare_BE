@@ -147,5 +147,17 @@ public class IngredientServiceImpl implements IngredientService {
                 .map(i -> ingredientMapper.toIngredientResponse(i, cdnHelper))
                 .toList();
     }
+
+    // Đếm tổng số nguyên liệu
+    @Override
+    public long countIngredients() {
+        return ingredientRepository.count();
     }
+
+    // Đếm số nguyên liệu mới trong tuần này
+    @Override
+    public long countNewIngredientsThisWeek() {
+        return ingredientRepository.countNewThisWeek();
+    }
+}
 

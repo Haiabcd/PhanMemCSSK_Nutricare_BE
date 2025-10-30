@@ -16,4 +16,6 @@ public interface IngredientService {
     public Slice<IngredientResponse> getAll(Pageable pageable);
     public Slice<IngredientResponse> searchByName(String q, Pageable pageable);
     List<IngredientResponse> autocompleteIngredients(String keyword, int limit);
+    long countIngredients();
+    long countNewIngredientsThisWeek();
 }

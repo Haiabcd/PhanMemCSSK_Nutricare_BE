@@ -4,6 +4,7 @@ import com.hn.nutricarebe.dto.response.DailyNutritionDto;
 import com.hn.nutricarebe.dto.response.DateSlotProjection;
 import com.hn.nutricarebe.dto.response.TopFoodDto;
 import com.hn.nutricarebe.entity.PlanLog;
+import com.hn.nutricarebe.enums.LogSource;
 import com.hn.nutricarebe.enums.MealSlot;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -79,4 +80,33 @@ public interface PlanLogRepository extends JpaRepository<PlanLog, UUID> {
             @Param("start") LocalDate start,
             @Param("end") LocalDate end
     );
+
+    long countBySource(LogSource source);
+
+    // Đếm số log theo mealSlot và source
+    @Query("SELECT p.mealSlot, COUNT(p) " +
+            "FROM PlanLog p " +
+            "WHERE p.source = :source " +
+            "GROUP BY p.mealSlot")
+    List<Object[]> countByMealSlotAndSource(@Param("source") LogSource source);
+
+    // Tìm các món ăn được ghi log nhiều nhất theo nguồn
+    @Query("""
+        SELECT p.nameFood AS name, COUNT(p) AS count
+        FROM PlanLog p
+        WHERE p.source = :source AND p.nameFood IS NOT NULL
+        GROUP BY p.nameFood
+        ORDER BY COUNT(p) DESC
+    """)
+    List<Object[]> findTopFoodsBySource(@Param("source") LogSource source);
+
+    // Tìm 15 người dùng có số log nhiều nhất
+    @Query("""
+        SELECT p.user.profile.name AS name, COUNT(p) AS count
+        FROM PlanLog p
+        WHERE p.user.profile.name IS NOT NULL
+        GROUP BY p.user.profile.name
+        ORDER BY COUNT(p) DESC
+    """)
+    List<Object[]> findTopUsersByLogCount();
 }

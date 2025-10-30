@@ -68,4 +68,9 @@ public class ConditionServiceImpl implements ConditionService {
         Slice<Condition> slice = conditionRepository.findByNameContainingIgnoreCase(q, pageable);
         return slice.map(conditionMapper::toConditionResponse);
     }
+
+    // Đếm toàn bộ bệnh nền
+    public long getTotalConditions() {
+        return conditionRepository.count();
+    }
 }

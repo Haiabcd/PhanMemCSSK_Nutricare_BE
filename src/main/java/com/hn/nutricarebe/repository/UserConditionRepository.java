@@ -22,4 +22,12 @@ public interface UserConditionRepository extends JpaRepository<UserCondition, UU
     @Modifying
     @Query("delete from UserCondition uc where uc.user.id = :userId and uc.condition.id in :conditionIds")
     void deleteByUserIdAndConditionIdIn(UUID userId, Collection<UUID> conditionIds);
+
+    @Query("""
+        SELECT uc.condition.name AS name, COUNT(uc) AS total
+        FROM UserCondition uc
+        GROUP BY uc.condition.name
+        ORDER BY COUNT(uc) DESC
+    """)
+    List<Object[]> findTopConditionNames();
 }

@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.dto.overview.*;
 import com.hn.nutricarebe.dto.request.FoodCreationRequest;
 import com.hn.nutricarebe.dto.request.FoodPatchRequest;
 import com.hn.nutricarebe.dto.response.FoodResponse;
@@ -26,8 +27,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.UUID;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.*;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +42,10 @@ public class FoodServiceImpl implements FoodService {
     UserResolver userResolver;
     S3Service s3Service;
     CdnHelper cdnHelper;
+
+    // Default threshold (có thể đổi tuỳ hệ thống)
+    private static final BigDecimal DEFAULT_HIGH = new BigDecimal("800"); // >800 kcal
+    private static final BigDecimal DEFAULT_LOW  = new BigDecimal("300"); // <300 kcal
 
     // Tạo món ăn mới
     @Override
@@ -207,4 +215,156 @@ public class FoodServiceImpl implements FoodService {
         return input.trim().replaceAll("\\s+", " ");
     }
 
+    @Override
+    public long getTotalFoods() {
+        return foodRepository.count();
+    }
+
+    @Override
+    public List<MonthlyCountDto> getNewFoodsByMonth() {
+        String tz = "Asia/Ho_Chi_Minh";
+        ZoneId zone = ZoneId.of(tz);
+
+        int y = ZonedDateTime.now(zone).getYear();
+
+        // [startOfYear, startOfNextYear) theo TZ
+        LocalDate startDate = LocalDate.of(y, 1, 1);
+        LocalDate endDate   = startDate.plusYears(1);
+
+        Instant start = startDate.atStartOfDay(zone).toInstant();
+        Instant end   = endDate.atStartOfDay(zone).toInstant();
+
+        // Lấy tất cả thời điểm tạo món trong năm
+        List<Instant> times = foodRepository.findCreatedAtBetween(start, end);
+
+        // Đếm theo YearMonth (theo TZ)
+        Map<YearMonth, Long> counter = new HashMap<>();
+        for (Instant t : times) {
+            LocalDate d = t.atZone(zone).toLocalDate();
+            YearMonth ym = YearMonth.from(d);
+            counter.merge(ym, 1L, Long::sum);
+        }
+
+        // Fill đủ 12 tháng
+        List<MonthlyCountDto> result = new ArrayList<>(12);
+        for (int m = 1; m <= 12; m++) {
+            YearMonth ym = YearMonth.of(y, m);
+            long total = counter.getOrDefault(ym, 0L);
+            result.add(new MonthlyCountDto("Tháng " + m, m, total, ym));
+        }
+        return result;
+    }
+
+    // Đếm số món ăn mới trong tuần hiện tại (theo múi giờ VN)
+    @Override
+    public long countNewFoodsInLastWeek() {
+        ZoneId zone = ZoneId.of("Asia/Ho_Chi_Minh");
+
+        // Thời điểm hiện tại theo VN
+        ZonedDateTime now = ZonedDateTime.now(zone);
+
+        // 7 ngày trước
+        ZonedDateTime startOfWeek = now.minusDays(7);
+
+        Instant start = startOfWeek.toInstant();
+        Instant end = now.toInstant();
+
+        return foodRepository.countFoodsCreatedBetween(start, end);
+    }
+
+    // Lấy 10 món ăn có kcal cao nhất
+    @Override
+    public List<FoodTopKcalDto> getTop10HighKcalFoods() {
+        return foodRepository.findTop10FoodsByKcalNative()
+                .stream()
+                .map(row -> new FoodTopKcalDto(
+                        (String) row[0],
+                        row[1] != null ? ((Number) row[1]).doubleValue() : 0.0
+                ))
+                .collect(Collectors.toList());
+    }
+
+    // Lấy 10 món ăn có protein cao nhất
+    @Override
+    public List<FoodTopProteinDto> getTop10HighProteinFoods() {
+        return foodRepository.findTop10FoodsByProteinNative()
+                .stream()
+                .map(row -> new FoodTopProteinDto(
+                        (String) row[0],
+                        row[1] != null ? ((Number) row[1]).doubleValue() : 0.0
+                ))
+                .collect(Collectors.toList());
+    }
+
+
+    // Đếm số món ăn có kcal < 300
+    @Override
+    public Long countFoodsWithLowKcal() {
+        return foodRepository.countFoodsWithLowKcal();
+    }
+
+
+    // Đếm số món ăn có kcal > 800
+    @Override
+    public Long countFoodsWithHighKcal() {
+        return foodRepository.countFoodsWithHighKcal();
+    }
+
+
+    // Đếm số món ăn có đầy đủ 5 nhóm dinh dưỡng chính
+    @Override
+    public long countFoodsWithComplete5() {
+        return foodRepository.countFoodsWithComplete5();
+    }
+
+    // Tỷ lệ hoàn thiện dữ liệu dinh dưỡng (5 chỉ số chính)
+    @Override
+    public double getDataCompletenessRate() {
+        long countFoodsWithComplete5 = countFoodsWithComplete5();
+        long totalFoods = getTotalFoods();
+
+        if (totalFoods == 0) return 0.0;
+
+        double rate = ((double) countFoodsWithComplete5 / totalFoods) * 100.0;
+        return Math.round(rate * 100.0) / 100.0; // làm tròn 2 chữ số thập phân
+    }
+
+    // Thống kê biểu đồ histogram năng lượng món ăn (kcal)
+    @Override
+    public EnergyHistogramDto getEnergyHistogramFixed() {
+        Object row = foodRepository.countEnergyBinsRaw();
+        // native query trả 1 hàng, trong Spring sẽ là Object[] với 8 phần tử
+        Object[] cols = (Object[]) row;
+
+        long b1 = toLong(cols[0]);
+        long b2 = toLong(cols[1]);
+        long b3 = toLong(cols[2]);
+        long b4 = toLong(cols[3]);
+        long b5 = toLong(cols[4]);
+        long b6 = toLong(cols[5]);
+        long b7 = toLong(cols[6]);
+        long missing = toLong(cols[7]);
+
+        List<EnergyBinDto> bins = new ArrayList<>();
+        bins.add(new EnergyBinDto("0–200",     0,    200,   b1));
+        bins.add(new EnergyBinDto("200–400",   200,  400,   b2));
+        bins.add(new EnergyBinDto("400–600",   400,  600,   b3));
+        bins.add(new EnergyBinDto("600–800",   600,  800,   b4));
+        bins.add(new EnergyBinDto("800–1000",  800,  1000,  b5));
+        bins.add(new EnergyBinDto("1000–1200", 1000, 1200,  b6));
+        bins.add(new EnergyBinDto(">1200",     1200, null,  b7));
+        bins.add(new EnergyBinDto("Thiếu kcal", null, null, missing));
+
+        long total = b1 + b2 + b3 + b4 + b5 + b6 + b7 + missing;
+        long max   = Math.max(b1, Math.max(b2, Math.max(b3, Math.max(b4, Math.max(b5, Math.max(b6, Math.max(b7, missing)))))));
+
+        return new EnergyHistogramDto(bins, total, max);
+    }
+
+    private long toLong(Object v) {
+        if (v == null) return 0L;
+        if (v instanceof Number n) return n.longValue();
+        if (v instanceof BigInteger bi) return bi.longValue();
+        return Long.parseLong(v.toString());
+    }
 }
