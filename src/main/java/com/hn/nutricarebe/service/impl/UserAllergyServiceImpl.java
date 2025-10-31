@@ -89,4 +89,24 @@ public class UserAllergyServiceImpl implements UserAllergyService {
         return true;
     }
 
+    public List<Map<String, Object>> getTop5AllergyNames() {
+        List<Object[]> rows = userAllergyRepository.findTopAllergyNames();
+
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (int i = 0; i < Math.min(rows.size(), 5); i++) {
+            Object[] row = rows.get(i);
+            String name = (String) row[0];
+            Long total = (Long) row[1];
+
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("name", name);
+            map.put("total", total);
+
+            result.add(map);
+        }
+
+        return result;
+    }
+
 }

@@ -23,9 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 import static com.hn.nutricarebe.helper.ProfileHelper.*;
 
@@ -170,6 +168,19 @@ public class ProfileServiceImpl implements ProfileService {
                 .build();
     }
 
+    // Thống kê mục tiêu của người dùng
+    @Override
+    public Map<String, Long> getGoalStats() {
+        long gain = profileRepository.countByGoal(GoalType.GAIN);
+        long lose = profileRepository.countByGoal(GoalType.LOSE);
+        long maintain = profileRepository.countByGoal(GoalType.MAINTAIN);
 
+        Map<String, Long> stats = new HashMap<>();
+        stats.put("gain", gain);
+        stats.put("lose", lose);
+        stats.put("maintain", maintain);
+
+        return stats;
+    }
 
 }

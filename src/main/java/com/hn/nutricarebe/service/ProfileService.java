@@ -6,6 +6,7 @@ import com.hn.nutricarebe.dto.request.UpdateRequest;
 import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
 import com.hn.nutricarebe.entity.User;
 
+import java.util.Map;
 import java.util.UUID;
 
 public interface ProfileService {
@@ -14,4 +15,6 @@ public interface ProfileService {
     void updateProfile(UpdateRequest request);
     ProfileCreationRequest findByUserId_request(UUID userId);
     ProfileAI getHealthProfile(UUID userId);
+    ProfileAiDto getHealthProfile(UUID userId);
+    Map<String, Long> getGoalStats();
 }

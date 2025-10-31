@@ -1,5 +1,7 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.dto.overview.FoodLogStatDto;
+import com.hn.nutricarebe.dto.overview.TopUserDto;
 import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
 import com.hn.nutricarebe.dto.request.PlanLogScanRequest;
 import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
@@ -24,6 +26,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import java.time.temporal.ChronoUnit;
@@ -416,6 +420,66 @@ public class PlanLogServiceImpl implements PlanLogService {
         }
         return totalByDate.entrySet().stream()
                 .map(e -> new DayConsumedTotal(e.getKey(), e.getValue()))
+                .toList();
+    }
+
+    @Override
+    public Map<String, Long> getCountBySource() {
+        long manual = logRepository.countBySource(LogSource.MANUAL);
+        long scan = logRepository.countBySource(LogSource.SCAN);
+
+        return Map.of(
+                "manual", manual,
+                "scan", scan
+        );
+    }
+
+    @Override
+    public Map<String, Long> getPlanLogCountByMealSlot() {
+        List<Object[]> rows = logRepository.countByMealSlotAndSource(LogSource.PLAN);
+
+        Map<String, Long> result = new LinkedHashMap<>();
+        // Khởi tạo mặc định 0 cho các bữa
+        for (MealSlot slot : MealSlot.values()) {
+            result.put(slot.name(), 0L);
+        }
+
+        // Ghi đè giá trị có trong DB
+        for (Object[] row : rows) {
+            MealSlot slot = (MealSlot) row[0];
+            Long count = (Long) row[1];
+            result.put(slot.name(), count);
+        }
+
+        return result;
+    }
+
+    // Đếm tổng số log có nguồn từ PLAN
+    @Override
+    public long countLogsFromPlanSource(LogSource source) {
+        return logRepository.countBySource(source);
+    }
+
+    // Lấy top 10 món ăn được ghi log nhiều nhất từ nguồn PLAN
+    @Override
+    public List<FoodLogStatDto> getTop10FoodsFromPlan() {
+        return logRepository.findTopFoodsBySource(LogSource.PLAN)
+                .stream()
+                .map(r -> new FoodLogStatDto((String) r[0], ((Number) r[1]).longValue()))
+                .limit(10)
+                .collect(Collectors.toList());
+    }
+
+    // Lấy top 15 người dùng có số log nhiều nhất
+    @Override
+    public List<TopUserDto> getTopUsersByLogCount() {
+        return logRepository.findTopUsersByLogCount()
+                .stream()
+                .limit(10)
+                .map(row -> new TopUserDto(
+                        (String) row[0],
+                        ((Number) row[1]).longValue()
+                ))
                 .toList();
     }
 }

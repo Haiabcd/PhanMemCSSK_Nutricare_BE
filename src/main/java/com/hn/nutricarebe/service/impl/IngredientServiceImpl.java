@@ -335,7 +335,18 @@ public class IngredientServiceImpl implements IngredientService {
         a.setFiberG(z(a.getFiberG()).add(z(b.getFiberG())));
         a.setSodiumMg(z(a.getSodiumMg()).add(z(b.getSodiumMg())));
         a.setSugarMg(z(a.getSugarMg()).add(z(b.getSugarMg())));
+    // Đếm tổng số nguyên liệu
+    @Override
+    public long countIngredients() {
+        return ingredientRepository.count();
     }
+
+    // Đếm số nguyên liệu mới trong tuần này
+    @Override
+    public long countNewIngredientsThisWeek() {
+        return ingredientRepository.countNewThisWeek();
+    }
+}
 
     private BigDecimal z(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
 

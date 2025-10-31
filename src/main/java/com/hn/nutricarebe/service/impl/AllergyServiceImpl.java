@@ -70,6 +70,11 @@ public class AllergyServiceImpl implements AllergyService {
         return null;
     }
 
+    @Override
+    public long getTotalAllergies() {
+        return allergyRepository.count(); // Đếm tổng số bản ghi trong bảng allergies
+    }
+
 }
 
 

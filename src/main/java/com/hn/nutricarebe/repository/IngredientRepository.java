@@ -60,4 +60,10 @@ public interface IngredientRepository extends JpaRepository<Ingredient, UUID> {
 
     @Query("select i from Ingredient i join i.aliases a where lower(a) = lower(:alias)")
     Optional<Ingredient> findByAliasIgnoreCase(@Param("alias") String alias);
+    @Query(value = """
+        select count(*) 
+        from ingredients 
+        where created_at >= now() - interval '7 days'
+    """, nativeQuery = true)
+    long countNewThisWeek();
 }

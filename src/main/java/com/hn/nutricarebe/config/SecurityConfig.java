@@ -60,6 +60,14 @@ public class SecurityConfig {
             "/allergies/search/**",
             "/allergies/**",
             "/nutrition-rules/**",
+            "/overview",
+            "/overview/clinical",
+            "/overview/users",
+            "/overview/meals",
+            "/overview/nutrition",
+            "/overview/data-quality",
+            "/overview/energy-histogram",
+            "/overview/ingredients",
     };
 
     private final String[] PUBLIC_DELETE_ENDPOINTS = {

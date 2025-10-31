@@ -19,4 +19,6 @@ public interface IngredientService {
     Slice<IngredientResponse> searchByName(String q, Pageable pageable);
     List<IngredientResponse> autocompleteIngredients(String keyword, int limit);
     NutritionAudit audit(DishVisionResult vision, boolean strict);
+    long countIngredients();
+    long countNewIngredientsThisWeek();
 }

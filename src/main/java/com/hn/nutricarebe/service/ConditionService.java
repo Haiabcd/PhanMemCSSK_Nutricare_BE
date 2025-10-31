@@ -12,4 +12,5 @@ public interface ConditionService {
     Slice<ConditionResponse> getAll(Pageable pageable);
     ConditionResponse getById(UUID id);
     Slice<ConditionResponse> searchByName(String name, Pageable pageable);
+    public long getTotalConditions();
 }

@@ -1,10 +1,13 @@
 package com.hn.nutricarebe.service;
 
+import com.hn.nutricarebe.dto.overview.FoodLogStatDto;
+import com.hn.nutricarebe.dto.overview.TopUserDto;
 import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
 import com.hn.nutricarebe.dto.request.PlanLogScanRequest;
 import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.*;
+import com.hn.nutricarebe.enums.LogSource;
 import com.hn.nutricarebe.enums.MealSlot;
 import java.time.LocalDate;
 import java.util.List;
@@ -23,4 +26,9 @@ public interface PlanLogService {
     Map<MealSlot, Map<String, Long>> getMealSlotSummary(UUID userId, LocalDate start, LocalDate end);
     List<DayConsumedTotal> getConsumedTotalsBetween(LocalDate from, LocalDate to, UUID userId);
     KcalWarningResponse savePlanLog_Scan(PlanLogScanRequest req);
+    Map<String, Long> getCountBySource();
+    Map<String, Long> getPlanLogCountByMealSlot();
+    long countLogsFromPlanSource(LogSource source);
+    List<FoodLogStatDto> getTop10FoodsFromPlan();
+    List<TopUserDto> getTopUsersByLogCount();
 }

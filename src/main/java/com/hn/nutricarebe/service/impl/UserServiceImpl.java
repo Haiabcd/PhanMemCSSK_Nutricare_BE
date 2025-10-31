@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.dto.overview.DailyCountDto;
 import com.hn.nutricarebe.dto.response.HeaderResponse;
 import com.hn.nutricarebe.dto.response.InfoResponse;
 import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
@@ -22,7 +23,10 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
+import java.time.*;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
+import java.util.*;
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
@@ -92,4 +96,91 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    @Override
+    public long getTotalUsers() {
+        return userRepository.count();
+    }
+
+
+    @Override
+    public List<DailyCountDto> getNewUsersThisWeek() {
+        String tz = "Asia/Ho_Chi_Minh";
+
+        ZoneId zone = ZoneId.of(tz);
+        ZonedDateTime now = ZonedDateTime.now(zone);
+
+        // Thứ Hai của tuần hiện tại (theo TZ)
+        LocalDate monday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                .toLocalDate();
+        LocalDate endDate = monday.plusDays(7); // [monday, monday+7)
+
+        // Đổi LocalDate -> Instant theo TZ
+        Instant start = monday.atStartOfDay(zone).toInstant();
+        Instant end   = endDate.atStartOfDay(zone).toInstant();
+
+        // Lấy tất cả createdAt trong tuần
+        List<Instant> createdTimes = userRepository.findCreatedAtBetween(start, end);
+
+        // Đếm theo LocalDate (theo TZ)
+        Map<LocalDate, Long> counter = new HashMap<>();
+        for (Instant ts : createdTimes) {
+            LocalDate day = ts.atZone(zone).toLocalDate();
+            counter.merge(day, 1L, Long::sum);
+        }
+
+        // Fill đủ 7 ngày, gán nhãn "Thứ ..."
+        List<DailyCountDto> result = new ArrayList<>(7);
+        for (LocalDate d = monday; d.isBefore(endDate); d = d.plusDays(1)) {
+            long total = counter.getOrDefault(d, 0L);
+            result.add(new DailyCountDto(toVietnameseDayLabel(d.getDayOfWeek()), d, total));
+        }
+        return result;
+    }
+
+    private String toVietnameseDayLabel(DayOfWeek dow) {
+        switch (dow) {
+            case MONDAY:    return "Thứ 2";
+            case TUESDAY:   return "Thứ 3";
+            case WEDNESDAY: return "Thứ 4";
+            case THURSDAY:  return "Thứ 5";
+            case FRIDAY:    return "Thứ 6";
+            case SATURDAY:  return "Thứ 7";
+            case SUNDAY:    return "Chủ nhật";
+            default:        return "N/A";
+        }
+    }
+
+    // Đếm số người dùng mới trong 7 ngày qua
+    @Override
+    public long getNewUsersInLast7Days() {
+        Instant sevenDaysAgo = Instant.now().minus(7, ChronoUnit.DAYS);
+        return userRepository.countUsersCreatedAfter(sevenDaysAgo);
+    }
+
+    // Đếm số người dùng theo vai trò
+    @Override
+    public Map<String, Long> getUserRoleCounts() {
+        long guestCount = userRepository.countByRole(Role.GUEST);
+        long userCount = userRepository.countByRole(Role.USER);
+
+        Map<String, Long> result = new HashMap<>();
+        result.put("guestCount", guestCount);
+        result.put("userCount", userCount);
+
+        return result;
+    }
+
+    //  Đếm số người dùng theo trạng thái
+    @Override
+    public Map<String, Long> countUsersByStatus() {
+        long activeCount = userRepository.countByStatus(UserStatus.ACTIVE);
+        long deletedCount = userRepository.countByStatus(UserStatus.DELETED);
+
+        Map<String, Long> result = new HashMap<>();
+        result.put("active", activeCount);
+        result.put("deleted", deletedCount);
+        result.put("total", activeCount + deletedCount);
+
+        return result;
+    }
 }
