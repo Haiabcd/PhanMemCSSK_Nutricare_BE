@@ -1,10 +1,12 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.dto.ai.ProfileAI;
 import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
 import com.hn.nutricarebe.dto.response.UserAllergyResponse;
 import com.hn.nutricarebe.dto.response.UserConditionResponse;
 import com.hn.nutricarebe.entity.Condition;
+import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.entity.Profile;
 import com.hn.nutricarebe.entity.User;
 import com.hn.nutricarebe.enums.GoalType;
@@ -23,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.*;
 
-import static com.hn.nutricarebe.helper.ProfileHelper.buildGoalText;
+import static com.hn.nutricarebe.helper.ProfileHelper.*;
 
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -35,6 +37,7 @@ public class ProfileServiceImpl implements ProfileService {
     UserAllergyService userAllergyService;
     UserConditionService userConditionService;
     MealPlanDayService mealPlanDayService;
+    NutritionRuleService nutritionRuleService;
 
 
     @Override
@@ -130,31 +133,38 @@ public class ProfileServiceImpl implements ProfileService {
 
 
     @Override
-    public ProfileAiDto getHealthProfile(UUID userId) {
+    public ProfileAI getHealthProfile(UUID userId) {
+        Profile p = profileRepository.findByUser_Id(userId).orElse(null);
+        if (p == null) {
+            return null;
+        }
+
+        List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
+        List<String> messages = rules.stream()
+                .map(NutritionRule::getMessage)
+                .filter(Objects::nonNull)
+                .toList();
+
         List<String> conditions = userConditionService.findByUser_Id(userId)
                 .stream().map(UserConditionResponse::getName).toList();
 
         List<String> allergies = userAllergyService.findByUser_Id(userId)
                 .stream().map(UserAllergyResponse::getName).toList();
 
-        Profile p = profileRepository.findByUser_Id(userId).orElse(null);
-        if (p == null) {
-            return ProfileAiDto.builder()
-                    .conditions(conditions)
-                    .allergies(allergies)
-                    .build();
-        }
         // Tính tuổi từ birthYear
         int currentYear = LocalDate.now().getYear();
         Integer age = (p.getBirthYear() != null) ? currentYear - p.getBirthYear() : null;
 
-        return ProfileAiDto.builder()
+        return ProfileAI.builder()
                 .conditions(conditions)
                 .allergies(allergies)
                 .age(age)
-                .heightCm(p.getHeightCm() != null ? p.getHeightCm().doubleValue() : null)
-                .weightKg(p.getWeightKg() != null ? p.getWeightKg().doubleValue() : null)
+                .heightCm(p.getHeightCm() != null ? p.getHeightCm() : null)
+                .weightKg(p.getWeightKg() != null ? p.getWeightKg() : null)
                 .goal(buildGoalText(p))
+                .activityLevel(buildActivityLevel(p.getActivityLevel()))
+                .gender(buildGenderText(p.getGender()))
+                .nutritionRules(messages)
                 .build();
     }
 

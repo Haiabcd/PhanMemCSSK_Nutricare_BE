@@ -3,6 +3,7 @@ package com.hn.nutricarebe.service.impl;
 import com.hn.nutricarebe.dto.overview.FoodLogStatDto;
 import com.hn.nutricarebe.dto.overview.TopUserDto;
 import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
+import com.hn.nutricarebe.dto.request.PlanLogScanRequest;
 import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
 import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.*;
@@ -193,6 +194,63 @@ public class PlanLogServiceImpl implements PlanLogService {
             status = KcalWarningResponse.Status.OK;
         }
 
+        return KcalWarningResponse.builder()
+                .mealSlot(req.getMealSlot().name())
+                .targetKcal(targetKcal)
+                .actualKcal(actualKcal)
+                .diff(diff)
+                .status(status)
+                .build();
+    }
+
+    @Override
+    public KcalWarningResponse savePlanLog_Scan(PlanLogScanRequest req){
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UUID userId = UUID.fromString(auth.getName());
+        PlanLog log = PlanLog.builder()
+                .user(User.builder().id(userId).build())
+                .date(req.getDate())
+                .mealSlot(req.getMealSlot())
+                .food(null)
+                .nameFood(req.getNameFood())
+                .servingSizeGram(BigDecimal.ZERO)
+                .planItem(null)
+                .source(LogSource.SCAN)
+                .portion(req.getConsumedServings())
+                .actualNutrition(nutritionMapper.toNutrition(req.getTotalNutrition()))
+                .build();
+        log =  logRepository.save(log);
+        if(req.getIngredients() != null){
+            for(PlanLogScanRequest.IngredientEntryDTO ingredientDTO : req.getIngredients()){
+                PlanLogIngredient pli = PlanLogIngredient.builder()
+                        .planLog(log)
+                        .ingredient(Ingredient.builder().id(ingredientDTO.getId()).build())
+                        .quantity(ingredientDTO.getQty())
+                        .build();
+                planLogIngredientRepository.save(pli);
+            }
+        }
+        //Lấy kcal mục tiêu
+        double targetKcal = mealPlanDayService.getMealTargetKcal(userId, req.getMealSlot());
+
+        List<PlanLog> logAllDay = logRepository.findByUser_IdAndDate(userId, req.getDate());
+        NutritionResponse nr =  aggregateActual(logAllDay);
+        double actualKcal = nr.getKcal() != null ? nr.getKcal().doubleValue() : 0.0;
+        // 5. So sánh và trả về cảnh báo
+        double diff = actualKcal - targetKcal;
+        KcalWarningResponse.Status status;
+        if (diff > 50) {
+            mealPlanDayService.updatePlanForOneDay(req.getDate(), userId);
+            status = KcalWarningResponse.Status.OVER;
+        } else if (diff < -50) {
+            mealPlanDayService.updatePlanForOneDay(req.getDate(), userId);
+            status = KcalWarningResponse.Status.UNDER;
+        } else {
+            status = KcalWarningResponse.Status.OK;
+        }
         return KcalWarningResponse.builder()
                 .mealSlot(req.getMealSlot().name())
                 .targetKcal(targetKcal)

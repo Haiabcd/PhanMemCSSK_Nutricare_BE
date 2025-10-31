@@ -4,10 +4,7 @@ package com.hn.nutricarebe.helper;
 import com.hn.nutricarebe.dto.TagDirectives;
 import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
 import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
-import com.hn.nutricarebe.entity.Food;
-import com.hn.nutricarebe.entity.Nutrition;
-import com.hn.nutricarebe.entity.NutritionRule;
-import com.hn.nutricarebe.entity.Tag;
+import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -46,6 +43,11 @@ public final class MealPlanHelper {
     }
 
     public static String safeStr(String s){ return s==null? "" : s.trim(); }
+
+    //trả về giá trị nhỏ hơn (ưu tiên an toàn cho chất cần hạn chế)
+    public static BigDecimal minOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.min(b); }
+    //trả về giá trị lớn hơn (ưu tiên đảm bảo cho chất cần thiết)
+    public static BigDecimal maxOf(BigDecimal a, BigDecimal b){ if (a==null) return b; if (b==null) return a; return a.max(b); }
 
     //Tính TDEE
     public static double caculateTDEE(ProfileCreationRequest profile) {
@@ -102,7 +104,6 @@ public final class MealPlanHelper {
         boolean ageOk = (min == null || age >= min) && (max == null || age <= max);
         return genderOk && ageOk;
     }
-
 
 
     // Lấy tập tag của món, tránh null
@@ -250,4 +251,200 @@ public final class MealPlanHelper {
         return OptionalDouble.empty();
     }
     /* ===== CHỌN KHẨU PHẦN ===== */
+
+
+    /* ===== TÍNH DINH DƯỠNG NGÀY ===== */
+    public static  AggregateConstraints deriveAggregateConstraintsFromRules(List<NutritionRule> rules, int weightKg) {
+        AggregateConstraints a = new AggregateConstraints();
+
+        for (NutritionRule r : rules) {
+            if (r.getScope() != RuleScope.DAY) continue;
+            if (r.getTargetType() != TargetType.NUTRIENT) continue;
+            if (r.getComparator() == null) continue;
+
+            String code = safeStr(r.getTargetCode()).toUpperCase();
+            BigDecimal min = r.getThresholdMin();
+            BigDecimal max = r.getThresholdMax();
+
+            // Quy đổi perKg → gram/day
+            if (Boolean.TRUE.equals(r.getPerKg())) {
+                if (min != null) min = min.multiply(BigDecimal.valueOf(weightKg));
+                if (max != null) max = max.multiply(BigDecimal.valueOf(weightKg));
+            }
+
+            switch (code) {
+                case "PROTEIN" -> applyBoundsToPair( r.getComparator(), min, max,
+                        v -> a.dayProteinMin = maxOf(a.dayProteinMin, v),
+                        v -> a.dayProteinMax = minOf(a.dayProteinMax, v));
+
+                case "CARB" -> applyBoundsToPair( r.getComparator(), min, max,
+                        v -> a.dayCarbMin = maxOf(a.dayCarbMin, v),
+                        v -> a.dayCarbMax = minOf(a.dayCarbMax, v));
+
+                case "FAT" -> applyBoundsToPair( r.getComparator(), min, max,
+                        v -> a.dayFatMin = maxOf(a.dayFatMin, v),
+                        v -> a.dayFatMax = minOf(a.dayFatMax, v));
+
+                case "FIBER" -> applyBoundsToPair( r.getComparator(), min, max,
+                        v -> a.dayFiberMin = maxOf(a.dayFiberMin, v),
+                        v -> a.dayFiberMax = minOf(a.dayFiberMax, v));
+
+                case "SODIUM" -> applyBoundsToPair( r.getComparator(), min, max,
+                        v -> {},
+                        v -> a.daySodiumMax = minOf(a.daySodiumMax, v));
+
+                case "SUGAR" -> applyBoundsToPair( r.getComparator(), min, max,
+                        v -> {},
+                        v -> a.daySugarMax = minOf(a.daySugarMax, v));
+
+                case "WATER" -> applyBoundsToPair( r.getComparator(), min, max,
+                        v -> a.dayWaterMin = maxOf(a.dayWaterMin, v),
+                        v -> { /* thường không giới hạn trên với nước */ });
+                default -> { /* bỏ qua nutrient không hỗ trợ */ }
+            }
+        }
+        return a;
+    }
+
+    public static void applyBoundsToPair(
+            com.hn.nutricarebe.enums.Comparator op,
+            BigDecimal min,
+            BigDecimal max,
+            java.util.function.Consumer<BigDecimal> setMin,
+            java.util.function.Consumer<BigDecimal> setMax
+    ) {
+        switch (op) {
+            case LT, LTE -> { if (max != null) setMax.accept(max); }
+            case GT, GTE -> { if (min != null) setMin.accept(min); }
+            case EQ      -> {
+                if (min != null) setMin.accept(min);
+                if (min != null) setMax.accept(min);
+            }
+            case BETWEEN -> {
+                if (min != null) setMin.accept(min);
+                if (max != null) setMax.accept(max);
+            }
+            default -> {}
+        }
+    }
+
+    //Tính kcal mục tiêu / ngày
+    public static double calculateTargetKcal(double tdee, ProfileCreationRequest profile) {
+        final double MAX_DAILY_ADJ   = 1000.0;    // ±1000 kcal/ngày
+        final double MIN_KCAL_FEMALE = 1200.0;
+        final double MIN_KCAL_MALE   = 1500.0;
+
+        Integer deltaKg = profile.getTargetWeightDeltaKg();
+        Integer weeks   = profile.getTargetDurationWeeks();
+
+        double dailyAdj = 0.0;  // Số kcal cần tăng/giảm mỗi ngày
+        boolean hasDelta = (deltaKg != null && deltaKg != 0) && (weeks != null && weeks > 0);
+        if (hasDelta && profile.getGoal() != GoalType.MAINTAIN) {
+            dailyAdj = (deltaKg * 7700.0) / (weeks * 7.0);
+            dailyAdj = Math.max(-MAX_DAILY_ADJ, Math.min(MAX_DAILY_ADJ, dailyAdj));
+        }
+
+        // Nếu MAINTAIN, bỏ qua delta
+        double targetCalories = (profile.getGoal() == GoalType.MAINTAIN) ? tdee : (tdee + dailyAdj);
+
+        // Mức kcal tối thiểu theo giới tính
+        targetCalories = (profile.getGender() == Gender.MALE)
+                ? Math.max(MIN_KCAL_MALE, targetCalories)
+                : Math.max(MIN_KCAL_FEMALE, targetCalories);
+        return targetCalories;
+    }
+
+    //Tính nutrtion cho ngày
+    public static Nutrition caculateNutrition(ProfileCreationRequest profile,AggregateConstraints agg){
+        final double FAT_PCT = 0.30;              // WHO: chat beo ≤30%
+        final double FREE_SUGAR_PCT_MAX = 0.10;   // WHO: <10%
+        final int    SODIUM_MG_LIMIT = 2000;      // WHO: <2000 mg natri/ngày
+
+        int weight = Math.max(1, profile.getWeightKg());
+
+        //1) Tính TDEE
+        double tdee = caculateTDEE(profile);
+
+        //2) Tính kcal mục tiêu / ngày
+        double targetCalories = calculateTargetKcal(tdee, profile);
+
+        //3.1) Protein (Đạm) theo g/kg
+        double proteinPerKg = switch (profile.getGoal()) {
+            case MAINTAIN -> 0.8;
+            case LOSE     -> 1.0;
+            case GAIN     -> 1.2;
+        };
+        double proteinG = weight * proteinPerKg;
+        double proteinKcal = proteinG * 4.0;
+
+        //3.2) Fat: 30% năng lượng (NẾU BÉO PHÌ NHỎ HƠN 30%)
+        double fatKcal = targetCalories * FAT_PCT;
+        double fatG = fatKcal / 9.0;
+
+        //3.3) Carb = phần còn lại
+        double carbKcal = Math.max(0.0, targetCalories - proteinKcal - fatKcal);
+        double carbG = carbKcal / 4.0;
+
+        //3.4) Fiber: tối thiểu 25g (nâng theo 14g/1000kcal nếu cần)
+        double fiberG = Math.max(25.0, 14.0 * (targetCalories / 1000.0));
+
+        //3.5) Free sugar trần <10% năng lượng → g → mg
+        double sugarGMax = (targetCalories * FREE_SUGAR_PCT_MAX) / 4.0;
+        double sugarMg = sugarGMax * 1000.0;
+
+        // Target dinh dưỡng ngày
+        Nutrition target = Nutrition.builder()
+                .kcal(bd(targetCalories, 2))
+                .proteinG(bd(proteinG, 2))
+                .carbG(bd(carbG, 2))
+                .fatG(bd(fatG, 2))
+                .fiberG(bd(fiberG, 2))
+                .sodiumMg(bd(SODIUM_MG_LIMIT, 2))
+                .sugarMg(bd(sugarMg, 2))
+                .build();
+
+        return applyAggregateConstraintsToDayTarget(target, agg);
+    }
+
+    public static Nutrition applyAggregateConstraintsToDayTarget(Nutrition target, AggregateConstraints a) {
+        BigDecimal protein = target.getProteinG();
+        BigDecimal carb    = target.getCarbG();
+        BigDecimal fat     = target.getFatG();
+        BigDecimal fiber   = target.getFiberG();
+        BigDecimal sodium  = target.getSodiumMg();
+        BigDecimal sugar   = target.getSugarMg();
+
+
+        // Protein (g/day)
+        if (a.dayProteinMin != null && protein != null && protein.compareTo(a.dayProteinMin) < 0) protein = a.dayProteinMin;
+        if (a.dayProteinMax != null && protein != null && protein.compareTo(a.dayProteinMax) > 0) protein = a.dayProteinMax;
+
+        // Carb
+        if (a.dayCarbMin != null && carb != null && carb.compareTo(a.dayCarbMin) < 0) carb = a.dayCarbMin;
+        if (a.dayCarbMax != null && carb != null && carb.compareTo(a.dayCarbMax) > 0) carb = a.dayCarbMax;
+
+        // Fat
+        if (a.dayFatMin != null && fat != null && fat.compareTo(a.dayFatMin) < 0) fat = a.dayFatMin;
+        if (a.dayFatMax != null && fat != null && fat.compareTo(a.dayFatMax) > 0) fat = a.dayFatMax;
+
+        // Fiber
+        if (a.dayFiberMin != null && fiber != null && fiber.compareTo(a.dayFiberMin) < 0) fiber = a.dayFiberMin;
+        if (a.dayFiberMax != null && fiber != null && fiber.compareTo(a.dayFiberMax) > 0) fiber = a.dayFiberMax;
+
+        // Sodium (mg/day)
+        if (a.daySodiumMax != null && sodium != null && sodium.compareTo(a.daySodiumMax) > 0) sodium = a.daySodiumMax;
+
+        // Sugar (mg/day)
+        if (a.daySugarMax != null && sugar != null && sugar.compareTo(a.daySugarMax) > 0) sugar = a.daySugarMax;
+
+        return Nutrition.builder()
+                .kcal(target.getKcal())
+                .proteinG(protein)
+                .carbG(carb)
+                .fatG(fat)
+                .fiberG(fiber)
+                .sodiumMg(sodium)
+                .sugarMg(sugar)
+                .build();
+    }
 }

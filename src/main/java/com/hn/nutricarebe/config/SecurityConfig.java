@@ -5,9 +5,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
@@ -23,6 +26,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final String[] PUBLIC_POST_ENDPOINTS = {
@@ -36,6 +40,7 @@ public class SecurityConfig {
             "/nutrition-rules/save",
             "/auths/refresh",
             "/auths/logout",
+            "/auths/login",
     };
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
@@ -69,7 +74,8 @@ public class SecurityConfig {
             "/foods/**",
             "/ingredients/**",
             "/conditions/**",
-            "/allergies/**"
+            "/allergies/**",
+
     };
 
     private final String[] PUBLIC_PATCH_ENDPOINTS = {
@@ -165,5 +171,10 @@ public class SecurityConfig {
 
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(withIssuer, typeIsAccess));
         return decoder;
+    }
+
+    @Bean
+    PasswordEncoder passwordEncoder(){
+        return new BCryptPasswordEncoder(10);
     }
 }

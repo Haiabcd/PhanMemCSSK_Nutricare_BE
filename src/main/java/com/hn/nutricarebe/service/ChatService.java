@@ -1,14 +1,13 @@
 package com.hn.nutricarebe.service;
 
-import com.hn.nutricarebe.dto.ai.CreationRuleAI;
-import com.hn.nutricarebe.dto.ai.NutritionRuleAI;
-import com.hn.nutricarebe.dto.ai.SuggestionAI;
-import com.hn.nutricarebe.dto.ai.TagCreationRequest;
+import com.google.genai.errors.ClientException;
+import com.hn.nutricarebe.dto.ai.*;
 import com.hn.nutricarebe.entity.Nutrition;
-import com.hn.nutricarebe.entity.Tag;
 import com.hn.nutricarebe.enums.RuleScope;
 import com.hn.nutricarebe.enums.TargetType;
-import com.hn.nutricarebe.repository.TagRepository;
+import com.hn.nutricarebe.exception.AppException;
+import com.hn.nutricarebe.exception.ErrorCode;
+import com.hn.nutricarebe.service.tools.MealPlanTool;
 import com.hn.nutricarebe.service.tools.ProfileTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -18,31 +17,87 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.memory.repository.jdbc.JdbcChatMemoryRepository;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
     private final ChatClient chatClient;
-    private final JdbcChatMemoryRepository jdbcChatMemoryRepository;
     private final TagService tagService;
     private final NutritionRuleService nutritionRuleService;
 
 
     // === SYSTEM PROMPT NGẮN + HƯỚNG DẪN GỌI TOOL ===
     private static final String NUTRICARE_SYSTEM_PROMPT = """
-    Bạn là NutriCare Assistant – trợ lý dinh dưỡng.
-    Luôn dùng đơn vị: kcal, proteinG, carbG, fatG, fiberG, sodiumMg, sugarMg.
-    Khi cần dữ liệu hồ sơ, HÃY GỌI tool getProfileSummary() và THỰC THI tool; KHÔNG in ra mã hoặc 'tool_code'.
-    Nếu thiếu dữ liệu quan trọng, hỏi 1–2 câu ngắn rồi mới đề xuất chi tiết.
-    """;
+Bạn là NutriCare Assistant – trợ lý dinh dưỡng trong hệ thống NutriCare.
+
+PHONG CÁCH & MỤC TIÊU
+- Giọng điệu: THÂN THIỆN, TÔN TRỌNG, CHUYÊN MÔN, ngắn gọn – dễ hiểu – hữu ích.
+- Ưu tiên sự hài lòng người dùng: đề xuất rõ ràng, dễ hành động, có tùy chọn thay thế.
+- Khi THIẾU hoặc MƠ HỒ dữ liệu (ví dụ: mục tiêu, dị ứng, sở thích, giới hạn thời gian nấu, ngân sách…):
+  → HỎI LẠI TỐI ĐA 1–2 CÂU NGẮN, rồi tiếp tục xử lý.
+- Khi sinh kế hoạch hoặc đề xuất quan trọng:
+  → TÓM TẮT NGẮN (≤5 câu) + HỎI XÁC NHẬN “Bạn muốn giữ như thế hay đổi món X/Y?”.
+- Luôn lịch sự mời người dùng góp ý để cải thiện ở vòng sau.
+
+QUY TẮC BẮT BUỘC (DỮ LIỆU & TOOL)
+- KHÔNG bịa dữ liệu. Chỉ dùng profile/rules/foods từ tool.
+- Đơn vị bắt buộc: kcal, proteinG, carbG, fatG, fiberG, sodiumMg, sugarMg.
+- Khi cần hồ sơ/demographics/targets/rules/foods:
+  1) Gọi và THỰC THI:
+     - getProfileSummary() để lấy hồ sơ tóm tắt, hoặc
+     - createMealPlanningContext(days=?, overrides=?, foodsLimit=40, foodsCursor="0", slot=?, keyword=?)
+       → nhận: effectiveProfile, dailyTargets (kèm water), rules, foods (trang đầu), slotKcalPct, slotItemCounts.
+  2) Nếu danh sách món chưa đủ, gọi tiếp:
+     - getFoodsPage(limit=40, cursor=nextCursor, slot=?, keyword=?)
+  2a) Khi đã biết slotKcal và avg kcal per item:
+     - ƯU TIÊN gọi getFoodsCandidatesByKcalWindow(slot, perItemTargetKcal, 0.5, 2.0, 80)
+       để lấy pool ứng viên đúng “cửa sổ kcal” cho bữa đó.
+- Hỏi BMI → calcBmi(overrideWeightKg?, overrideHeightCm?).
+- Hỏi mục tiêu ngày/nước/macro → getDailyTargets(overrides?).
+
+KẾ HOẠCH ĂN – ĐẦU RA XEM TRƯỚC (KHÔNG COMMIT DB)
+- Trả JSON preview theo schema:
+{
+  "days": <int>,
+  "plan": [
+    {
+      "date": "YYYY-MM-DD",
+      "slots": {
+        "BREAKFAST": [ {"foodId":"<UUID>","portion":1.0}, ... ],
+        "LUNCH":     [ ... ],
+        "DINNER":    [ ... ],
+        "SNACK":     [ ... ]
+      }
+    }
+  ],
+  "notes": "≤5 câu nhận xét/giải thích ngắn"
+}
+- portion ∈ {1.5, 1.0, 0.5}. Giữ SLOT_ITEM_COUNTS & tránh trùng món trong 3 ngày.
+- Tôn trọng rules AVOID/LIMIT/PREFER. Không chọn món thiếu nutrition bắt buộc (kcal/proteinG/carbG/fatG) nếu cần tính macro.
+- Sau khi trả JSON preview: HỎI XÁC NHẬN (giữ/đổi món/đổi slot/tăng-giảm khẩu phần).
+
+GIẢI THÍCH & TƯ VẤN
+- Khi người dùng yêu cầu giải thích: mô tả ngắn gọn cách tính (TDEE, target kcal, phân bổ theo slot), nêu các ràng buộc rule quan trọng (ví dụ hạn chế sodium/sugar), KHÔNG bịa số liệu thiếu.
+- Khi người dùng muốn ĐỔI MÓN: tính perItemTargetKcal cho slot, gọi getFoodsCandidatesByKcalWindow để đề xuất 2–3 lựa chọn thay thế phù hợp macro/rules, kèm khẩu phần {1.5,1.0,0.5}.
+
+NGOÀI PHẠM VI & AN TOÀN
+- Câu hỏi không liên quan đến dinh dưỡng/kế hoạch ăn/foods/profile/rules của hệ thống:
+  → Lịch sự từ chối: “Mình đang hỗ trợ dinh dưỡng trong NutriCare nên không thể tư vấn chủ đề này.”
+- Nội dung y khoa (chẩn đoán bệnh, điều trị, thuốc) vượt quá dữ liệu hồ sơ & rule:
+  → Đưa khuyến cáo chung, TRÁNH kết luận y khoa, khuyên gặp bác sĩ/chuyên gia dinh dưỡng.
+- Nếu thiếu dữ liệu trọng yếu để đảm bảo an toàn (dị ứng/bệnh nền…):
+  → HỎI LẠI NGẮN GỌN trước khi đề xuất.
+""";
+
+
     private static final String DISH_COPYWRITER_SYSTEM_PROMPT = """
    Bạn là copywriter ẩm thực của NutriCare. Viết mô tả món ăn NGẮN GỌN, THÂN THIỆN, dễ hiểu cho người Việt.
    QUY TẮC:
@@ -76,37 +131,47 @@ public class ChatService {
    5) ageMin≤ageMax nếu cả hai có.
    6) Nếu nhiều rule chỉ khác về tag/message → gộp (union tag, message đại diện).
    """;
+    private static final String VISION_SYSTEM_PROMPT = """
+   Bạn là chuyên gia ẩm thực NutriCare, PHÂN TÍCH ẢNH MÓN ĂN VIỆT NAM.
+   YÊU CẦU ĐẦU RA (BẮT BUỘC):
+   - TRẢ LỜI 100% BẰNG TIẾNG VIỆT.
+   - Chỉ trả về JSON hợp lệ theo DTO DishVisionResult (không kèm giải thích, không markdown).
+   - Phải có: dishName (tên món, tiếng Việt, ≤60 ký tự; nếu không chắc thì ước đoán gần nhất).
+   - Dinh dưỡng là CHO 1 KHẨU PHẦN; đủ: kcal, proteinG, carbG, fatG, fiberG, sodiumMg, sugarMg.
+   - servingName ngắn gọn (“phần”, “bát”, “đĩa”, “ly”…); servingGram nếu ước tính được (gram).
+   - ingredients: 5–12 nguyên liệu TÊN TIẾNG VIỆT; mỗi item { name, amount (số), unit (GRAM|ML) }.
+   - Nếu không chắc, vẫn phải ước tính hợp lý theo nguồn uy tín của Việt Nam; KHÔNG để null các trường dinh dưỡng.
+   """;
 
     public ChatService(ChatClient.Builder builder,
                        JdbcChatMemoryRepository jdbcChatMemoryRepository,
                        ProfileTool profileTool,
                        TagService tagService,
-                       NutritionRuleService nutritionRuleService
+                       NutritionRuleService nutritionRuleService,
+                       MealPlanTool mealPlanTool
     ) {
-        this.jdbcChatMemoryRepository = jdbcChatMemoryRepository;
         this.tagService = tagService;
         this.nutritionRuleService = nutritionRuleService;
 
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
                 .chatMemoryRepository(jdbcChatMemoryRepository)
-                .maxMessages(30)
+                .maxMessages(15)
                 .build();
 
         chatClient = builder
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .defaultTools(profileTool) //Đăng ký tool
+                .defaultTools(profileTool, mealPlanTool) //Đăng ký tool
                 .build();
     }
 
 
     public String chat(MultipartFile file, String message) {
-//        var auth = SecurityContextHolder.getContext().getAuthentication();
-//        if (auth == null || !auth.isAuthenticated()) {
-//            throw new AppException(ErrorCode.UNAUTHORIZED);
-//        }
-//        UUID userId = UUID.fromString(auth.getName());
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UUID userId = UUID.fromString(auth.getName());
 
-        UUID userId = UUID.fromString("6b2df221-c835-47b7-a527-43c40acbd0df");
         String conversationId =  userId.toString();
 
         ChatOptions chatOptions = ChatOptions.builder()
@@ -119,18 +184,21 @@ public class ChatService {
                 .system(NUTRICARE_SYSTEM_PROMPT)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId));
 
+        String safeMsg = (message != null && !message.isBlank())
+                ? message
+                : "Phân tích ảnh/trao đổi theo hướng dẫn hệ thống.";
+
         if (file != null && !file.isEmpty() && file.getContentType() != null) {
             var media = Media.builder()
                     .mimeType(MimeTypeUtils.parseMimeType(file.getContentType()))
                     .data(file.getResource())
                     .build();
-            prompt .user(u -> u.media(media).text(message));
+            prompt.user(u -> u.media(media).text(safeMsg));
         } else {
-            prompt .user(message);
+            prompt .user(safeMsg);
         }
         return prompt .call().content();
     }
-
 
     public String writeDishDescription(SuggestionAI request) {
 
@@ -190,13 +258,64 @@ public class ChatService {
                 .prompt(prompt)
                 .options(chatOptions)
                 .call()
-                .entity(new ParameterizedTypeReference<List<NutritionRuleAI>>() {});
+                .entity(new ParameterizedTypeReference<>() {});
         if (rules == null) rules = List.of();
 
         for (NutritionRuleAI r : rules) {
             normalizeFoodTags(r);
         }
         nutritionRuleService.saveRules(request, rules);
+    }
+
+
+    public DishVisionResult analyzeDishFromImage(MultipartFile image, String hint) {
+        if (image == null || image.isEmpty() || image.getContentType() == null) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED);
+        }
+
+        ChatOptions opts = ChatOptions.builder()
+                .temperature(0D)
+                .build();
+
+        var media = Media.builder()
+                .mimeType(MimeTypeUtils.parseMimeType(image.getContentType()))
+                .data(image.getResource())
+                .build();
+
+        String userText = (hint != null && !hint.isBlank())
+                ? "Gợi ý: " + hint + "\nHãy trả JSON DishVisionResult."
+                : "Phân tích ảnh món ăn và trả JSON DishVisionResult.";
+        try {
+            DishVisionResult result = chatClient
+                    .prompt()
+                    .options(opts)
+                    .system(VISION_SYSTEM_PROMPT)
+                    .user(u -> u.text(userText).media(media))
+                    .call()
+                    .entity(new ParameterizedTypeReference<>() {});
+            ensureNutritionFields(result);
+            ensureDishName(result, hint);
+            return result;
+        } catch (ClientException ex) {
+            if (ex.getMessage() != null && ex.getMessage().contains("429")) {
+                throw new AppException(ErrorCode.AI_SERVICE_ERROR);
+            }
+            throw ex;
+        }
+    }
+
+
+    //==========================HELPER========================================//
+    private void ensureDishName(DishVisionResult r, String hint) {
+        if (r == null) return;
+        String name = (r.getDishName() == null) ? "" : r.getDishName().trim();
+        if (!name.isEmpty()) return;
+        if (hint != null && !hint.isBlank()) {
+            r.setDishName(hint.trim());
+            return;
+        }
+        // Fallback cuối
+        r.setDishName("Món ăn không rõ");
     }
 
 
@@ -255,6 +374,21 @@ public class ChatService {
                 .replaceAll("_+", "_")              // gộp _
                 .replaceAll("^_|_$", "")            // bỏ _ đầu/cuối
                 .toLowerCase();
+    }
+
+    private void ensureNutritionFields(DishVisionResult r) {
+        if( r == null) return;
+        if (r.getNutrition() == null) {
+            r.setNutrition(new Nutrition());
+        }
+        Nutrition n = r.getNutrition();
+        if (n.getKcal() == null) n.setKcal(java.math.BigDecimal.ZERO);
+        if (n.getProteinG() == null) n.setProteinG(java.math.BigDecimal.ZERO);
+        if (n.getCarbG() == null) n.setCarbG(java.math.BigDecimal.ZERO);
+        if (n.getFatG() == null) n.setFatG(java.math.BigDecimal.ZERO);
+        if (n.getFiberG() == null) n.setFiberG(java.math.BigDecimal.ZERO);
+        if (n.getSodiumMg() == null) n.setSodiumMg(java.math.BigDecimal.ZERO);
+        if (n.getSugarMg() == null) n.setSugarMg(java.math.BigDecimal.ZERO);
     }
 
 }

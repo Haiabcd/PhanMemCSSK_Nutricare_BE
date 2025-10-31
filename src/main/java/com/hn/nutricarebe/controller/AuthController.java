@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.controller;
 
+import com.hn.nutricarebe.dto.request.AdminLoginRequest;
 import com.hn.nutricarebe.dto.request.OnboardingRequest;
 import com.hn.nutricarebe.dto.request.RefreshRequest;
 import com.hn.nutricarebe.dto.response.*;
@@ -15,11 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -45,10 +44,12 @@ public class AuthController {
 
     // ===========================Google OAuth2================================= //
     @PostMapping("/google/start")
-    public ApiResponse<Map<String, String>> googleStart(@RequestParam(required = false) String device) {
+    public ApiResponse<Map<String, String>> googleStart(@RequestParam(required = false) String device,
+                                                        @RequestParam(required = false) Boolean upgrade
+    ) {
         return ApiResponse.<Map<String, String>>builder()
                 .message("Khởi tạo OAuth với Google thành công")
-                .data(authService.startGoogleOAuth(device))
+                .data(authService.startGoogleOAuth(device, upgrade))
                 .build();
     }
 
@@ -58,6 +59,7 @@ public class AuthController {
             @RequestParam String code,
             @RequestParam("app_state") String appState,
             @RequestParam("device") String device,
+            @RequestParam("upgrade") Boolean upgrade,
             @RequestParam(required = false) String error,
             @RequestParam(name = "error_description", required = false) String errorDesc
     ) {
@@ -70,7 +72,7 @@ public class AuthController {
                 return ResponseEntity.status(HttpStatus.FOUND).location(fail).build();
             }
 
-            GoogleCallbackResponse res = authService.googleCallback(code, appState, device);
+            GoogleCallbackResponse res = authService.googleCallback(code, appState, device, upgrade);
 
             String returnTo = switch (res.getOutcome()) {
                 case FIRST_TIME_GOOGLE -> "nutricare://oauth/first";
@@ -108,7 +110,6 @@ public class AuthController {
     }
 
     // ===========================Google OAuth2================================= //
-
     @PostMapping("/refresh")
     public ApiResponse<TokenPairResponse> refresh(@Valid @RequestBody RefreshRequest req) {
         var tokens = authService.refresh(req.getRefreshToken());
@@ -123,6 +124,15 @@ public class AuthController {
         authService.logout(req.getRefreshToken());
         return ApiResponse.<Void>builder()
                 .message("Đăng xuất thành công")
+                .build();
+    }
+
+
+    @PostMapping("/login")
+    ApiResponse<AdminLoginResponse> authenticate(@RequestBody AdminLoginRequest request){
+        return ApiResponse.<AdminLoginResponse>builder()
+                .message("Đăng nhập admin thành công")
+                .data(authService.authenticate(request))
                 .build();
     }
 

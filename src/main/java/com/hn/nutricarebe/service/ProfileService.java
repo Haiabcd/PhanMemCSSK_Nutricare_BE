@@ -1,6 +1,6 @@
 package com.hn.nutricarebe.service;
 
-import com.hn.nutricarebe.dto.request.ProfileAiDto;
+import com.hn.nutricarebe.dto.ai.ProfileAI;
 import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
 import com.hn.nutricarebe.dto.request.UpdateRequest;
 import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
@@ -14,6 +14,7 @@ public interface ProfileService {
     ProfileCreationResponse findByUserId(UUID userId);
     void updateProfile(UpdateRequest request);
     ProfileCreationRequest findByUserId_request(UUID userId);
+    ProfileAI getHealthProfile(UUID userId);
     ProfileAiDto getHealthProfile(UUID userId);
     Map<String, Long> getGoalStats();
 }

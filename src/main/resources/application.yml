@@ -23,7 +23,7 @@ spring:
     password: "nutricareqdrhd@#$"
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 5
+      maximum-pool-size: 3
       minimum-idle: 1
       connection-timeout: 30000     # 30s
       idle-timeout: 60000
@@ -35,7 +35,6 @@ spring:
       ddl-auto: update
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc.lob.non_contextual_creation: true
     open-in-view: false
@@ -48,11 +47,6 @@ aws:
   s3:
     bucket:
       public: nutricare-public
-
-  cloudfront:
-    domain: dyfgxhmdeg59a.cloudfront.net
-    signing:
-      enabled: false
 cdn:
   base-url: https://dyfgxhmdeg59a.cloudfront.net/
 
@@ -66,10 +60,6 @@ supabase:
   anon-key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3eWVpc2hraXhkY2Zobnp4cHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMDMxMDgsImV4cCI6MjA3MTY3OTEwOH0.E9oUPHv6OmpWXTylXCHSF2ULWxxUM_GBLuPCh3BbOl0"
 oauth:
   callback-url: "http://192.168.110.187:8080/auths/google/callback"
-logmeal:
-  base-url: "https://api.logmeal.com"
-  key: "1c3ca8708971979495ba8e1f4d8df37399afe9f4"
-  algorithm-version: v1.1
 
 logging:
   level:
