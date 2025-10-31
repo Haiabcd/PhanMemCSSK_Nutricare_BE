@@ -1,8 +1,13 @@
 package com.hn.nutricarebe.service;
 
+import com.hn.nutricarebe.dto.overview.EnergyHistogramDto;
+import com.hn.nutricarebe.dto.overview.FoodTopKcalDto;
+import com.hn.nutricarebe.dto.overview.FoodTopProteinDto;
+import com.hn.nutricarebe.dto.overview.MonthlyCountDto;
 import com.hn.nutricarebe.dto.request.FoodCreationRequest;
 import com.hn.nutricarebe.dto.request.FoodPatchRequest;
 import com.hn.nutricarebe.dto.response.FoodResponse;
+import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.enums.MealSlot;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -19,4 +24,14 @@ public interface FoodService {
     Slice<FoodResponse> getAll(Pageable pageable);
     FoodResponse patchUpdate(UUID id, FoodPatchRequest request);
     List<FoodResponse> autocompleteFoods(String keyword, int limit);
+    long getTotalFoods();
+    List<MonthlyCountDto> getNewFoodsByMonth();
+    long countNewFoodsInLastWeek();
+    List<FoodTopKcalDto> getTop10HighKcalFoods();
+    List<FoodTopProteinDto> getTop10HighProteinFoods();
+    EnergyHistogramDto getEnergyHistogramFixed();
+    Long countFoodsWithLowKcal();
+    Long countFoodsWithHighKcal();
+    long countFoodsWithComplete5();
+    double getDataCompletenessRate();
 }

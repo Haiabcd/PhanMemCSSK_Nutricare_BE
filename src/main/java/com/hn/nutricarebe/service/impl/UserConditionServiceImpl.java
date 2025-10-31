@@ -97,5 +97,21 @@ public class UserConditionServiceImpl implements UserConditionService {
         return true;
     }
 
+    @Override
+    public List<Map<String, Object>> getTop5ConditionNames() {
+        List<Object[]> rows = userConditionRepository.findTopConditionNames();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (int i = 0; i < Math.min(rows.size(), 5); i++) {
+            Object[] row = rows.get(i);
+            String name = (String) row[0];
+            Long total = (Long) row[1];
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("name", name);
+            item.put("total", total);
+            result.add(item);
+        }
+        return result;
+    }
+
 }
 

@@ -5,7 +5,6 @@ import com.hn.nutricarebe.dto.response.ConditionResponse;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
-import java.util.List;
 import java.util.UUID;
 
 public interface ConditionService {
@@ -14,4 +13,5 @@ public interface ConditionService {
     public Slice<ConditionResponse> getAll(Pageable pageable);
     public ConditionResponse getById(UUID id);
     public Slice<ConditionResponse> searchByName(String name, Pageable pageable);
+    public long getTotalConditions();
 }

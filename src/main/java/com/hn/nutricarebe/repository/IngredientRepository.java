@@ -54,4 +54,11 @@ public interface IngredientRepository extends JpaRepository<Ingredient, UUID> {
             nativeQuery = true
     )
     Page<Ingredient> searchByNameOrAlias(@Param("kw") String keyword, Pageable pageable);
+
+    @Query(value = """
+        select count(*) 
+        from ingredients 
+        where created_at >= now() - interval '7 days'
+    """, nativeQuery = true)
+    long countNewThisWeek();
 }

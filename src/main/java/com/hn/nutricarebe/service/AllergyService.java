@@ -18,4 +18,5 @@ public interface AllergyService {
     public AllergyResponse getById(UUID id);
     public Slice<AllergyResponse> searchByName(String name, Pageable pageable);
     public AllergyResponse update(UUID id, Allergy allergy);
+    public long getTotalAllergies();
 }
