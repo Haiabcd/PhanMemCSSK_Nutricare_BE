@@ -1,41 +1,50 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.dto.request.AllergyCreationRequest;
+import com.hn.nutricarebe.dto.request.AllergyRequest;
 import com.hn.nutricarebe.dto.response.AllergyResponse;
 import com.hn.nutricarebe.entity.Allergy;
+import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.AllergyMapper;
 import com.hn.nutricarebe.repository.AllergyRepository;
+import com.hn.nutricarebe.repository.NutritionRuleRepository;
 import com.hn.nutricarebe.service.AllergyService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+
+
 
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AllergyServiceImpl implements AllergyService {
     AllergyRepository allergyRepository;
+    NutritionRuleRepository nutritionRuleRepository;
     AllergyMapper allergyMapper;
+
 
     // Tạo mới một dị ứng
     @Override
-    public AllergyResponse save(AllergyCreationRequest request) {
-
-        if (allergyRepository.existsByName(request.getName())) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public void save(AllergyRequest request) {
+        if (allergyRepository.existsByNameIgnoreCase(request.getName().strip())) {
             throw new AppException(ErrorCode.ALLERGY_EXISTED);
         }
-
-        Allergy savedAllergy = allergyRepository.save(allergyMapper.toAllergy(request));
-        return allergyMapper.toAllergyResponse(savedAllergy);
+         allergyRepository.save(allergyMapper.toAllergy(request));
     }
 
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteById(UUID id) {
         Allergy allergy = allergyRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.DELETE_ALLERGY_CONFLICT));
@@ -45,8 +54,19 @@ public class AllergyServiceImpl implements AllergyService {
     // Lấy danh sách tất cả dị ứng
     @Override
     public Slice<AllergyResponse> getAll(Pageable pageable) {
-        Slice<Allergy> allergy = allergyRepository.findAllBy(pageable);
-        return allergy.map(allergyMapper::toAllergyResponse);
+        Slice<Allergy> slice = allergyRepository.findAllBy(pageable);
+        List<Allergy> content = slice.getContent();
+
+        if (content.isEmpty()) {
+            return slice.map(allergyMapper::toAllergyResponse);
+        }
+        Set<UUID> ids = content.stream()
+                .map(Allergy::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndAllergy_IdIn(ids);
+        Map<UUID, List<NutritionRule>> rulesByAllergy = rules.stream()
+                .collect(java.util.stream.Collectors.groupingBy(nr -> nr.getAllergy().getId()));
+        return slice.map(a -> allergyMapper.toAllergyResponse(a, rulesByAllergy));
     }
 
     // Tìm một dị ứng theo id
@@ -66,13 +86,25 @@ public class AllergyServiceImpl implements AllergyService {
     }
 
     @Override
-    public AllergyResponse update(UUID id, Allergy allergy) {
-        return null;
+    @PreAuthorize("hasRole('ADMIN')")
+    public void update(UUID id, AllergyRequest allergy) {
+        Allergy existing = allergyRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
+        if (allergy.getName() != null) {
+            String newName = allergy.getName().trim();
+            if (!newName.equalsIgnoreCase(existing.getName().strip())) {
+                if (allergyRepository.existsByNameIgnoreCase(newName)) {
+                    throw new AppException(ErrorCode.ALLERGY_EXISTED);
+                }
+                existing.setName(newName);
+                allergyRepository.save(existing);
+            }
+        }
     }
 
     @Override
     public long getTotalAllergies() {
-        return allergyRepository.count(); // Đếm tổng số bản ghi trong bảng allergies
+        return allergyRepository.count();
     }
 
 }

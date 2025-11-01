@@ -23,6 +23,8 @@ public interface FoodMapper {
     @Mapping(target = "savedByUsers", ignore = true)
     @Mapping(target = "loggedByUsers", ignore = true)
     @Mapping(target = "inMealPlanItems", ignore = true)
+    @Mapping(target = "isIngredient", ignore = true)
+    @Mapping(target = "tags", ignore = true)
     Food toFood(FoodCreationRequest req);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)

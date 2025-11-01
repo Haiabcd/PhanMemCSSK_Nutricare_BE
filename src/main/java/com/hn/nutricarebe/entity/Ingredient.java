@@ -1,13 +1,11 @@
 package com.hn.nutricarebe.entity;
 
-import com.hn.nutricarebe.enums.IngredientTag;
 import com.hn.nutricarebe.enums.Unit;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -52,25 +50,6 @@ public class Ingredient {
     )
     @Column(name = "alias")
     Set<String> aliases;
-
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(
-            name = "ingredient_tags",
-            joinColumns = @JoinColumn(
-                    name = "ingredient_id",
-                    foreignKey = @ForeignKey(name = "fk_ingredient_tags_ingredients")
-            )
-    )
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tag", nullable = false, length = 50)
-    @Builder.Default
-    Set<IngredientTag> tags = new HashSet<>();
-
-    @Column(name = "serving_name")
-    String servingName;
-
-    @Column(name = "serving_size_gram", precision = 10, scale = 2)
-    BigDecimal servingSizeGram;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "unit", nullable = false)

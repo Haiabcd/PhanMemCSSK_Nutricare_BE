@@ -1,12 +1,14 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.dto.request.ConditionCreationRequest;
+import com.hn.nutricarebe.dto.request.ConditionRequest;
 import com.hn.nutricarebe.dto.response.ConditionResponse;
 import com.hn.nutricarebe.entity.Condition;
+import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ConditionMapper;
 import com.hn.nutricarebe.repository.ConditionRepository;
+import com.hn.nutricarebe.repository.NutritionRuleRepository;
 import com.hn.nutricarebe.service.ConditionService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +16,15 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -25,21 +33,23 @@ import java.util.UUID;
 public class ConditionServiceImpl implements ConditionService {
 
     ConditionRepository conditionRepository;
+    NutritionRuleRepository nutritionRuleRepository;
     ConditionMapper conditionMapper;
 
     // Tạo mới một bệnh nền
     @Override
-    public ConditionResponse save(ConditionCreationRequest request) {
-       if(conditionRepository.existsByName(request.getName())) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public void save(ConditionRequest request) {
+       if(conditionRepository.existsByNameIgnoreCase(request.getName().strip())) {
            throw new AppException(ErrorCode.CONDITION_EXISTED);
        }
-       Condition saveCondition = conditionRepository.save(conditionMapper.toCondition(request));
-       return conditionMapper.toConditionResponse(saveCondition);
+       conditionRepository.save(conditionMapper.toCondition(request));
     }
 
     // Xóa một bệnh nền theo id
     @Override
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteById(UUID id) {
         Condition con = conditionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.DELETE_CONDITION_CONFLICT));
@@ -49,8 +59,18 @@ public class ConditionServiceImpl implements ConditionService {
     // Lấy danh sách tất cả bệnh nền
     @Override
     public Slice<ConditionResponse> getAll(Pageable pageable) {
-        Slice<Condition> conditions = conditionRepository.findAllBy(pageable);
-        return conditions.map(conditionMapper::toConditionResponse);
+        Slice<Condition> slice = conditionRepository.findAllBy(pageable);
+        List<Condition> content = slice.getContent();
+        if (content.isEmpty()) {
+            return slice.map(conditionMapper::toConditionResponse);
+        }
+        Set<UUID> ids = content.stream()
+                .map(Condition::getId)
+                .collect(Collectors.toSet());
+        List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndAllergy_IdIn(ids);
+        Map<UUID, List<NutritionRule>> rulesByCondition = rules.stream()
+                .collect(Collectors.groupingBy(nr -> nr.getCondition().getId()));
+        return slice.map(a -> conditionMapper.toConditionResponse(a, rulesByCondition));
     }
 
     // Tìm một bệnh nền theo id
@@ -70,7 +90,25 @@ public class ConditionServiceImpl implements ConditionService {
     }
 
     // Đếm toàn bộ bệnh nền
+    @Override
     public long getTotalConditions() {
         return conditionRepository.count();
+    }
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    public void update(UUID id, ConditionRequest condition) {
+        Condition existing = conditionRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
+        if (condition.getName() != null) {
+            String newName = condition.getName().trim();
+            if (!newName.equalsIgnoreCase(existing.getName().strip())) {
+                if (conditionRepository.existsByNameIgnoreCase(newName)) {
+                    throw new AppException(ErrorCode.ALLERGY_EXISTED);
+                }
+                existing.setName(newName);
+                conditionRepository.save(existing);
+            }
+        }
     }
 }

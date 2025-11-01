@@ -9,8 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,15 +20,15 @@ public interface IngredientRepository extends JpaRepository<Ingredient, UUID> {
     boolean existsByNameIgnoreCase(String name);
 
     // Lấy nguyên liệu theo ID
-    @EntityGraph(attributePaths = {"aliases", "tags"})
+    @EntityGraph(attributePaths = {"aliases"})
     Optional<Ingredient> findWithCollectionsById(UUID id);
 
     // Lấy tất cả nguyên liệu
-    @EntityGraph(attributePaths = {"aliases", "tags"})
+    @EntityGraph(attributePaths = {"aliases"})
     Slice<Ingredient> findAllBy(Pageable pageable);
 
     // Tìm nguyên liệu theo tên gần đúng
-    @EntityGraph(attributePaths = {"aliases", "tags"})
+    @EntityGraph(attributePaths = {"aliases"})
     Slice<Ingredient> findByNameContainingIgnoreCase(String q, Pageable pageable);
 
     @Query(

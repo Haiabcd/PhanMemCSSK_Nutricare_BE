@@ -3,15 +3,20 @@ package com.hn.nutricarebe.service.impl;
 import com.hn.nutricarebe.dto.overview.*;
 import com.hn.nutricarebe.dto.request.FoodCreationRequest;
 import com.hn.nutricarebe.dto.request.FoodPatchRequest;
+import com.hn.nutricarebe.dto.request.RecipeIngredientCreationRequest;
 import com.hn.nutricarebe.dto.response.FoodResponse;
 import com.hn.nutricarebe.entity.Food;
+import com.hn.nutricarebe.entity.Ingredient;
+import com.hn.nutricarebe.entity.RecipeIngredient;
+import com.hn.nutricarebe.entity.Tag;
 import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.FoodMapper;
-import com.hn.nutricarebe.mapper.UserResolver;
 import com.hn.nutricarebe.repository.FoodRepository;
+import com.hn.nutricarebe.repository.IngredientRepository;
+import com.hn.nutricarebe.repository.TagRepository;
 import com.hn.nutricarebe.service.FoodService;
 import com.hn.nutricarebe.service.S3Service;
 import lombok.AccessLevel;
@@ -26,9 +31,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.*;
 import java.util.*;
@@ -39,19 +42,18 @@ import java.util.stream.Collectors;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class FoodServiceImpl implements FoodService {
     FoodRepository foodRepository;
+    IngredientRepository ingredientRepository;
+    TagRepository tagRepository;
     FoodMapper foodMapper;
-    UserResolver userResolver;
     S3Service s3Service;
     CdnHelper cdnHelper;
 
-    // Default threshold (có thể đổi tuỳ hệ thống)
-    private static final BigDecimal DEFAULT_HIGH = new BigDecimal("800"); // >800 kcal
-    private static final BigDecimal DEFAULT_LOW  = new BigDecimal("300"); // <300 kcal
 
     // Tạo món ăn mới
     @Override
     @Transactional
-    public FoodResponse saveFood(FoodCreationRequest request) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public void saveFood(FoodCreationRequest request) {
         String normalizedName = normalizeName(request.getName());
         if (foodRepository.existsByNameIgnoreCase(normalizedName)) {
             throw new AppException(ErrorCode.FOOD_NAME_EXISTED);
@@ -59,17 +61,42 @@ public class FoodServiceImpl implements FoodService {
         Food food = foodMapper.toFood(request);
         food.setName(normalizedName);
 
+        if (request.getTags() != null && !request.getTags().isEmpty()) {
+            var tagMap = tagRepository.findAllById(request.getTags()).stream()
+                    .collect(Collectors.toMap(Tag::getId, it -> it));
+            for (UUID id : request.getTags()) {
+                Tag tag = tagMap.get(id);
+                food.getTags().add(tag);
+            }
+        }
+        if (request.getIngredients() != null && !request.getIngredients().isEmpty()) {
+            var ingredientIds = request.getIngredients().stream()
+                    .map(RecipeIngredientCreationRequest::getIngredientId)
+                    .collect(Collectors.toSet());
+
+            var ingredientMap = ingredientRepository.findAllById(ingredientIds).stream()
+                    .collect(Collectors.toMap(Ingredient::getId, it -> it));
+
+            for (var riReq : request.getIngredients()) {
+                Ingredient ing = ingredientMap.get(riReq.getIngredientId());
+
+                RecipeIngredient ri = RecipeIngredient.builder()
+                        .food(food)
+                        .ingredient(ing)
+                        .quantity(riReq.getQuantity())
+                        .build();
+                food.getIngredients().add(ri);
+            }
+        }
+        boolean hasIngredients = food.getIngredients() != null && !food.getIngredients().isEmpty();
+        food.setIngredient(hasIngredients);
         String objectKey = null;
         try {
             if (request.getImage() != null && !request.getImage().isEmpty()) {
                 objectKey = s3Service.uploadObject(request.getImage(), "images/foods");
                 food.setImageKey(objectKey);
             }
-            Food saved = foodRepository.save(food);
-            return foodMapper.toFoodResponse(saved, cdnHelper);
-        } catch (DataIntegrityViolationException e) {
-            if (objectKey != null) s3Service.deleteObject(objectKey);
-            throw e;
+            foodRepository.save(food);
         } catch (IOException e) {
             throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
         } catch (RuntimeException e) {
@@ -364,8 +391,12 @@ public class FoodServiceImpl implements FoodService {
 
     private long toLong(Object v) {
         if (v == null) return 0L;
-        if (v instanceof Number n) return n.longValue();
-        if (v instanceof BigInteger bi) return bi.longValue();
-        return Long.parseLong(v.toString());
+        return switch (v) {
+            case BigInteger bi -> bi.longValue();
+            case Number n      -> n.longValue();
+            default            -> Long.parseLong(v.toString());
+        };
     }
+
+
 }

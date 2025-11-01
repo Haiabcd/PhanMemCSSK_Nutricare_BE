@@ -2,8 +2,8 @@ package com.hn.nutricarebe.controller;
 
 
 import com.hn.nutricarebe.dto.request.IngredientCreationRequest;
+import com.hn.nutricarebe.dto.request.IngredientUpdateRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
-import com.hn.nutricarebe.dto.response.FoodResponse;
 import com.hn.nutricarebe.dto.response.IngredientResponse;
 import com.hn.nutricarebe.service.IngredientService;
 import jakarta.validation.Valid;
@@ -14,7 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,10 +30,10 @@ public class IngredientController {
 
     // Tạo nguyên liệu mới
     @PostMapping("/save")
-    public ApiResponse<IngredientResponse> saveIngredient(@Valid @ModelAttribute IngredientCreationRequest request) {
-        return ApiResponse.<IngredientResponse>builder()
+    public ApiResponse<Void> saveIngredient(@Valid @ModelAttribute IngredientCreationRequest request) {
+        ingredientService.saveIngredient(request);
+        return ApiResponse.<Void>builder()
                 .message("Tạo nguyên liệu thành công")
-                .data(ingredientService.saveIngredient(request))
                 .build();
     }
 
@@ -67,19 +67,7 @@ public class IngredientController {
                 .build();
     }
 
-    // Tìm kiếm nguyên liệu theo tên
-    @GetMapping("/search")
-    public ApiResponse<Slice<IngredientResponse>> search(
-            @RequestParam("name") String name,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
-    ) {
-        Slice<IngredientResponse> ing = ingredientService.searchByName(name, pageable);
-        return ApiResponse.<Slice<IngredientResponse>>builder()
-                .message("Tìm kiếm nguyên liệu thành công")
-                .data(ing)
-                .build();
-    }
-
+    // Gợi ý nguyên liệu
     @GetMapping("/autocomplete")
     public ApiResponse<List<IngredientResponse>> autocomplete(
             @RequestParam String keyword,
@@ -88,6 +76,18 @@ public class IngredientController {
         return ApiResponse.<List<IngredientResponse>>builder()
                 .message("Gợi ý món ăn")
                 .data(ingredientService.autocompleteIngredients(keyword, limit))
+                .build();
+    }
+
+    // Cập nhật nguyên liệu
+    @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<Void> updateIngredient(
+            @PathVariable UUID id,
+            @Valid @ModelAttribute IngredientUpdateRequest request
+    ) {
+        ingredientService.updateIngredient(id, request);
+        return ApiResponse.<Void>builder()
+                .message("Cập nhật nguyên liệu thành công")
                 .build();
     }
 }

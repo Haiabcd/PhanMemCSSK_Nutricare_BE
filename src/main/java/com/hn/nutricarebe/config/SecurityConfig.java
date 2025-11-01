@@ -20,62 +20,47 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.*;
-
 import javax.crypto.spec.SecretKeySpec;
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final String[] PUBLIC_POST_ENDPOINTS = {
             "/auths/onboarding",
             "/auths/google/start/**",
-            "/ai/plan",
-            "/foods/save",
-            "/ingredients/save",
-            "/conditions/save",
-            "/allergies/save",
-            "/nutrition-rules/save",
             "/auths/refresh",
             "/auths/logout",
             "/auths/login",
+
+            "/ai/plan",
+            "/nutrition-rules/save",
     };
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
             "/auths/google/callback",
             "/auths/google/redeem",
+            "/ingredients/all",
+            "/ingredients/autocomplete/**",
+
             "/foods/**",
             "/foods/search/**",
             "/foods/autocomplete/**",
-            "/ingredients/**",
-            "/ingredients/autocomplete/**",
             "/foods/all/**",
-            "/ingredients/all/**",
+
             "/conditions/all/**",
-            "/conditions/**",
             "/conditions/search/**",
+
             "/allergies/all/**",
             "/allergies/search/**",
-            "/allergies/**",
+
             "/nutrition-rules/**",
-            "/overview",
-            "/overview/clinical",
-            "/overview/users",
-            "/overview/meals",
-            "/overview/nutrition",
-            "/overview/data-quality",
-            "/overview/energy-histogram",
-            "/overview/ingredients",
     };
 
     private final String[] PUBLIC_DELETE_ENDPOINTS = {
             "/foods/**",
-            "/ingredients/**",
-            "/conditions/**",
-            "/allergies/**",
-
     };
 
     private final String[] PUBLIC_PATCH_ENDPOINTS = {
@@ -137,15 +122,8 @@ public class SecurityConfig {
         return request -> {
             String method = request.getMethod();
             String uri = request.getRequestURI();
-
             // Cho phép preflight
             if ("OPTIONS".equalsIgnoreCase(method)) return null;
-
-            // Bỏ qua token cho POST /foods/save (bất kể có context-path)
-            if ("POST".equalsIgnoreCase(method) && uri.contains("/foods/save")) {
-                return null;
-            }
-
             // Bỏ qua token cho các endpoint public
             if (uri.contains("/auths/")) return null;
 

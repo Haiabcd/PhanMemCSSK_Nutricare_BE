@@ -15,6 +15,5 @@ public interface ProfileService {
     void updateProfile(UpdateRequest request);
     ProfileCreationRequest findByUserId_request(UUID userId);
     ProfileAI getHealthProfile(UUID userId);
-    ProfileAiDto getHealthProfile(UUID userId);
     Map<String, Long> getGoalStats();
 }

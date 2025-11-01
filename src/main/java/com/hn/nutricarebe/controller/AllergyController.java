@@ -1,9 +1,8 @@
 package com.hn.nutricarebe.controller;
 
-import com.hn.nutricarebe.dto.request.AllergyCreationRequest;
+import com.hn.nutricarebe.dto.request.AllergyRequest;
 import com.hn.nutricarebe.dto.response.AllergyResponse;
 import com.hn.nutricarebe.dto.response.ApiResponse;
-import com.hn.nutricarebe.dto.response.ConditionResponse;
 import com.hn.nutricarebe.service.AllergyService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -26,12 +25,11 @@ public class AllergyController {
 
     // Tạo dị ứng
     @PostMapping("/save")
-    public ApiResponse<AllergyResponse> saveAllergy(@Valid @RequestBody AllergyCreationRequest request) {
-        return ApiResponse.<AllergyResponse>builder()
+    public ApiResponse<Void> saveAllergy(@Valid @RequestBody AllergyRequest request) {
+        allergyService.save(request);
+        return ApiResponse.<Void>builder()
                 .message("Tạo dị ứng thành công")
-                .data(allergyService.save(request))
                 .build();
-
     }
 
     // Lấy danh sách dị ứng
@@ -74,6 +72,18 @@ public class AllergyController {
         allergyService.deleteById(id);
         return ApiResponse.<Void>builder()
                 .message("Xoá dị ứng thành công")
+                .build();
+    }
+
+    //Cập nhật dị ứng
+    @PutMapping("/{id}")
+    public ApiResponse<Void> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody AllergyRequest request
+    ) {
+        allergyService.update(id, request);
+        return ApiResponse.<Void>builder()
+                .message("Cập nhật dị ứng thành công")
                 .build();
     }
 }

@@ -66,6 +66,8 @@ public enum ErrorCode {
     CONVERSION_REQUIRES_DENSITY(11002,"Không thể quy đổi giữa khối lượng và thể tích khi thiếu mật độ (density).", HttpStatus.BAD_REQUEST),
     AI_SERVICE_ERROR(12001, "AI đang quá tải. Vui lòng thử lại sau ít phút.", HttpStatus.INTERNAL_SERVER_ERROR),
 
+    USER_NAME_NOT_FOUND(13001, "Tên đăng nhập không đúng", HttpStatus.NOT_FOUND),
+    PASSWORD_INCORRECT(13002, "Mật khẩu không đúng", HttpStatus.UNAUTHORIZED)
     ;
     int code;
     String message;

@@ -1,9 +1,8 @@
 package com.hn.nutricarebe.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.util.List;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -11,10 +10,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class PlanRequest {
-    String userId;
-    int days;
-    Integer mealsPerDay;
-    List<String> focusTags;
-    List<String> avoidTags;
+public class AllergyRequest {
+    @NotBlank(message = "Tên dị ứng không được để trống")
+    String name;
 }

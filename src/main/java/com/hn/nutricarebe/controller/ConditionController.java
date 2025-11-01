@@ -1,11 +1,9 @@
 package com.hn.nutricarebe.controller;
 
-import com.hn.nutricarebe.dto.request.ConditionCreationRequest;
+import com.hn.nutricarebe.dto.request.ConditionRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.ConditionResponse;
-import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.service.ConditionService;
-import com.hn.nutricarebe.service.impl.ConditionServiceImpl;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -14,12 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.ResponseEntity;
-import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -31,10 +24,10 @@ public class ConditionController {
 
     // Tạo bệnh nền
     @PostMapping("/save")
-    public ApiResponse<ConditionResponse> saveCondition(@Valid @RequestBody ConditionCreationRequest request){
-        return ApiResponse.<ConditionResponse>builder()
+    public ApiResponse<Void> saveCondition(@Valid @RequestBody ConditionRequest request){
+        conditionService.save(request);
+        return ApiResponse.<Void>builder()
                 .message("Tạo bệnh nền thành công")
-                .data(conditionService.save(request))
                 .build();
     }
 
@@ -78,6 +71,18 @@ public class ConditionController {
         conditionService.deleteById(id);
         return ApiResponse.<Void>builder()
                 .message("Xoá bệnh nền thành công")
+                .build();
+    }
+
+    //Cập nhật bệnh nền
+    @PutMapping("/{id}")
+    public ApiResponse<Void> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody ConditionRequest request
+    ) {
+        conditionService.update(id, request);
+        return ApiResponse.<Void>builder()
+                .message("Cập nhật bệnh nền thành công")
                 .build();
     }
 }

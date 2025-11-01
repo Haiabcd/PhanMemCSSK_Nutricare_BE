@@ -1,14 +1,16 @@
 package com.hn.nutricarebe.dto.request;
 
-
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.hn.nutricarebe.enums.Unit;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -18,7 +20,7 @@ import java.util.Set;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class IngredientCreationRequest {
+public class IngredientUpdateRequest {
     @NotBlank(message = "Tên nguyên liệu không được để trống")
     String name;
 
@@ -26,7 +28,6 @@ public class IngredientCreationRequest {
     @NotNull(message = "Thông tin dinh dưỡng trên 100g là bắt buộc")
     NutritionRequest per100;
 
-    @NotNull(message = "Ảnh nguyên liệu là bắt buộc")
     MultipartFile image;
 
     @Builder.Default

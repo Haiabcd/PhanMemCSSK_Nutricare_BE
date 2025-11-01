@@ -10,8 +10,6 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-
 
 @RestController
 @RequiredArgsConstructor
@@ -27,7 +25,7 @@ public class ChatController {
         return chatService.chat(request.getFile(),request.getMessage());
     }
 
-    @PostMapping("/suggestion")
+    @PostMapping("/description-suggestion")
     String suggestion(@ModelAttribute SuggestionAI request) {
         return chatService.writeDishDescription(request);
     }

@@ -29,7 +29,6 @@ import java.util.UUID;
 )
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class NutritionRule {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, name = "id")

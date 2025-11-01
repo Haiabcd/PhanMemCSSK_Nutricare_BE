@@ -10,6 +10,7 @@ import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,7 +20,7 @@ import java.util.Map;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
 @Service
-public class OverviewServiceImpl {
+public class OverviewServiceImpl implements OverviewAdminService{
     FoodService foodService;
     UserService userService;
     PlanLogService planLogService;
@@ -31,6 +32,8 @@ public class OverviewServiceImpl {
     IngredientService ingredientService;
 
     // Tổng quan
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public OverviewResponse getOverview() {
         long totalUsers = userService.getTotalUsers();
         long totalFoods = foodService.getTotalFoods();
@@ -50,6 +53,8 @@ public class OverviewServiceImpl {
     }
 
     // Quan ly bệnh nền va di ung
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public ClinicalResponse clinical() {
         List<Map<String, Object>> top5Condition =   userConditionService.getTop5ConditionNames();
         List<Map<String, Object>> top5Allergy =   userAllergyService.getTop5AllergyNames();
@@ -66,6 +71,8 @@ public class OverviewServiceImpl {
     }
 
     // Quan ly nguoi dung
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public UserManageResponse userManage(){
         long totalUsers = userService.getTotalUsers();
         long getNewUsersInLast7Days = userService.getNewUsersInLast7Days();
@@ -85,6 +92,8 @@ public class OverviewServiceImpl {
     }
 
     // quản lý món ăn
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public MealsManageResponse mealsManage(){
         long countNewFoodsInLastWeek = foodService.countNewFoodsInLastWeek();
         long totalFoods = foodService.getTotalFoods();
@@ -104,6 +113,8 @@ public class OverviewServiceImpl {
     }
 
     // quản lý dinh dưỡng
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public NutritionManageResponse nutritionManage(){
         long countFoodsUnder300Kcal = foodService.countFoodsWithLowKcal();
         long countFoodsOver800Kcal = foodService.countFoodsWithHighKcal();
@@ -127,6 +138,8 @@ public class OverviewServiceImpl {
     }
 
     // quản lý nguyên liệu
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public IngredientManageResponse ingredientManage(){
         long countIngredients = ingredientService.countIngredients();
         long countNewIngredientsThisWeek = ingredientService.countNewIngredientsThisWeek();

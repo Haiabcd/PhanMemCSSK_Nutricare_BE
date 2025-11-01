@@ -398,12 +398,13 @@ public class AuthServiceImpl implements AuthService {
     public AdminLoginResponse authenticate(AdminLoginRequest request){
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         var user = userRepository.findByUsernameIgnoreCase(request.getUsername())
-                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NAME_NOT_FOUND));
 
         boolean authenticated = passwordEncoder.matches(request.getPasswordHash(), user.getPasswordHash());
 
         if (!authenticated)
-            throw new AppException(ErrorCode.UNAUTHENTICATED);
+            throw new AppException(ErrorCode.PASSWORD_INCORRECT);
+
         String familyId = UUID.randomUUID().toString();
         String access  = createAccessToken(user);
         String refresh = createRefreshToken(user, familyId);
@@ -411,11 +412,11 @@ public class AuthServiceImpl implements AuthService {
         long refreshExp = getClaims(parseJwt(refresh)).getExpirationTime().toInstant().getEpochSecond();
 
         return AdminLoginResponse.builder()
-                        .accessToken(access)
-                        .accessExpiresAt(accessExp)
-                        .refreshToken(refresh)
-                        .refreshExpiresAt(refreshExp)
-                        .build();
+                .accessToken(access)
+                .accessExpiresAt(accessExp)
+                .refreshToken(refresh)
+                .refreshExpiresAt(refreshExp)
+                .build();
     }
 
 

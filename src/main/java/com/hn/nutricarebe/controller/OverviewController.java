@@ -1,8 +1,7 @@
 package com.hn.nutricarebe.controller;
 
 import com.hn.nutricarebe.dto.overview.*;
-import com.hn.nutricarebe.service.FoodService;
-import com.hn.nutricarebe.service.impl.OverviewServiceImpl;
+import com.hn.nutricarebe.service.OverviewAdminService;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -15,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/overview")
 public class OverviewController {
-    OverviewServiceImpl overviewService;
+    OverviewAdminService overviewService;
 
     /** ====== 1) Tổng quan hệ thống ====== */
     @GetMapping

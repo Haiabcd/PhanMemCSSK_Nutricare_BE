@@ -14,7 +14,6 @@ import java.time.Duration;
 public class CacheConfig {
     @Bean
     public Caffeine<Object, Object> caffeineSpec() {
-        // Hết hạn sau 10 phút, tối đa 200 phần tử trong cache
         return Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofMinutes(10))
                 .maximumSize(200);

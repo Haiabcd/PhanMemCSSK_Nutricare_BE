@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Repository
 public interface ConditionRepository extends JpaRepository<Condition, UUID> {
-    boolean existsByName(String name);
+    boolean existsByNameIgnoreCase(String name);
     Slice<Condition> findAllBy(Pageable pageable);
     Slice<Condition> findByNameContainingIgnoreCase(String name, Pageable pageable);
 }

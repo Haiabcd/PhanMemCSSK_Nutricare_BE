@@ -4,6 +4,7 @@ import com.hn.nutricarebe.dto.ai.DishVisionResult;
 import com.hn.nutricarebe.dto.ai.IngredientBreakdown;
 import com.hn.nutricarebe.dto.ai.NutritionAudit;
 import com.hn.nutricarebe.dto.request.IngredientCreationRequest;
+import com.hn.nutricarebe.dto.request.IngredientUpdateRequest;
 import com.hn.nutricarebe.dto.response.IngredientResponse;
 import com.hn.nutricarebe.entity.Ingredient;
 import com.hn.nutricarebe.entity.Nutrition;
@@ -24,15 +25,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -54,7 +53,8 @@ public class IngredientServiceImpl implements IngredientService {
     // Tạo mới nguyên liệu
     @Override
     @Transactional
-    public IngredientResponse saveIngredient(IngredientCreationRequest request) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public void saveIngredient(IngredientCreationRequest request) {
         String normalizedName = normalizeName(request.getName());
         if (ingredientRepository.existsByNameIgnoreCase(normalizedName)) {
             throw new AppException(ErrorCode.INGREDIENT_NAME_EXISTED);
@@ -68,8 +68,7 @@ public class IngredientServiceImpl implements IngredientService {
                 objectKey = s3Service.uploadObject(request.getImage(), "images/ingredients");
                 i.setImageKey(objectKey);
             }
-            Ingredient saved = ingredientRepository.save(i);
-            return ingredientMapper.toIngredientResponse(saved, cdnHelper);
+            ingredientRepository.save(i);
         } catch (DataIntegrityViolationException e) {
             if (objectKey != null) safeDeleteObject(objectKey);
             throw e;
@@ -90,15 +89,11 @@ public class IngredientServiceImpl implements IngredientService {
         return ingredientMapper.toIngredientResponse(ingredient, cdnHelper);
     }
 
-    // Lấy tất cả nguyên liệu
-    private String normalizeName(String input) {
-        if (input == null) return null;
-        return input.trim().replaceAll("\\s+", " ");
-    }
 
     // Xóa nguyên liệu theo ID
     @Override
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteById(UUID id) {
         Ingredient ing = ingredientRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
@@ -234,6 +229,90 @@ public class IngredientServiceImpl implements IngredientService {
     }
 
 
+    // Đếm tổng số nguyên liệu
+    @Override
+    public long countIngredients() {
+        return ingredientRepository.count();
+    }
+
+    // Đếm số nguyên liệu mới trong tuần này
+    @Override
+    public long countNewIngredientsThisWeek() {
+        return ingredientRepository.countNewThisWeek();
+    }
+
+
+    //Cập nhật nguyên liệu
+    @Override
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
+    public void updateIngredient(UUID id, IngredientUpdateRequest request) {
+        // 1) Tìm bản ghi
+        Ingredient ing = ingredientRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
+        // 2) Chuẩn hoá tên và kiểm tra trùng
+        String normalizedName = normalizeName(request.getName());
+        if (normalizedName == null || normalizedName.isBlank()) {
+            throw new AppException(ErrorCode.NAME_EMPTY);
+        }
+        // Nếu tên thay đổi, kiểm tra trùng với bản ghi khác
+        if (!normalizedName.equalsIgnoreCase(ing.getName())) {
+            ingredientRepository.findByNameIgnoreCase(normalizedName)
+                    .filter(other -> !other.getId().equals(ing.getId()))
+                    .ifPresent(other -> {throw new AppException(ErrorCode.INGREDIENT_NAME_EXISTED); });
+        }
+        // 3) Map per100 (dinh dưỡng trên 100 đơn vị) từ request sang entity
+        Nutrition per100 = new Nutrition();
+        if (request.getPer100() != null) {
+            per100.setKcal(request.getPer100().getKcal());
+            per100.setProteinG(request.getPer100().getProteinG());
+            per100.setCarbG(request.getPer100().getCarbG());
+            per100.setFatG(request.getPer100().getFatG());
+            per100.setFiberG(request.getPer100().getFiberG());
+            per100.setSodiumMg(request.getPer100().getSodiumMg());
+            per100.setSugarMg(request.getPer100().getSugarMg());
+        }
+        // 4) Chuẩn bị cập nhật ảnh (nếu có)
+        String oldKey = ing.getImageKey();
+        String newKey = null;
+        boolean hasNewImage = request.getImage() != null && !request.getImage().isEmpty();
+
+        try {
+            if (hasNewImage) {
+                newKey = s3Service.uploadObject(request.getImage(), "images/ingredients");
+            }
+            // 5) Gán các trường lên entity
+            ing.setName(normalizedName);
+            ing.setPer100(per100);
+            ing.setUnit(request.getUnit() == null ? Unit.G : request.getUnit());
+            Set<String> aliases = request.getAliases() == null ? new HashSet<>() : request.getAliases();
+            ing.setAliases(aliases);
+            if (hasNewImage) {
+                ing.setImageKey(newKey);
+            }
+            // 6) Lưu
+            ingredientRepository.save(ing);
+            // 7) Sau khi lưu thành công, nếu có ảnh mới thì xoá ảnh cũ
+            if (hasNewImage && oldKey != null && !oldKey.isBlank()) {
+                try {
+                    s3Service.deleteObject(oldKey);
+                } catch (RuntimeException e) {
+                    log.warn("Failed to delete old image object: {}", oldKey, e);
+                }
+            }
+        } catch (DataIntegrityViolationException e) {
+            if (hasNewImage && newKey != null) safeDeleteObject(newKey);
+            throw e;
+        } catch (IOException e) {
+            if (hasNewImage && newKey != null) safeDeleteObject(newKey);
+            throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
+        } catch (RuntimeException e) {
+            if (hasNewImage && newKey != null) safeDeleteObject(newKey);
+            throw e;
+        }
+    }
+
+
 
     public Optional<Ingredient> resolveOne(String requestedName) {
         if (requestedName == null || requestedName.isBlank()) return Optional.empty();
@@ -261,10 +340,8 @@ public class IngredientServiceImpl implements IngredientService {
             return CDN_BASE + "/" + key.replaceFirst("^/+", "");
         }
     }
-
     private boolean isMass(Unit u)   { return u == Unit.MG || u == Unit.G; }
     private boolean isVolume(Unit u) { return u == Unit.ML || u == Unit.L; }
-
     /** Chuẩn hóa về G cho khối lượng, ML cho thể tích; rồi đổi hệ nếu cần; cuối cùng đổi sang đơn vị đích. */
     private BigDecimal convert(BigDecimal amount, Unit from, Unit to, boolean allowApproxDensity) {
         if (amount == null) return BigDecimal.ZERO;
@@ -308,7 +385,6 @@ public class IngredientServiceImpl implements IngredientService {
             return amount;
         }
     }
-
     /** per100 là dinh dưỡng trên 100 đơn vị gốc (theo Ingredient.unit).
      *  amountInIngredientUnit là lượng đã quy đổi về đúng đơn vị gốc của Ingredient.
      */
@@ -326,7 +402,6 @@ public class IngredientServiceImpl implements IngredientService {
         n.setSugarMg(z(per100.getSugarMg()).multiply(factor));
         return n;
     }
-
     private void add(Nutrition a, Nutrition b) {
         a.setKcal(z(a.getKcal()).add(z(b.getKcal())));
         a.setProteinG(z(a.getProteinG()).add(z(b.getProteinG())));
@@ -335,25 +410,16 @@ public class IngredientServiceImpl implements IngredientService {
         a.setFiberG(z(a.getFiberG()).add(z(b.getFiberG())));
         a.setSodiumMg(z(a.getSodiumMg()).add(z(b.getSodiumMg())));
         a.setSugarMg(z(a.getSugarMg()).add(z(b.getSugarMg())));
-    // Đếm tổng số nguyên liệu
-    @Override
-    public long countIngredients() {
-        return ingredientRepository.count();
     }
-
-    // Đếm số nguyên liệu mới trong tuần này
-    @Override
-    public long countNewIngredientsThisWeek() {
-        return ingredientRepository.countNewThisWeek();
-    }
-}
-
     private BigDecimal z(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
-
     private void safeDeleteObject(String objectKey) {
         if (objectKey != null) {
             try { s3Service.deleteObject(objectKey); } catch (Exception ignored) {}
         }
+    }
+    private String normalizeName(String input) {
+        if (input == null) return null;
+        return input.trim().replaceAll("\\s+", " ");
     }
 }
 

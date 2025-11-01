@@ -10,7 +10,7 @@ import java.util.UUID;
 
 @Repository
 public interface AllergyRepository extends JpaRepository<Allergy, UUID> {
-    boolean existsByName(String name);
+    boolean existsByNameIgnoreCase(String name);
     Slice<Allergy> findAllBy(Pageable pageable);
     Slice<Allergy> findByNameContainingIgnoreCase(String name, Pageable pageable);
 }

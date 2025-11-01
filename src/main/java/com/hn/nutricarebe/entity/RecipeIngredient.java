@@ -42,9 +42,6 @@ public class RecipeIngredient {
     @Column(name = "quantity", precision = 10, scale = 2)
     BigDecimal quantity;
 
-    @Column(name = "amount", precision = 10, scale = 2)
-    BigDecimal amount;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false)
     Instant createdAt;

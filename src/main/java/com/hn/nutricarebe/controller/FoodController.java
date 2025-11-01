@@ -30,10 +30,10 @@ public class FoodController {
 
     // Tạo món ăn mới
     @PostMapping(value = "/save",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<FoodResponse> createFood(@Valid @ModelAttribute FoodCreationRequest request) {
-        return ApiResponse.<FoodResponse>builder()
+    public ApiResponse<Void> createFood(@Valid @ModelAttribute FoodCreationRequest request) {
+        foodService.saveFood(request);
+        return ApiResponse.<Void>builder()
                 .message("Tạo món ăn thành công")
-                .data(foodService.saveFood(request))
                 .build();
     }
 

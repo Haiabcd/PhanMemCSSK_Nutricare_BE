@@ -35,11 +35,4 @@ public class PlanLogUpdateRequest {
     private NutritionRequest totalNutrition;
 
     private List<PlanLogManualRequest.IngredientEntryDTO> ingredients;
-
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-    public static class IngredientEntryDTO {
-        private UUID id;
-        private BigDecimal qty;
-
-    }
 }

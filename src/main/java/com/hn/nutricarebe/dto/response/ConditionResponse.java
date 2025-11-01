@@ -3,6 +3,8 @@ package com.hn.nutricarebe.dto.response;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -15,4 +17,5 @@ import java.util.UUID;
 public class ConditionResponse {
     UUID id;
     String name;
+    List<NutritionRuleResponse> nutritionRules;
 }
