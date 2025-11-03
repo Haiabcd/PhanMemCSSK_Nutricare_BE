@@ -21,7 +21,7 @@ public interface FoodService {
     Slice<FoodResponse> findByMealSlot(MealSlot mealSlot, Pageable pageable);
     Slice<FoodResponse> searchByName(String name, Pageable pageable);
     Slice<FoodResponse> getAll(Pageable pageable);
-    FoodResponse patchUpdate(UUID id, FoodPatchRequest request);
+    void patchUpdate(UUID id, FoodPatchRequest request);
     List<FoodResponse> autocompleteFoods(String keyword, int limit);
     long getTotalFoods();
     List<MonthlyCountDto> getNewFoodsByMonth();

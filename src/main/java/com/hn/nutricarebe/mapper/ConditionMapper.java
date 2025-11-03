@@ -19,7 +19,10 @@ public interface ConditionMapper {
     ConditionResponse toConditionResponse(Condition condition);
 
     @Mapping(target = "nutritionRules", ignore = true)
-    ConditionResponse toConditionResponse(Condition condition, @Context Map<UUID, List<NutritionRule>> rulesByCondition);
+    ConditionResponse toConditionResponse(Condition condition,
+                                          @Context Map<UUID, List<NutritionRule>> rulesByCondition,
+                                          @Context NutritionRuleMapper ruleMapper
+    );
 
     UserConditionResponse toUserConditionResponse(Condition condition);
 
@@ -27,9 +30,20 @@ public interface ConditionMapper {
     default void fillRules(Condition source,
                            @MappingTarget ConditionResponse target,
                            @Context Map<UUID, List<NutritionRule>> rulesByCondition,
-                           NutritionRuleMapper ruleMapper) {
+                           @Context NutritionRuleMapper ruleMapper) {
         var rules = rulesByCondition.getOrDefault(source.getId(), List.of());
         target.setNutritionRules(ruleMapper.toResponses(rules));
+    }
+
+    @AfterMapping
+    default void fillRulesBuilder(
+            Condition source,
+            @MappingTarget ConditionResponse.ConditionResponseBuilder target,
+            @Context Map<UUID, List<NutritionRule>> rulesByCondition,
+            @Context NutritionRuleMapper ruleMapper
+    ) {
+        var rules = rulesByCondition.getOrDefault(source.getId(), List.of());
+        target.nutritionRules(ruleMapper.toResponses(rules));
     }
 
     @AfterMapping

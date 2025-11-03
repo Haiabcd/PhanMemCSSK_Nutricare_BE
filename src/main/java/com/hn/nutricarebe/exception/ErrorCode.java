@@ -10,7 +10,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
     ALLERGY_EXISTED(1001, "Dị ứng đã tồn tại", HttpStatus.CONFLICT),
     ALLERGY_NOT_FOUND(1002, "Dị ứng không tồn tại", HttpStatus.NOT_FOUND),
-    DELETE_ALLERGY_CONFLICT(1003, "Không thể xóa dị ứng", HttpStatus.CONFLICT),
+    DELETE_ALLERGY_CONFLICT(1003, "Dị ứng đã được gán cho người dùng, không thể xóa.", HttpStatus.CONFLICT),
 
     VALIDATION_FAILED(2001, "Dữ liệu không hợp lệ", HttpStatus.BAD_REQUEST),
 
@@ -31,7 +31,7 @@ public enum ErrorCode {
 
     CONDITION_EXISTED(7001, "Bệnh nền đã tồn tại", HttpStatus.CONFLICT),
     CONDITION_NOT_FOUND(7002, "Bệnh nền không tồn tại", HttpStatus.NOT_FOUND),
-    DELETE_CONDITION_CONFLICT(7003, "Không thể xóa bệnh nền", HttpStatus.CONFLICT),
+    DELETE_CONDITION_CONFLICT(7003, "Bệnh nền đã được gán cho người dùng, không thể xóa.", HttpStatus.CONFLICT),
 
     FILE_EMPTY(8001, "File rỗng hoặc không tồn tại", HttpStatus.BAD_REQUEST),
     FILE_UPLOAD_FAILED(8002, "Tải file lên thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
@@ -57,6 +57,7 @@ public enum ErrorCode {
 
 
     NUTRITION_RULE_NOT_FOUND(9012, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND),
+    INVALID_ARGUMENT(9013, "Tham số không hợp lệ", HttpStatus.BAD_REQUEST),
 
     MEAL_PLAN_NOT_FOUND(10001, "Kế hoạch không tồn tại", HttpStatus.NOT_FOUND),
     MEAL_PLAN_ITEM_USED(10002, "Món ăn trong kế hoạch đã được sử dụng", HttpStatus.BAD_REQUEST),
@@ -67,7 +68,9 @@ public enum ErrorCode {
     AI_SERVICE_ERROR(12001, "AI đang quá tải. Vui lòng thử lại sau ít phút.", HttpStatus.INTERNAL_SERVER_ERROR),
 
     USER_NAME_NOT_FOUND(13001, "Tên đăng nhập không đúng", HttpStatus.NOT_FOUND),
-    PASSWORD_INCORRECT(13002, "Mật khẩu không đúng", HttpStatus.UNAUTHORIZED)
+    PASSWORD_INCORRECT(13002, "Mật khẩu không đúng", HttpStatus.UNAUTHORIZED),
+    USERNAME_EXISTED(13003, "Tên đăng nhập đã tồn tại", HttpStatus.CONFLICT),
+    PASSWORD_SAME_AS_OLD(13004, "Mật khẩu mới không được giống mật khẩu cũ", HttpStatus.BAD_REQUEST)
     ;
     int code;
     String message;

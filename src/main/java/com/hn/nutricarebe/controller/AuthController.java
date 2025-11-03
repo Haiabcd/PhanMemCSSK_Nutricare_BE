@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.controller;
 
+import com.hn.nutricarebe.dto.request.AdminCredentialUpdateRequest;
 import com.hn.nutricarebe.dto.request.AdminLoginRequest;
 import com.hn.nutricarebe.dto.request.OnboardingRequest;
 import com.hn.nutricarebe.dto.request.RefreshRequest;
@@ -31,8 +32,6 @@ public class AuthController {
     AuthService authService;
     OAuthExchangeStore exchangeStore;
 
-
-
     @PostMapping("/onboarding")
     public ApiResponse<OnboardingResponse> onboarding(@Valid  @RequestBody OnboardingRequest request){
         return ApiResponse.<OnboardingResponse>builder()
@@ -40,7 +39,6 @@ public class AuthController {
                 .data(authService.onBoarding(request))
                 .build();
     }
-
 
     // ===========================Google OAuth2================================= //
     @PostMapping("/google/start")
@@ -129,10 +127,21 @@ public class AuthController {
 
 
     @PostMapping("/login")
-    ApiResponse<AdminLoginResponse> authenticate(@RequestBody AdminLoginRequest request){
+    ApiResponse<AdminLoginResponse> authenticate(@Valid @RequestBody AdminLoginRequest request){
         return ApiResponse.<AdminLoginResponse>builder()
                 .message("Đăng nhập admin thành công")
                 .data(authService.authenticate(request))
+                .build();
+    }
+
+
+    @PatchMapping("/change")
+    public ApiResponse<Void> updateAdminCredentials(
+            @Valid @RequestBody AdminCredentialUpdateRequest request
+    ) {
+        authService.updateAdminCredentials(request);
+        return ApiResponse.<Void>builder()
+                .message("Cập nhật thông tin đăng nhập admin thành công")
                 .build();
     }
 

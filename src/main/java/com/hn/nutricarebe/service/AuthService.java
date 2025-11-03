@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.service;
 
+import com.hn.nutricarebe.dto.request.AdminCredentialUpdateRequest;
 import com.hn.nutricarebe.dto.request.AdminLoginRequest;
 import com.hn.nutricarebe.dto.request.OnboardingRequest;
 import com.hn.nutricarebe.dto.response.AdminLoginResponse;
@@ -17,4 +18,5 @@ public interface AuthService {
     TokenPairResponse refresh(String refreshTokenRaw);
     void logout(String refreshTokenRaw);
     AdminLoginResponse authenticate(AdminLoginRequest request);
+    void updateAdminCredentials(AdminCredentialUpdateRequest request);
 }

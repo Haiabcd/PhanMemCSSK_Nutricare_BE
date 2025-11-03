@@ -1,8 +1,12 @@
 package com.hn.nutricarebe.dto.response;
 
+import com.hn.nutricarebe.dto.request.TagDto;
+import com.hn.nutricarebe.entity.Tag;
 import com.hn.nutricarebe.enums.MealSlot;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.springframework.core.metrics.StartupStep;
+
 import java.math.BigDecimal;
 import java.util.Set;
 import java.util.UUID;
@@ -24,5 +28,6 @@ public class FoodResponse {
     NutritionResponse nutrition;
     boolean isIngredient;
     Set<MealSlot> mealSlots;
-    Set<String> tags;
+    Set<TagDto> tags;
+    Set<RecipeIngredientResponse> ingredients;
 }

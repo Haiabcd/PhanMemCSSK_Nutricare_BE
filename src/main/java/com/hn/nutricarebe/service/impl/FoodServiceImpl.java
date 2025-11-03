@@ -85,7 +85,7 @@ public class FoodServiceImpl implements FoodService {
                         .ingredient(ing)
                         .quantity(riReq.getQuantity())
                         .build();
-                food.getIngredients().add(ri);
+                food.addIngredient(ri);
             }
         }
         boolean hasIngredients = food.getIngredients() != null && !food.getIngredients().isEmpty();
@@ -182,44 +182,93 @@ public class FoodServiceImpl implements FoodService {
 
     @Override
     @Transactional
-    public FoodResponse patchUpdate(UUID id, FoodPatchRequest req) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public void patchUpdate(UUID id, FoodPatchRequest req) {
         Food food = foodRepository.findWithCollectionsById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
-
-        // 2) Đổi tên nếu request có name
         String newName = normalizeName(req.getName());
-        if(newName != null && !newName.equalsIgnoreCase(food.getName())
-                && !foodRepository.existsByNameIgnoreCase(newName)) {
+        if (!newName.equalsIgnoreCase(food.getName())) {
+            if (foodRepository.existsByNameIgnoreCase(newName)) {
+                throw new AppException(ErrorCode.FOOD_NAME_EXISTED);
+            }
             food.setName(newName);
         }
-        // 3) Ảnh: nếu có file mới -> upload trước, set key mới lên entity
         String oldKey = food.getImageKey();
         String newKey = null;
         MultipartFile file = req.getImage();
         if (file != null && !file.isEmpty()) {
             try {
                 newKey = s3Service.uploadObject(file, "images/foods");
-                if (newKey != null && !newKey.isBlank()) {
-                   food.setImageKey(newKey);
-                }
+                food.setImageKey(newKey);
             } catch (IOException e) {
                 throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
             }
         }
-        // 4) Patch các field còn lại (null sẽ bị bỏ qua)
-        foodMapper.patch(food, req);
-        // 5) Lưu DB
-        Food saved = foodRepository.save(food);
-        // 6) Nếu có ảnh mới -> sau khi DB ok, thử xóa ảnh cũ (không rollback nếu xóa fail)
+        food.setDescription(req.getDescription());
+        food.setDefaultServing(req.getDefaultServing());
+        food.setServingName(req.getServingName());
+        food.setServingGram(req.getServingGram());
+        food.setCookMinutes(req.getCookMinutes());
+
+        var n = req.getNutrition();
+        food.getNutrition().setKcal(n.getKcal());
+        food.getNutrition().setProteinG(n.getProteinG());
+        food.getNutrition().setCarbG(n.getCarbG());
+        food.getNutrition().setFatG(n.getFatG());
+        food.getNutrition().setFiberG(n.getFiberG());
+        food.getNutrition().setSodiumMg(n.getSodiumMg());
+        food.getNutrition().setSugarMg(n.getSugarMg());
+        food.getMealSlots().clear();
+        if (req.getMealSlots() != null && !req.getMealSlots().isEmpty()) {
+            food.getMealSlots().addAll(req.getMealSlots());
+        }
+
+        food.getTags().clear();
+        if (req.getTags() != null && !req.getTags().isEmpty()) {
+            var tagIds = req.getTags();
+            var foundTags = tagRepository.findAllById(tagIds);
+            if (foundTags.size() != tagIds.size()) {
+                throw new AppException(ErrorCode.VALIDATION_FAILED);
+            }
+            for (Tag t : foundTags) {
+                food.getTags().add(t);
+            }
+        }
+
+        if (food.getIngredients() != null) {
+            food.getIngredients().clear();
+        }
+        if (req.getIngredients() != null && !req.getIngredients().isEmpty()) {
+            var ingIds = req.getIngredients().stream()
+                    .map(RecipeIngredientCreationRequest::getIngredientId)
+                    .collect(Collectors.toSet());
+            var ingMap = ingredientRepository.findAllById(ingIds)
+                    .stream().collect(Collectors.toMap(Ingredient::getId, it -> it));
+            if (ingMap.size() != ingIds.size()) {
+                throw new AppException(ErrorCode.INGREDIENT_NOT_FOUND);
+            }
+            for (var riReq : req.getIngredients()) {
+                Ingredient ing = ingMap.get(riReq.getIngredientId());
+                RecipeIngredient ri = RecipeIngredient.builder()
+                        .food(food)
+                        .ingredient(ing)
+                        .quantity(riReq.getQuantity())
+                        .build();
+                food.addIngredient(ri);
+            }
+        }
+        boolean hasIngredients = food.getIngredients() != null && !food.getIngredients().isEmpty();
+        food.setIngredient(hasIngredients);
+        foodRepository.save(food);
         if (newKey != null && oldKey != null && !oldKey.isBlank() && !oldKey.equals(newKey)) {
             try {
                 s3Service.deleteObject(oldKey);
             } catch (Exception ex) {
-               throw new AppException(ErrorCode.DELETE_OBJECT_FAILED);
+                throw new AppException(ErrorCode.DELETE_OBJECT_FAILED);
             }
         }
-        return foodMapper.toFoodResponse(saved, cdnHelper);
     }
+
 
 
     @Override

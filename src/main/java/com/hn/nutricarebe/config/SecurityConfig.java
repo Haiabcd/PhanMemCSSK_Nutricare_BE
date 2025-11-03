@@ -34,9 +34,7 @@ public class SecurityConfig {
             "/auths/refresh",
             "/auths/logout",
             "/auths/login",
-
-            "/ai/plan",
-            "/nutrition-rules/save",
+            "/ai/plan"
     };
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
@@ -44,27 +42,12 @@ public class SecurityConfig {
             "/auths/google/redeem",
             "/ingredients/all",
             "/ingredients/autocomplete/**",
-
-            "/foods/**",
-            "/foods/search/**",
             "/foods/autocomplete/**",
-            "/foods/all/**",
-
+            "/foods/all",
             "/conditions/all/**",
             "/conditions/search/**",
-
             "/allergies/all/**",
             "/allergies/search/**",
-
-            "/nutrition-rules/**",
-    };
-
-    private final String[] PUBLIC_DELETE_ENDPOINTS = {
-            "/foods/**",
-    };
-
-    private final String[] PUBLIC_PATCH_ENDPOINTS = {
-            "/foods/**",
     };
 
     @Value("${jwt.signerKey}")
@@ -79,8 +62,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()   // cho preflight
                         .requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.GET,  PUBLIC_GET_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.DELETE, PUBLIC_DELETE_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.PATCH, PUBLIC_PATCH_ENDPOINTS).permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
@@ -124,8 +105,6 @@ public class SecurityConfig {
             String uri = request.getRequestURI();
             // Cho phép preflight
             if ("OPTIONS".equalsIgnoreCase(method)) return null;
-            // Bỏ qua token cho các endpoint public
-            if (uri.contains("/auths/")) return null;
 
             return delegate.resolve(request);
         };

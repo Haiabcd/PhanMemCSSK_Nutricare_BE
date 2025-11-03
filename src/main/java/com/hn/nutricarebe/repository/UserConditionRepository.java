@@ -30,4 +30,6 @@ public interface UserConditionRepository extends JpaRepository<UserCondition, UU
         ORDER BY COUNT(uc) DESC
     """)
     List<Object[]> findTopConditionNames();
+
+    boolean existsByCondition_Id(UUID conditionId);
 }

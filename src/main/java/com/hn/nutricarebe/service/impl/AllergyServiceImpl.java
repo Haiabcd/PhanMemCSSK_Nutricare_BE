@@ -7,9 +7,12 @@ import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.AllergyMapper;
+import com.hn.nutricarebe.mapper.NutritionRuleMapper;
 import com.hn.nutricarebe.repository.AllergyRepository;
 import com.hn.nutricarebe.repository.NutritionRuleRepository;
+import com.hn.nutricarebe.repository.UserAllergyRepository;
 import com.hn.nutricarebe.service.AllergyService;
+import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -17,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,6 +35,8 @@ public class AllergyServiceImpl implements AllergyService {
     AllergyRepository allergyRepository;
     NutritionRuleRepository nutritionRuleRepository;
     AllergyMapper allergyMapper;
+    NutritionRuleMapper nutritionRuleMapper;
+    UserAllergyRepository userAllergyRepository;
 
 
     // Tạo mới một dị ứng
@@ -45,9 +51,18 @@ public class AllergyServiceImpl implements AllergyService {
 
     @Override
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public void deleteById(UUID id) {
         Allergy allergy = allergyRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.DELETE_ALLERGY_CONFLICT));
+                .orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
+        // 1) Nếu có user đang dùng -> chặn xóa
+        if (userAllergyRepository.existsByAllergy_Id(id)) {
+            throw new AppException(ErrorCode.DELETE_ALLERGY_CONFLICT);
+        }
+        // 2) Nếu chưa ai dùng -> dọn các NutritionRule liên quan rồi xóa Allergy
+        if (nutritionRuleRepository.existsByAllergy_Id(id)) {
+            nutritionRuleRepository.deleteByAllergyId(id);
+        }
         allergyRepository.delete(allergy);
     }
 
@@ -66,7 +81,7 @@ public class AllergyServiceImpl implements AllergyService {
         List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndAllergy_IdIn(ids);
         Map<UUID, List<NutritionRule>> rulesByAllergy = rules.stream()
                 .collect(java.util.stream.Collectors.groupingBy(nr -> nr.getAllergy().getId()));
-        return slice.map(a -> allergyMapper.toAllergyResponse(a, rulesByAllergy));
+        return slice.map(a -> allergyMapper.toAllergyResponse(a, rulesByAllergy, nutritionRuleMapper));
     }
 
     // Tìm một dị ứng theo id
@@ -74,7 +89,11 @@ public class AllergyServiceImpl implements AllergyService {
     public AllergyResponse getById(UUID id) {
         Allergy allergy = allergyRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
-        return allergyMapper.toAllergyResponse(allergy);
+        Set<UUID> ids = Set.of(allergy.getId());
+        List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndAllergy_IdIn(ids);
+        Map<UUID, List<NutritionRule>> rulesByAllergy = rules.stream()
+                .collect(java.util.stream.Collectors.groupingBy(nr -> nr.getAllergy().getId()));
+        return allergyMapper.toAllergyResponse(allergy, rulesByAllergy, nutritionRuleMapper);
     }
 
     // Tìm kiếm dị ứng theo tên

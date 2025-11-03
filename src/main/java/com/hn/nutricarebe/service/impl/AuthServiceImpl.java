@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -411,12 +412,50 @@ public class AuthServiceImpl implements AuthService {
         long accessExp = getClaims(parseJwt(access)).getExpirationTime().toInstant().getEpochSecond();
         long refreshExp = getClaims(parseJwt(refresh)).getExpirationTime().toInstant().getEpochSecond();
 
+        saveRefreshRecord(user.getId(), refresh);
+
         return AdminLoginResponse.builder()
                 .accessToken(access)
                 .accessExpiresAt(accessExp)
                 .refreshToken(refresh)
                 .refreshExpiresAt(refreshExp)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
+    public void updateAdminCredentials(AdminCredentialUpdateRequest request) {
+        var user = userRepository.findByUsernameIgnoreCase(request.getUsername())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NAME_NOT_FOUND));
+
+        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
+        if (!passwordEncoder.matches(request.getPasswordOld(), user.getPasswordHash())) {
+            throw new AppException(ErrorCode.PASSWORD_INCORRECT);
+        }
+        boolean changed = false;
+
+        // 4) Đổi username (nếu có)
+        String newUsername = request.getNewUsername();
+        if (newUsername != null && !newUsername.isBlank()
+                && !newUsername.equalsIgnoreCase(user.getUsername())) {
+            userRepository.findByUsernameIgnoreCase(newUsername).ifPresent(u -> {
+                throw new AppException(ErrorCode.USERNAME_EXISTED);
+            });
+            user.setUsername(newUsername);
+            changed = true;
+        }
+        String newPassword = request.getNewPassword();
+        if (newPassword != null && !newPassword.isBlank()) {
+            if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+                throw new AppException(ErrorCode.PASSWORD_SAME_AS_OLD);
+            }
+            user.setPasswordHash(passwordEncoder.encode(newPassword));
+            changed = true;
+        }
+        if (changed) {
+            userRepository.save(user);
+        }
     }
 
 

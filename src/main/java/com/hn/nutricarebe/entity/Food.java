@@ -90,6 +90,7 @@ public class Food {
     Set<Tag> tags = new HashSet<>();
 
     @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     Set<RecipeIngredient> ingredients = new HashSet<>();
 
     @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
@@ -108,4 +109,12 @@ public class Food {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     Instant updatedAt;
+
+    public void addIngredient(RecipeIngredient ri) {
+        if (ingredients == null) {
+            ingredients = new HashSet<>();
+        }
+        ingredients.add(ri);
+        ri.setFood(this);
+    }
 }

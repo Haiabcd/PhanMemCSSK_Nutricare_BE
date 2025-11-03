@@ -25,22 +25,42 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
     boolean existsByNameIgnoreCase(String name);
 
     // Lấy món ăn theo ID
-    @EntityGraph(attributePaths = {"mealSlots", "tags"})
+    @EntityGraph(attributePaths = {
+            "mealSlots",
+            "tags",
+            "ingredients",
+            "ingredients.ingredient"
+    })
     Optional<Food> findWithCollectionsById(UUID id);
 
     // Tìm món ăn theo slot
-    @EntityGraph(attributePaths = {"mealSlots", "tags"})
+    @EntityGraph(attributePaths = {
+            "mealSlots",
+            "tags",
+            "ingredients",
+            "ingredients.ingredient"
+    })
     @Query("select distinct f from Food f join f.mealSlots ms where ms = :slot")
     Slice<Food> findByMealSlot(@Param("slot") MealSlot slot, Pageable pageable);
 
 
     // Tìm món ăn theo tên gần đúng
-    @EntityGraph(attributePaths = {"mealSlots", "tags"})
+    @EntityGraph(attributePaths = {
+            "mealSlots",
+            "tags",
+            "ingredients",
+            "ingredients.ingredient"
+    })
     Slice<Food> findByNameContainingIgnoreCase(String q, Pageable pageable);
 
 
     // Lấy tất cả món ăn
-    @EntityGraph(attributePaths = {"mealSlots", "tags"})
+    @EntityGraph(attributePaths = {
+            "mealSlots",
+            "tags",
+            "ingredients",
+            "ingredients.ingredient"
+    })
     Slice<Food> findAllBy(Pageable pageable);
 
     @Query(value = """

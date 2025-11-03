@@ -1,6 +1,9 @@
 package com.hn.nutricarebe.service.impl;
 
+import com.hn.nutricarebe.dto.request.TagCreationRequest;
+import com.hn.nutricarebe.dto.request.TagDto;
 import com.hn.nutricarebe.entity.Tag;
+import com.hn.nutricarebe.mapper.TagMapper;
 import com.hn.nutricarebe.repository.TagRepository;
 import com.hn.nutricarebe.service.TagService;
 import lombok.AccessLevel;
@@ -9,8 +12,10 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -20,7 +25,7 @@ import java.util.UUID;
 @Service
 public class TagServiceImpl implements TagService {
     TagRepository tagRepository;
-
+    TagMapper tagMapper;
 
     @Override
     public List<String> findNameCodeByNormal(Set<String> normalized) {
@@ -31,9 +36,18 @@ public class TagServiceImpl implements TagService {
                 .toList();
     }
 
-    @Cacheable(value = "allTagsCache", key = "'v1'")
-    public List<Tag> getAllTagsForPrompt() {
-        return tagRepository.findAll();
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<TagDto> autocomplete(String keyword, int limit) {
+        String q = keyword == null ? "" : keyword.trim();
+        if (q.isEmpty()) {
+            return Collections.emptyList();
+        }
+        int bounded = Math.max(1, Math.min(limit, 50));
+        List<Tag> results = tagRepository.autocompleteUnaccent(q, bounded);
+        return results.stream()
+                .map(tagMapper::toTagDto)
+                .toList();
     }
 
     // Lấy text danh mục Tag để chèn vào prompt
@@ -54,6 +68,17 @@ public class TagServiceImpl implements TagService {
         }
         if (tags.size() > MAX) sb.append("(Đã rút gọn: ").append(MAX).append("/").append(tags.size()).append(")\n");
         return sb.toString();
+    }
+
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    public void save (TagCreationRequest request){
+        Tag tag = Tag.builder()
+                .nameCode(request.getNameCode())
+                .description(request.getDescription())
+                .build();
+        tagRepository.save(tag);
     }
 
     @Caching(evict = {
@@ -86,5 +111,10 @@ public class TagServiceImpl implements TagService {
     private String safe(String s) {
         if (s == null) return null;
         return s.replaceAll("[\\r\\u0000]", "").replace('\t',' ').trim();
+    }
+
+    @Cacheable(value = "allTagsCache", key = "'v1'")
+    public List<Tag> getAllTagsForPrompt() {
+        return tagRepository.findAll();
     }
 }

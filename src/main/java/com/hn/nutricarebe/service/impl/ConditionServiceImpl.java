@@ -7,8 +7,10 @@ import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ConditionMapper;
+import com.hn.nutricarebe.mapper.NutritionRuleMapper;
 import com.hn.nutricarebe.repository.ConditionRepository;
 import com.hn.nutricarebe.repository.NutritionRuleRepository;
+import com.hn.nutricarebe.repository.UserConditionRepository;
 import com.hn.nutricarebe.service.ConditionService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,8 @@ public class ConditionServiceImpl implements ConditionService {
     ConditionRepository conditionRepository;
     NutritionRuleRepository nutritionRuleRepository;
     ConditionMapper conditionMapper;
+    NutritionRuleMapper nutritionRuleMapper;
+    UserConditionRepository userConditionRepository;
 
     // Tạo mới một bệnh nền
     @Override
@@ -52,7 +56,16 @@ public class ConditionServiceImpl implements ConditionService {
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteById(UUID id) {
         Condition con = conditionRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.DELETE_CONDITION_CONFLICT));
+                .orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
+
+        // 1) Có user đang gán bệnh nền -> chặn xoá
+        if (userConditionRepository.existsByCondition_Id(id)) {
+            throw new AppException(ErrorCode.DELETE_CONDITION_CONFLICT);
+        }
+        // 2) Không ai dùng -> dọn các rule tham chiếu tới condition rồi xoá
+        if (nutritionRuleRepository.existsByCondition_Id(id)) {
+            nutritionRuleRepository.deleteByConditionId(id);
+        }
         conditionRepository.delete(con);
     }
 
@@ -67,10 +80,10 @@ public class ConditionServiceImpl implements ConditionService {
         Set<UUID> ids = content.stream()
                 .map(Condition::getId)
                 .collect(Collectors.toSet());
-        List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndAllergy_IdIn(ids);
+        List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndCondition_IdIn(ids);
         Map<UUID, List<NutritionRule>> rulesByCondition = rules.stream()
                 .collect(Collectors.groupingBy(nr -> nr.getCondition().getId()));
-        return slice.map(a -> conditionMapper.toConditionResponse(a, rulesByCondition));
+        return slice.map(a -> conditionMapper.toConditionResponse(a, rulesByCondition, nutritionRuleMapper));
     }
 
     // Tìm một bệnh nền theo id
@@ -78,7 +91,11 @@ public class ConditionServiceImpl implements ConditionService {
     public ConditionResponse getById(UUID id) {
         Condition c = conditionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
-        return conditionMapper.toConditionResponse(c);
+        Set<UUID> ids = Set.of(c.getId());
+        List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndCondition_IdIn(ids);
+        Map<UUID, List<NutritionRule>> rulesByCondition = rules.stream()
+                .collect(Collectors.groupingBy(nr -> nr.getCondition().getId()));
+        return conditionMapper.toConditionResponse(c, rulesByCondition, nutritionRuleMapper);
     }
 
     // Tìm kiếm bệnh nền theo tên

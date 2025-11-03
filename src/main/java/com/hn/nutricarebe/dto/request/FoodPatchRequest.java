@@ -1,17 +1,13 @@
 package com.hn.nutricarebe.dto.request;
 
-import com.hn.nutricarebe.entity.Tag;
 import com.hn.nutricarebe.enums.MealSlot;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.PositiveOrZero;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
-import java.util.Set;
+import java.util.*;
 
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -21,31 +17,37 @@ import java.util.Set;
 @NoArgsConstructor
 @Builder
 public class FoodPatchRequest {
-    @Size(min = 1, message = "Tên không được rỗng nếu gửi")
+    @NotBlank(message = "Tên không được để trống")
     String name;
-
     String description;
-
+    @NotNull(message = "Số khẩu phần mặc định là bắt buộc")
     @Min(value = 1, message = "Số khẩu phần mặc định phải >= 1")
-    Integer defaultServing;
-
-    @Size(min = 1, message = "Tên khẩu phần không được rỗng nếu gửi")
+    @Builder.Default
+    Integer defaultServing = 1 ;
     String servingName;
 
-    @Digits(integer = 8, fraction = 2)
-    @PositiveOrZero(message = "Khối lượng phục vụ phải >= 0")
-    BigDecimal servingGram;
+    @Digits(integer=8, fraction=2)
+    @PositiveOrZero(message ="Khối lượng phục vụ phải là số dương hoặc bằng 0")
+    @Builder.Default
+    BigDecimal servingGram = BigDecimal.ZERO;
 
+    @Builder.Default
     @Min(value = 0, message = "Thời gian nấu phải >= 0")
-    Integer cookMinutes;
+    Integer cookMinutes = 0;
 
     @Valid
+    @NotNull(message = "Thông tin dinh dưỡng là bắt buộc")
     NutritionRequest nutrition;
 
-    Boolean isIngredient;
+    @Builder.Default
+    Set<MealSlot> mealSlots = new HashSet<>();
 
-    Set<MealSlot> mealSlots;
-    Set<Tag> tags;
+    @Builder.Default
+    Set<UUID> tags= new HashSet<>();
 
     MultipartFile image;
+
+    @Builder.Default
+    @Valid
+    List<RecipeIngredientCreationRequest> ingredients = new ArrayList<>();
 }

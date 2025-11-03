@@ -68,19 +68,6 @@ public class FoodController {
                 .build();
     }
 
-    // Tìm kiếm món ăn theo tên với phân trang
-    @GetMapping("/search")
-    public ApiResponse<Slice<FoodResponse>> searchByName(
-            @RequestParam("name") String name,
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
-    ) {
-        Slice<FoodResponse> foods = foodService.searchByName(name, pageable);
-        return ApiResponse.<Slice<FoodResponse>>builder()
-                .message("Tìm kiếm món ăn thành công")
-                .data(foods)
-                .build();
-    }
-
     // Lấy tất cả món ăn với phân trang
     @GetMapping("/all")
     public ApiResponse<Slice<FoodResponse>> getAll(
@@ -95,17 +82,15 @@ public class FoodController {
 
     // Cập nhật một phần thông tin món ăn
     @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<FoodResponse> patchUpdate(
+    public ApiResponse<Void> patchUpdate(
             @PathVariable UUID id,
             @Valid @ModelAttribute FoodPatchRequest req
     ) {
-        FoodResponse data = foodService.patchUpdate(id, req);
-        return ApiResponse.<FoodResponse>builder()
+        foodService.patchUpdate(id, req);
+        return ApiResponse.<Void>builder()
                 .message("Cập nhật món ăn thành công")
-                .data(data)
                 .build();
     }
-
 
     @GetMapping("/autocomplete")
     public ApiResponse<List<FoodResponse>> autocomplete(

@@ -10,9 +10,11 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class AdminLoginRequest {
-    @NotBlank(message = "Tên đăng nhập không được để trống")
+public class AdminCredentialUpdateRequest {
+    @NotBlank(message = "Tên đăng nhập hiện tại không được để trống")
     String username;
-    @NotBlank(message = "Mật khẩu không được để trống")
-    String passwordHash;
+    @NotBlank(message = "Mật khẩu cũ không được để trống")
+    String passwordOld;
+    String newUsername;
+    String newPassword;
 }

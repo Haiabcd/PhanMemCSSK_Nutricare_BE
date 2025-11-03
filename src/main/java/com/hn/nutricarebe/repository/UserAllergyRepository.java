@@ -31,4 +31,6 @@ public interface UserAllergyRepository extends JpaRepository<UserAllergy, UUID> 
         ORDER BY COUNT(ua) DESC
     """)
     List<Object[]> findTopAllergyNames();
+
+    boolean existsByAllergy_Id(UUID allergyId);
 }
