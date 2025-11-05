@@ -26,8 +26,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import java.time.temporal.ChronoUnit;
@@ -102,9 +100,7 @@ public class PlanLogServiceImpl implements PlanLogService {
         List<PlanLog> logs = logRepository.findByUser_IdAndDateAndMealSlot(userId, date, mealSlot);
 
         return logs.stream()
-                .map(log -> {
-                    return logMapper.toLogResponse(log, cdnHelper);
-                })
+                .map(log -> logMapper.toLogResponse(log, cdnHelper))
                 .toList();
     }
 
@@ -117,7 +113,7 @@ public class PlanLogServiceImpl implements PlanLogService {
         if(p == null || p.getUser() == null || !userId.equals(p.getUser().getId())) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        if (p != null && p.getPlanItem() != null) {
+        if (p.getPlanItem() != null) {
             MealPlanItem item = p.getPlanItem();
             item.setUsed(false);
             mealPlanItemRepository.save(item);
@@ -414,9 +410,7 @@ public class PlanLogServiceImpl implements PlanLogService {
             LocalDate d = l.getDate();
             Nutrition add = resolveActualOrFallback(l);
             if (add == null) continue;
-
-            Nutrition cur = totalByDate.get(d);
-            totalByDate.put(d, (cur == null) ? add : addNut(cur, add));
+            totalByDate.compute(d, (key, cur) -> (cur == null) ? add : addNut(cur, add));
         }
         return totalByDate.entrySet().stream()
                 .map(e -> new DayConsumedTotal(e.getKey(), e.getValue()))

@@ -59,7 +59,7 @@ public class FoodController {
     @GetMapping
     public ApiResponse<Slice<FoodResponse>> listByMealSlot(
             @RequestParam("mealSlot") MealSlot mealSlot,
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         Slice<FoodResponse> foods = foodService.findByMealSlot(mealSlot, pageable);
         return ApiResponse.<Slice<FoodResponse>>builder()
@@ -71,7 +71,7 @@ public class FoodController {
     // Lấy tất cả món ăn với phân trang
     @GetMapping("/all")
     public ApiResponse<Slice<FoodResponse>> getAll(
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable
     ) {
         return ApiResponse.<Slice<FoodResponse>>builder()

@@ -209,7 +209,6 @@ public final class MealPlanHelper {
                     case BETWEEN -> (min != null && max != null)
                             && value.compareTo(min) >= 0
                             && value.compareTo(max) <= 0;
-                    default      -> true;
                 };
             }
         }
@@ -218,24 +217,6 @@ public final class MealPlanHelper {
     /* ===== KIỂM TRA LẠI MÓN ĐƯỢC CHỌN ===== */
 
     /* ===== CHỌN KHẨU PHẦN ===== */
-    public static double pickPortionStep(double kcalRemain, double foodKcal) {
-        if (foodKcal <= 0) return 1.0;
-        double best = PORTION_STEPS[0];
-        double bestDiff = Math.abs(kcalRemain - best * foodKcal);  //Độ lệch ||
-
-        for (double step : PORTION_STEPS) {
-            double diff = Math.abs(kcalRemain - step * foodKcal);  //Độ lệch từng bậc ||
-
-            boolean overBest = best * foodKcal > kcalRemain;   //Kiểm tra bậc hiện tại  (true --> vượt)
-            boolean overCur  = step * foodKcal > kcalRemain;   //Kiểm tra bậc đang xét
-
-            if (diff < bestDiff || (Math.abs(diff - bestDiff) < 1e-6 && !overCur && overBest)) {
-                best = step;
-                bestDiff = diff;
-            }
-        }
-        return best;
-    }
     public static OptionalDouble stepDown(double current) {
         for (int i = 0; i < PORTION_STEPS.length; i++) {
             if (Math.abs(PORTION_STEPS[i] - current) < 1e-9) {

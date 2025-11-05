@@ -1,6 +1,5 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.config.AppTimeConfig;
 import com.hn.nutricarebe.dto.request.WaterLogCreationRequest;
 import com.hn.nutricarebe.dto.response.DailyWaterTotalDto;
 import com.hn.nutricarebe.repository.WaterLogRepository;
@@ -31,7 +30,6 @@ import java.util.stream.Collectors;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class WaterLogServiceImpl implements WaterLogService {
     WaterLogRepository waterLogRepository;
-    AppTimeConfig appTimeConfig;
     ZoneId appZone = ZoneId.of("Asia/Ho_Chi_Minh");
 
     @Override

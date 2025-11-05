@@ -31,7 +31,7 @@ public final class GoogleLoginHelper {
         // --- email ---
         String email = Optional.ofNullable(u)
                 .map(SupabaseUser::getEmail)
-                .filter(s -> s != null && !s.isBlank())
+                .filter(s -> !s.isBlank())
                 .orElseGet(() -> safeStr((String) meta.get("email")));
 
         // --- emailVerified ---

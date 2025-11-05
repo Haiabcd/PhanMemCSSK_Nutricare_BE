@@ -138,16 +138,16 @@ public class UserServiceImpl implements UserService {
     }
 
     private String toVietnameseDayLabel(DayOfWeek dow) {
-        switch (dow) {
-            case MONDAY:    return "Thứ 2";
-            case TUESDAY:   return "Thứ 3";
-            case WEDNESDAY: return "Thứ 4";
-            case THURSDAY:  return "Thứ 5";
-            case FRIDAY:    return "Thứ 6";
-            case SATURDAY:  return "Thứ 7";
-            case SUNDAY:    return "Chủ nhật";
-            default:        return "N/A";
-        }
+        if (dow == null) return "N/A";
+        return switch (dow) {
+            case MONDAY    -> "Thứ 2";
+            case TUESDAY   -> "Thứ 3";
+            case WEDNESDAY -> "Thứ 4";
+            case THURSDAY  -> "Thứ 5";
+            case FRIDAY    -> "Thứ 6";
+            case SATURDAY  -> "Thứ 7";
+            case SUNDAY    -> "Chủ nhật";
+        };
     }
 
     // Đếm số người dùng mới trong 7 ngày qua

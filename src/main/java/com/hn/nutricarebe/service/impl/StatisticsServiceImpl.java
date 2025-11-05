@@ -125,8 +125,8 @@ public class StatisticsServiceImpl implements StatisticsService {
                 .build();
     }
 
-    public static record MonthRange(LocalDate start, LocalDate end) {}
-    public static record WeekRange(LocalDate start, LocalDate end) {}
+    public record MonthRange(LocalDate start, LocalDate end) {}
+    public record WeekRange(LocalDate start, LocalDate end) {}
 
     private double calculateBmi(ProfileCreationRequest p) {
         double heightM = p.getHeightCm() / 100.0;            // cm -> m

@@ -148,24 +148,6 @@ public class FoodServiceImpl implements FoodService {
         );
     }
 
-    // Tìm món ăn theo tên 
-    @Override
-    public Slice<FoodResponse> searchByName(String name, Pageable pageable) {
-        String keyword = (name == null) ? "" : name.trim();
-        if (keyword.length() < 2) {
-            throw new AppException(ErrorCode.NAME_EMPTY);
-        }
-
-         Slice<Food> slice = foodRepository.findByNameContainingIgnoreCase(keyword, pageable);
-
-        return new SliceImpl<>(
-                slice.getContent().stream()
-                        .map(food -> foodMapper.toFoodResponse(food, cdnHelper))
-                        .toList(),
-                pageable,
-                slice.hasNext()
-        );
-    }
 
     // Lấy tất cả món ăn với phân trang
     @Override
@@ -268,7 +250,6 @@ public class FoodServiceImpl implements FoodService {
             }
         }
     }
-
 
 
     @Override

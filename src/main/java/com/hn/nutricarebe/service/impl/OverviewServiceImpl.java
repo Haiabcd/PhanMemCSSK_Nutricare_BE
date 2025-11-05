@@ -1,15 +1,11 @@
 package com.hn.nutricarebe.service.impl;
 
 import com.hn.nutricarebe.dto.overview.*;
-import com.hn.nutricarebe.dto.response.IngredientResponse;
-import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.enums.LogSource;
 import com.hn.nutricarebe.service.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 

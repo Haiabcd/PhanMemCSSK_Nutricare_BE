@@ -19,7 +19,6 @@ public interface FoodService {
     FoodResponse getById(UUID id);
     void deleteById(UUID id);
     Slice<FoodResponse> findByMealSlot(MealSlot mealSlot, Pageable pageable);
-    Slice<FoodResponse> searchByName(String name, Pageable pageable);
     Slice<FoodResponse> getAll(Pageable pageable);
     void patchUpdate(UUID id, FoodPatchRequest request);
     List<FoodResponse> autocompleteFoods(String keyword, int limit);

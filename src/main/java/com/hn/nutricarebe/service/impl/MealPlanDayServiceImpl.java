@@ -679,18 +679,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
     private static final double EPS_CARB   = 6.0;
     private static final double EPS_FAT    = 3.0;
     private static final double EPS_FIBER  = 3.0;
-    private static final double EPS_SODIUM = 200.0;
-    private static final double EPS_SUGAR  = 6.0;
 
-    private boolean isSatisfied(Nutrition n) {
-        return  safeDouble(n.getKcal())     <= EPS_KCAL   &&
-                safeDouble(n.getProteinG()) <= EPS_PROT   &&
-                safeDouble(n.getCarbG())    <= EPS_CARB   &&
-                safeDouble(n.getFatG())     <= EPS_FAT    &&
-                safeDouble(n.getFiberG())   <= EPS_FIBER  &&
-                safeDouble(n.getSodiumMg()) <= EPS_SODIUM &&
-                safeDouble(n.getSugarMg())  <= EPS_SUGAR;
-    }
 
     // remaining = max(0, target - consumed)
     private Nutrition subNutClamp0(Nutrition target, Nutrition consumed) {

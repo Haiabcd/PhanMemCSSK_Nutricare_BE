@@ -24,16 +24,16 @@ public interface NutritionRuleRepository extends JpaRepository<NutritionRule, UU
     @EntityGraph(attributePaths = {"condition", "allergy", "tags"})
     List<NutritionRule> findByActiveTrueAndAllergy_IdIn(Set<UUID> allergyIds);
 
-    boolean existsByAllergy_Id(UUID allergyId);
-    boolean existsByCondition_Id(UUID conditionId);
+    @Modifying
+    @Transactional
+    @Query("delete from NutritionRule r where r.allergy.id = :allergyId")
+    void deleteByAllergyId(@Param("allergyId") UUID allergyId);
 
     @Modifying
     @Transactional
     @Query("delete from NutritionRule r where r.condition.id = :conditionId")
     void deleteByConditionId(@Param("conditionId") UUID conditionId);
 
-    @Modifying
-    @Transactional
-    @Query("delete from NutritionRule r where r.allergy.id = :allergyId")
-    void deleteByAllergyId(@Param("allergyId") UUID allergyId);
+    boolean existsByAllergy_Id(UUID allergyId);
+    boolean existsByCondition_Id(UUID conditionId);
 }

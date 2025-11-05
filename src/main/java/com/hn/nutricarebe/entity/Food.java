@@ -93,8 +93,6 @@ public class Food {
     @Builder.Default
     Set<RecipeIngredient> ingredients = new HashSet<>();
 
-    @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<SavedFood> savedByUsers = new HashSet<>();
 
     @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<PlanLog> loggedByUsers = new HashSet<>();

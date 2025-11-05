@@ -1,6 +1,5 @@
 package com.hn.nutricarebe.dto.overview;
 
-import com.hn.nutricarebe.entity.Food;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 

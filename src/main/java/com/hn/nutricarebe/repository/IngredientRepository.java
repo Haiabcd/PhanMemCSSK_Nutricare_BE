@@ -27,10 +27,6 @@ public interface IngredientRepository extends JpaRepository<Ingredient, UUID> {
     @EntityGraph(attributePaths = {"aliases"})
     Slice<Ingredient> findAllBy(Pageable pageable);
 
-    // Tìm nguyên liệu theo tên gần đúng
-    @EntityGraph(attributePaths = {"aliases"})
-    Slice<Ingredient> findByNameContainingIgnoreCase(String q, Pageable pageable);
-
     @Query(
             value = """
             select distinct i.*

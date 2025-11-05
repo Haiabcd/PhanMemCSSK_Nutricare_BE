@@ -7,7 +7,6 @@ import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.orchestrator.ProfileOrchestrator;
 import com.hn.nutricarebe.repository.ProfileRepository;
-import com.hn.nutricarebe.service.ProfileService;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;

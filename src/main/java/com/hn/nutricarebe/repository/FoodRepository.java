@@ -1,6 +1,5 @@
 package com.hn.nutricarebe.repository;
 
-import com.hn.nutricarebe.dto.overview.FoodTopKcalDto;
 import com.hn.nutricarebe.entity.Food;
 import com.hn.nutricarebe.enums.MealSlot;
 import org.springframework.data.domain.Page;
@@ -12,7 +11,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Pageable;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -129,22 +127,6 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
 """, nativeQuery = true)
     List<Object[]> findTop10FoodsByProteinNative();
 
-    /** Số món có đầy đủ 4 macro (nutrition có thể null) */
-    @Query("""
-        SELECT COUNT(f) FROM Food f
-        WHERE f.nutrition IS NOT NULL
-          AND f.nutrition.kcal     IS NOT NULL
-          AND f.nutrition.proteinG IS NOT NULL
-          AND f.nutrition.carbG    IS NOT NULL
-          AND f.nutrition.fatG     IS NOT NULL
-    """)
-    long countFoodsWithCompleteMacros();
-
-    /** Món năng lượng cao (kcal > threshold) */
-    long countByNutrition_KcalGreaterThan(BigDecimal threshold);
-
-    /** Món năng lượng thấp (kcal < threshold) */
-    long countByNutrition_KcalLessThan(BigDecimal threshold);
 
     // Đếm số món ăn theo các bin năng lượng
     @Query(value = """

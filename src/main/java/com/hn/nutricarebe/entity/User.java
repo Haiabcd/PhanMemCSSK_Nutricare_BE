@@ -66,7 +66,7 @@ public class User {
     Instant updatedAt;
 
 
-    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     Profile profile;
 
 
@@ -74,7 +74,7 @@ public class User {
     Set<WaterLog> waterLogs = new HashSet<>();
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<MealPlanDay>  mealPlanDays = new HashSet<>();;
+    Set<MealPlanDay>  mealPlanDays = new HashSet<>();
 
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<UserCondition> userConditions = new HashSet<>();
@@ -84,8 +84,4 @@ public class User {
 
     @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
     Set<UserAllergy> userAllergies = new HashSet<>();
-
-    @OneToMany(mappedBy = "user",fetch = FetchType.LAZY,
-            cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<SavedFood> savedFoods = new HashSet<>();
 }

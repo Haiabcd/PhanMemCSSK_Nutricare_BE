@@ -39,7 +39,6 @@ public final class StatisticHelper {
         double dFat   = safe(c.getFatG())     - safe(t.getFatG());
         double dFiber = safe(c.getFiberG())   - safe(t.getFiberG());
         double dNa    = safe(c.getSodiumMg()) - safe(t.getSodiumMg());
-        double dSug   = safe(c.getSugarMg())  - safe(t.getSugarMg()); // không dùng để cảnh báo
 
         StringBuilder sb = new StringBuilder();
 
@@ -56,7 +55,7 @@ public final class StatisticHelper {
 
         // Sugar: KHÔNG cảnh báo → bỏ hẳn
 
-        if (sb.length() == 0) return null;
+        if (sb.isEmpty()) return null;
         return "Ngày " + target.getDate() + ": " + sb.toString().trim();
     }
 

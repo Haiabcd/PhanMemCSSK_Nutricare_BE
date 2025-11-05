@@ -125,24 +125,6 @@ public class IngredientServiceImpl implements IngredientService {
         );
     }
 
-    // Tìm kiếm nguyên liệu theo tên gần đúng
-    @Override
-    public Slice<IngredientResponse> searchByName(String q, Pageable pageable) {
-        String keyword = q == null ? "" : q.trim();
-        if (keyword.length() < 2) {
-            throw new AppException(ErrorCode.NAME_EMPTY);
-        }
-
-        Slice<Ingredient> slice = ingredientRepository.findByNameContainingIgnoreCase(keyword, pageable);
-        return new SliceImpl<>(
-                slice.getContent().stream()
-                        .map(ingredient -> ingredientMapper.toIngredientResponse(ingredient, cdnHelper))
-                        .toList(),
-                pageable,
-                slice.hasNext()
-        );
-    }
-
 
     @Override
     @Transactional(readOnly = true)
@@ -250,18 +232,21 @@ public class IngredientServiceImpl implements IngredientService {
         // 1) Tìm bản ghi
         Ingredient ing = ingredientRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
+
         // 2) Chuẩn hoá tên và kiểm tra trùng
         String normalizedName = normalizeName(request.getName());
         if (normalizedName == null || normalizedName.isBlank()) {
             throw new AppException(ErrorCode.NAME_EMPTY);
         }
+
         // Nếu tên thay đổi, kiểm tra trùng với bản ghi khác
         if (!normalizedName.equalsIgnoreCase(ing.getName())) {
             ingredientRepository.findByNameIgnoreCase(normalizedName)
                     .filter(other -> !other.getId().equals(ing.getId()))
                     .ifPresent(other -> {throw new AppException(ErrorCode.INGREDIENT_NAME_EXISTED); });
         }
-        // 3) Map per100 (dinh dưỡng trên 100 đơn vị) từ request sang entity
+
+        // 3) Map per100
         Nutrition per100 = new Nutrition();
         if (request.getPer100() != null) {
             per100.setKcal(request.getPer100().getKcal());
@@ -272,43 +257,49 @@ public class IngredientServiceImpl implements IngredientService {
             per100.setSodiumMg(request.getPer100().getSodiumMg());
             per100.setSugarMg(request.getPer100().getSugarMg());
         }
-        // 4) Chuẩn bị cập nhật ảnh (nếu có)
+
+        // 4) Upload ảnh mới (nếu có)
         String oldKey = ing.getImageKey();
         String newKey = null;
         boolean hasNewImage = request.getImage() != null && !request.getImage().isEmpty();
 
-        try {
-            if (hasNewImage) {
+        if (hasNewImage) {
+            try {
                 newKey = s3Service.uploadObject(request.getImage(), "images/ingredients");
+            } catch (IOException e) {
+                throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
             }
-            // 5) Gán các trường lên entity
-            ing.setName(normalizedName);
-            ing.setPer100(per100);
-            ing.setUnit(request.getUnit() == null ? Unit.G : request.getUnit());
-            Set<String> aliases = request.getAliases() == null ? new HashSet<>() : request.getAliases();
-            ing.setAliases(aliases);
-            if (hasNewImage) {
-                ing.setImageKey(newKey);
-            }
-            // 6) Lưu
+        }
+
+        // 5) Gán các trường lên entity
+        ing.setName(normalizedName);
+        ing.setPer100(per100);
+        ing.setUnit(request.getUnit() == null ? Unit.G : request.getUnit());
+        Set<String> aliases = request.getAliases() == null ? new HashSet<>() : request.getAliases();
+        ing.setAliases(aliases);
+
+        if (newKey != null) {
+            ing.setImageKey(newKey);
+        }
+
+        // 6) Lưu
+        try {
             ingredientRepository.save(ing);
-            // 7) Sau khi lưu thành công, nếu có ảnh mới thì xoá ảnh cũ
-            if (hasNewImage && oldKey != null && !oldKey.isBlank()) {
-                try {
-                    s3Service.deleteObject(oldKey);
-                } catch (RuntimeException e) {
-                    log.warn("Failed to delete old image object: {}", oldKey, e);
-                }
-            }
         } catch (DataIntegrityViolationException e) {
-            if (hasNewImage && newKey != null) safeDeleteObject(newKey);
+            // Rollback: xóa ảnh mới đã upload
+            if (newKey != null) {
+                safeDeleteObject(newKey);
+            }
             throw e;
-        } catch (IOException e) {
-            if (hasNewImage && newKey != null) safeDeleteObject(newKey);
-            throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
-        } catch (RuntimeException e) {
-            if (hasNewImage && newKey != null) safeDeleteObject(newKey);
-            throw e;
+        }
+
+        // 7) Xóa ảnh cũ sau khi lưu thành công
+        if (newKey != null && oldKey != null && !oldKey.isBlank()) {
+            try {
+                s3Service.deleteObject(oldKey);
+            } catch (RuntimeException e) {
+                log.warn("Failed to delete old image object: {}", oldKey, e);
+            }
         }
     }
 

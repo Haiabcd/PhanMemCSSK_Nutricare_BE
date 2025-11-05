@@ -3,10 +3,8 @@ package com.hn.nutricarebe.mapper;
 
 import com.hn.nutricarebe.dto.request.AllergyRequest;
 import com.hn.nutricarebe.dto.response.AllergyResponse;
-import com.hn.nutricarebe.dto.response.ConditionResponse;
 import com.hn.nutricarebe.dto.response.UserAllergyResponse;
 import com.hn.nutricarebe.entity.Allergy;
-import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.entity.NutritionRule;
 import org.mapstruct.*;
 import java.util.List;
@@ -46,7 +44,6 @@ public interface  AllergyMapper {
         var rules = rulesByAllergy.getOrDefault(source.getId(), List.of());
         target.nutritionRules(ruleMapper.toResponses(rules));
     }
-
 
     @AfterMapping
     default void ensureRulesNotNull(@MappingTarget AllergyResponse target) {

@@ -146,7 +146,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<RecoItemDto> items = new ArrayList<>();
 
         // Query cho tin tức
-        String generalQuery = buildGeneralNewsQuery(profile);
+        String generalQuery = buildGeneralNewsQuery();
         String goalQuery    = buildGoalNewsQuery(profile);
         List<String> condQueries = buildConditionNewsQueries(profile);
 
@@ -211,10 +211,10 @@ public class RecommendationServiceImpl implements RecommendationService {
         /* ===================== Scoring & Sorting ===================== */
         Comparator<RecoItemDto> priorityCmp = (a, b) -> {
             double sa = 1.3 * recencyBoost(a.getPublished())
-                    + 1.0 * domainBoost(a.getSource())
+                    + domainBoost(a.getSource())
                     + 0.8 * relevanceScore(safeLower(a.getTitle()), merge(goalBoostKws, condBoostKws));
             double sb = 1.3 * recencyBoost(b.getPublished())
-                    + 1.0 * domainBoost(b.getSource())
+                    + domainBoost(b.getSource())
                     + 0.8 * relevanceScore(safeLower(b.getTitle()), merge(goalBoostKws, condBoostKws));
             int c = Double.compare(sb, sa);
             if (c != 0) return c;
@@ -223,10 +223,10 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         Comparator<RecoItemDto> othersCmp = (a, b) -> {
             double sa = 1.2 * recencyBoost(a.getPublished())
-                    + 1.0 * domainBoost(a.getSource())
+                    + domainBoost(a.getSource())
                     + 0.3 * relevanceScore(safeLower(a.getTitle()), nutritionKeywords);
             double sb = 1.2 * recencyBoost(b.getPublished())
-                    + 1.0 * domainBoost(b.getSource())
+                    + domainBoost(b.getSource())
                     + 0.3 * relevanceScore(safeLower(b.getTitle()), nutritionKeywords);
             int c = Double.compare(sb, sa);
             if (c != 0) return c;
@@ -254,11 +254,11 @@ public class RecommendationServiceImpl implements RecommendationService {
     /* ============================ Helpers dành cho NEWS ============================ */
 
     /** Query chung về dinh dưỡng/sức khỏe để lấp đầy */
-    private static String buildGeneralNewsQuery(ProfileDto p) {
-        List<String> parts = new ArrayList<>();
-        parts.addAll(Arrays.asList(
+    private static String buildGeneralNewsQuery() {
+        List<String> parts = new ArrayList<>(List.of(
                 "dinh dưỡng", "sức khỏe", "khuyến cáo", "cảnh báo",
-                "ăn kiêng", "thực phẩm", "chế độ ăn", "bác sĩ", "viện dinh dưỡng", "WHO"
+                "ăn kiêng", "thực phẩm", "chế độ ăn", "bác sĩ",
+                "viện dinh dưỡng", "WHO"
         ));
         return join(parts, " ");
     }
@@ -405,7 +405,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                 if (img == null) img = firstImgFromHtml(text(it, "summary"));
             }
 
-            if (link == null || link.trim().isEmpty()) continue;
+            if (link.trim().isEmpty()) continue;
 
             // BỎ các bài mang tính "video/clip"
             if (isVideoLike(link, hostOf(link), title)) continue;
@@ -426,16 +426,16 @@ public class RecommendationServiceImpl implements RecommendationService {
         return out;
     }
 
-    @SuppressWarnings("unchecked")
+
     private List<RecoItemDto> fetchPubMed(String query) throws Exception {
         Document d1 = fetchDoc(pubmedSearchUrl(query));
         org.json.JSONObject search = new org.json.JSONObject(d1.text());
         org.json.JSONObject esr = search.optJSONObject("esearchresult");
         if (esr == null) return Collections.emptyList();
         org.json.JSONArray idList = esr.optJSONArray("idlist");
-        if (idList == null || idList.length() == 0) return Collections.emptyList();
+        if (idList == null || idList.isEmpty()) return Collections.emptyList();
 
-        List<String> idsArr = new ArrayList<String>();
+        List<String> idsArr = new ArrayList<>();
         for (int i = 0; i < idList.length(); i++) {
             idsArr.add(String.valueOf(idList.get(i)));
         }
@@ -448,10 +448,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         org.json.JSONObject sum = root.optJSONObject("result");
         if (sum == null) return Collections.emptyList();
 
-        List<RecoItemDto> out = new ArrayList<RecoItemDto>();
+        List<RecoItemDto> out = new ArrayList<>();
         String[] idSplit = ids.split(",");
-        for (int i = 0; i < idSplit.length; i++) {
-            String id = idSplit[i];
+        for (String id : idSplit) {
             if (!sum.has(id)) continue;
             org.json.JSONObject it = sum.getJSONObject(id);
 
@@ -486,9 +485,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     /* ================== tiny utils ================== */
 
     private static int clampLimit(int limit) {
-        if (limit < 1) return 12;
-        if (limit > 30) return 30;
-        return limit;
+        return Math.min(30, Math.max(limit, 12));
     }
 
     private static String text(Element root, String css) {
@@ -526,7 +523,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         Element img = org.jsoup.Jsoup.parse(html).selectFirst("img");
         if (img == null) return null;
         String src = img.absUrl("src");
-        return (src != null && !src.isEmpty()) ? src : null;
+        return (!src.isEmpty()) ? src : null;
     }
 
     private static boolean isBlank(String s) {
@@ -601,24 +598,22 @@ public class RecommendationServiceImpl implements RecommendationService {
     private static String viToEn(String s) {
         if (s == null) return null;
         String t = s.trim().toLowerCase(Locale.ROOT);
-        switch (t) {
-            case "giảm cân": return "weight loss";
-            case "tăng cân": return "weight gain";
-            case "tăng cơ":  return "muscle gain";
-            case "giữ cân":  return "maintenance";
-            case "dinh dưỡng": return "nutrition";
-            case "thực đơn": return "meal plan";
-            case "dị ứng":   return "allergy";
-            case "bệnh nền": return "chronic disease";
-            case "tiểu đường":
-            case "đái tháo đường": return "diabetes";
-            case "cao huyết áp":
-            case "tăng huyết áp":   return "hypertension";
-            case "rối loạn mỡ máu": return "dyslipidemia";
-            case "béo phì":         return "obesity";
-            case "tim mạch":        return "cardiovascular";
-            default: return null;
-        }
+        return switch (t) {
+            case "giảm cân"          -> "weight loss";
+            case "tăng cân"          -> "weight gain";
+            case "tăng cơ"           -> "muscle gain";
+            case "giữ cân"           -> "maintenance";
+            case "dinh dưỡng"        -> "nutrition";
+            case "thực đơn"          -> "meal plan";
+            case "dị ứng"            -> "allergy";
+            case "bệnh nền"          -> "chronic disease";
+            case "tiểu đường", "đái tháo đường" -> "diabetes";
+            case "cao huyết áp", "tăng huyết áp" -> "hypertension";
+            case "rối loạn mỡ máu"   -> "dyslipidemia";
+            case "béo phì"           -> "obesity";
+            case "tim mạch"          -> "cardiovascular";
+            default -> null;
+        };
     }
 
     private static String buildEnglishQuery(ProfileDto p) {
@@ -654,9 +649,8 @@ public class RecommendationServiceImpl implements RecommendationService {
         // title/source ám chỉ clip
         if (t.contains("video") || t.contains("clip") || t.contains("livestream") ||
                 t.contains("trực tiếp") || t.contains("phát trực tiếp")) return true;
-        if (s.contains("youtube") || s.contains("tiktok") || s.contains("facebook")) return true;
 
-        return false;
+        return s.contains("youtube") || s.contains("tiktok") || s.contains("facebook");
     }
 
     /* ========= Misc helpers ========= */
@@ -686,9 +680,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                 Instant a = it.getPublished();
                 Instant b = old.getPublished();
                 int cmp = comparePublishedDesc(a, b); // b - a (desc)
-                if (cmp < 0) {
-                    // old mới hơn -> giữ old
-                } else {
+                if (cmp >= 0) {
                     byKey.put(key, it); // it mới hơn (hoặc bằng) -> thay
                 }
             }
@@ -707,24 +699,22 @@ public class RecommendationServiceImpl implements RecommendationService {
     /** Map GoalType -> tiếng Việt gọn */
     private String mapGoalToString(com.hn.nutricarebe.enums.GoalType goal) {
         if (goal == null) return null;
-        switch (goal) {
-            case LOSE:     return "giảm cân";
-            case GAIN:     return "tăng cân";
-            case MAINTAIN: return "giữ cân";
-            default:       return goal.name().toLowerCase(Locale.ROOT);
-        }
+        return switch (goal) {
+            case LOSE      -> "giảm cân";
+            case GAIN      -> "tăng cân";
+            case MAINTAIN  -> "giữ cân";
+        };
     }
 
     /** Map ActivityLevel -> tiếng Việt gọn */
     private String mapActivityToString(com.hn.nutricarebe.enums.ActivityLevel act) {
         if (act == null) return null;
-        switch (act) {
-            case SEDENTARY:         return "Ít vận động";
-            case LIGHTLY_ACTIVE:    return "Vận động nhẹ";
-            case MODERATELY_ACTIVE: return "Vận động vừa phải";
-            case VERY_ACTIVE:       return "Vận động nhiều";
-            case EXTRA_ACTIVE:      return "Vận động rất nhiều";
-            default:                return act.name().toLowerCase(Locale.ROOT);
-        }
+        return switch (act) {
+            case SEDENTARY         -> "Ít vận động";
+            case LIGHTLY_ACTIVE    -> "Vận động nhẹ";
+            case MODERATELY_ACTIVE -> "Vận động vừa phải";
+            case VERY_ACTIVE       -> "Vận động nhiều";
+            case EXTRA_ACTIVE      -> "Vận động rất nhiều";
+        };
     }
 }

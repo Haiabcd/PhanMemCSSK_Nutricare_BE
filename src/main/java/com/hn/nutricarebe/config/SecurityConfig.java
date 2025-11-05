@@ -102,10 +102,8 @@ public class SecurityConfig {
         DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
         return request -> {
             String method = request.getMethod();
-            String uri = request.getRequestURI();
             // Cho phép preflight
             if ("OPTIONS".equalsIgnoreCase(method)) return null;
-
             return delegate.resolve(request);
         };
     }

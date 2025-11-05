@@ -5,7 +5,6 @@ import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
 import com.hn.nutricarebe.dto.response.UserAllergyResponse;
 import com.hn.nutricarebe.dto.response.UserConditionResponse;
-import com.hn.nutricarebe.entity.Condition;
 import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.entity.Profile;
 import com.hn.nutricarebe.entity.User;
@@ -80,7 +79,7 @@ public class ProfileServiceImpl implements ProfileService {
         boolean conditionUpdated = userConditionService.updateUserConditions(userId, request.getConditions());
 
         // 2) Tính toán giá trị "kỳ vọng" cho các field ảnh hưởng meal plan từ request
-        Integer expectedTargetDeltaKg;
+        int expectedTargetDeltaKg;
         Integer expectedTargetDurationWeeks;
 
         switch (profileRequest.getGoal()) {

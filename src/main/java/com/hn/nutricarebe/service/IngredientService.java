@@ -16,7 +16,6 @@ public interface IngredientService {
     IngredientResponse getById(UUID id);
     void deleteById(UUID id);
     Slice<IngredientResponse> getAll(Pageable pageable);
-    Slice<IngredientResponse> searchByName(String q, Pageable pageable);
     List<IngredientResponse> autocompleteIngredients(String keyword, int limit);
     NutritionAudit audit(DishVisionResult vision, boolean strict);
     long countIngredients();

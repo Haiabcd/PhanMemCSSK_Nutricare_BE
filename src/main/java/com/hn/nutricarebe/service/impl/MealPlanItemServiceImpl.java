@@ -84,7 +84,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
 
                 // Tìm portion thuộc {1.5, 1.0, 0.5}
                 PortionScore ps = bestPortionAgainstTarget(n, oldSnap);
-                if (ps == null) continue;
+
 
                 // Tính điểm chênh lệch (L1 weighted)
                 double score = ps.distance;
@@ -181,7 +181,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         }
         LinkedHashMap<UUID, Food> dedup = new LinkedHashMap<>();
         for (Food f : allowed) dedup.putIfAbsent(f.getId(), f);
-        List<Food> dsFood =  dedup.values().stream().limit(limit).collect(Collectors.toList());
+        List<Food> dsFood =  dedup.values().stream().limit(limit).toList();
         return dsFood.stream()
                 .map(f -> foodMapper.toFoodResponse(f, cdnHelper))
                 .collect(Collectors.toList());
@@ -207,11 +207,10 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
 
     // Chọn khẩu phần tốt nhất  + điểm chênh lệch so với mục tiêu
     private PortionScore bestPortionAgainstTarget(Nutrition cand, Nutrition target) {
-        double[] steps = PORTION_STEPS;
         double bestDist = Double.POSITIVE_INFINITY;
         double bestStep = 1.0;
 
-        for (double step : steps) {
+        for (double step : PORTION_STEPS) {
             Nutrition s = scaleNutrition(cand, step);
             double dist = nutritionDistanceL1Weighted(s, target);
             if (dist < bestDist) {
@@ -228,7 +227,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         double dp = Math.abs(safeDouble(a.getProteinG()) - safeDouble(b.getProteinG()));
         double dc = Math.abs(safeDouble(a.getCarbG())    - safeDouble(b.getCarbG()));
         double df = Math.abs(safeDouble(a.getFatG())     - safeDouble(b.getFatG()));
-        return dk * 1.0 + dp * 0.4 + dc * 0.3 + df * 0.3;
+        return dk + dp * 0.4 + dc * 0.3 + df * 0.3;
     }
 
     private boolean isGoodEnough(double score, Nutrition target) {
