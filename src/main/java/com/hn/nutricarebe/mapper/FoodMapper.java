@@ -23,7 +23,6 @@ public interface FoodMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "ingredients", ignore = true)
-    @Mapping(target = "savedByUsers", ignore = true)
     @Mapping(target = "loggedByUsers", ignore = true)
     @Mapping(target = "inMealPlanItems", ignore = true)
     @Mapping(target = "isIngredient", ignore = true)

@@ -21,21 +21,21 @@ spring:
     restart:
       enabled: false
   datasource:
-    url: jdbc:postgresql://aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require&preferQueryMode=simple&prepareThreshold=0&applicationName=NutriCareBE
+    url: jdbc:postgresql://aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require&preferQueryMode=simple&applicationName=NutriCareBE
     username: postgres.ewyeishkixdcfhnzxprj
     password: "nutricareqdrhd@#$"
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 3
+      maximum-pool-size: 2
       minimum-idle: 0
       connection-timeout: 30000
-      keepalive-time: 60000
+      keepalive-time: 0
       idle-timeout: 300000
       max-lifetime: 480000
       leak-detection-threshold: 20000
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
@@ -57,13 +57,11 @@ jwt:
   signerKey: "y1dxnqQi/A28NV/zHsbVY1dOZhtByCOGUs9mov/l7LlJTnCnLtXvZjHB5jURJm66"
   valid-duration: 900 # in second
   refreshable-duration: 2592000 # in seconds
-
 supabase:
   host: "https://ewyeishkixdcfhnzxprj.supabase.co"
   anon-key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3eWVpc2hraXhkY2Zobnp4cHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMDMxMDgsImV4cCI6MjA3MTY3OTEwOH0.E9oUPHv6OmpWXTylXCHSF2ULWxxUM_GBLuPCh3BbOl0"
 oauth:
   callback-url: "http://192.168.110.187:8080/auths/google/callback"
-
 logging:
   level:
     ROOT: INFO
