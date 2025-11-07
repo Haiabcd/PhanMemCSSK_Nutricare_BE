@@ -1,10 +1,10 @@
 package com.hn.nutricarebe.dto.ai;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.util.List;
 import java.util.UUID;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -34,8 +34,12 @@ public class PlanningContextAI {
         String name;
         List<String> slotHints; // từ Set<MealSlot> -> ["BREAKFAST",...]
         Integer kcal;
-        Double proteinG; Double carbG; Double fatG; Double fiberG;
-        Integer sodiumMg; Integer sugarMg;
+        Double proteinG;
+        Double carbG;
+        Double fatG;
+        Double fiberG;
+        Integer sodiumMg;
+        Integer sugarMg;
         List<String> tags; // từ Set<Tag> -> nameCode
         Integer defaultServing;
         String servingName;

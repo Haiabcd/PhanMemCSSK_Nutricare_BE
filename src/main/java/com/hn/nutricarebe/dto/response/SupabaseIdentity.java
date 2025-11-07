@@ -11,9 +11,9 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Builder
 public class SupabaseIdentity {
-   String id;
-   String provider;
-   String provider_id;
-   String email;
-   Boolean email_verified;
+    String id;
+    String provider;
+    String provider_id;
+    String email;
+    Boolean email_verified;
 }

@@ -1,9 +1,10 @@
 package com.hn.nutricarebe.dto.response;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
 import java.util.List;
 import java.util.UUID;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

@@ -11,9 +11,9 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class TokenPairResponse {
-    String tokenType;        // "Bearer"
+    String tokenType; // "Bearer"
     String accessToken;
-    Long   accessExpiresAt;  // epoch seconds
+    Long accessExpiresAt; // epoch seconds
     String refreshToken;
-    Long   refreshExpiresAt; // epoch seconds
+    Long refreshExpiresAt; // epoch seconds
 }

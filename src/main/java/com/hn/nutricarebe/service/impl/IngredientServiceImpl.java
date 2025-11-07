@@ -1,5 +1,19 @@
 package com.hn.nutricarebe.service.impl;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.hn.nutricarebe.dto.ai.DishVisionResult;
 import com.hn.nutricarebe.dto.ai.IngredientBreakdown;
 import com.hn.nutricarebe.dto.ai.NutritionAudit;
@@ -16,22 +30,11 @@ import com.hn.nutricarebe.mapper.IngredientMapper;
 import com.hn.nutricarebe.repository.IngredientRepository;
 import com.hn.nutricarebe.service.IngredientService;
 import com.hn.nutricarebe.service.S3Service;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.SliceImpl;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.*;
 
 @Slf4j
 @Service
@@ -43,12 +46,11 @@ public class IngredientServiceImpl implements IngredientService {
     S3Service s3Service;
     CdnHelper cdnHelper;
 
-    static  BigDecimal THOUSAND = new BigDecimal("1000");
+    static BigDecimal THOUSAND = new BigDecimal("1000");
     static BigDecimal HUNDRED = new BigDecimal("100");
     static int SCALE = 6;
-    static  RoundingMode RM = RoundingMode.HALF_UP;
+    static RoundingMode RM = RoundingMode.HALF_UP;
     static String CDN_BASE = "https://dyfgxhmdeg59a.cloudfront.net";
-
 
     // Tạo mới nguyên liệu
     @Override
@@ -84,19 +86,19 @@ public class IngredientServiceImpl implements IngredientService {
     // Lấy nguyên liệu theo ID
     @Override
     public IngredientResponse getById(UUID id) {
-        Ingredient ingredient = ingredientRepository.findWithCollectionsById(id)
+        Ingredient ingredient = ingredientRepository
+                .findWithCollectionsById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
         return ingredientMapper.toIngredientResponse(ingredient, cdnHelper);
     }
-
 
     // Xóa nguyên liệu theo ID
     @Override
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteById(UUID id) {
-        Ingredient ing = ingredientRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
+        Ingredient ing =
+                ingredientRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
         String key = ing.getImageKey();
         if (key != null && !key.isBlank()) {
             try {
@@ -121,10 +123,8 @@ public class IngredientServiceImpl implements IngredientService {
                         .map(ingredient -> ingredientMapper.toIngredientResponse(ingredient, cdnHelper))
                         .toList(),
                 pageable,
-                slice.hasNext()
-        );
+                slice.hasNext());
     }
-
 
     @Override
     @Transactional(readOnly = true)
@@ -133,14 +133,10 @@ public class IngredientServiceImpl implements IngredientService {
 
         Pageable pageable = PageRequest.of(0, size);
 
-        return ingredientRepository
-                .searchByNameOrAlias(keyword.trim(), pageable)
-                .getContent()
-                .stream()
+        return ingredientRepository.searchByNameOrAlias(keyword.trim(), pageable).getContent().stream()
                 .map(i -> ingredientMapper.toIngredientResponse(i, cdnHelper))
                 .toList();
     }
-
 
     @Override
     public NutritionAudit audit(DishVisionResult vision, boolean strict) {
@@ -170,11 +166,10 @@ public class IngredientServiceImpl implements IngredientService {
                 } else {
                     per100 = (ing.getPer100() != null) ? ing.getPer100() : new Nutrition();
                     amountInIngredientUnit = convert(
-                            est.getAmount(),   // số lượng AI trả về
-                            est.getUnit(),     // đơn vị AI trả về (MG/G/ML/L)
-                            ing.getUnit(),     // đơn vị gốc trong DB
-                            allowApproxDensity
-                    );
+                            est.getAmount(), // số lượng AI trả về
+                            est.getUnit(), // đơn vị AI trả về (MG/G/ML/L)
+                            ing.getUnit(), // đơn vị gốc trong DB
+                            allowApproxDensity);
                     sub = mulPer100ByAmount(per100, amountInIngredientUnit);
                     add(total, sub);
                     if (ing.getImageKey() != null && !ing.getImageKey().isBlank()) {
@@ -197,8 +192,7 @@ public class IngredientServiceImpl implements IngredientService {
         }
 
         if (strict && !missing.isEmpty()) {
-            throw new AppException(
-                    ErrorCode.INGREDIENT_NOT_FOUND);
+            throw new AppException(ErrorCode.INGREDIENT_NOT_FOUND);
         }
 
         return NutritionAudit.builder()
@@ -209,7 +203,6 @@ public class IngredientServiceImpl implements IngredientService {
                 .servingGram(vision.getServingGram())
                 .build();
     }
-
 
     // Đếm tổng số nguyên liệu
     @Override
@@ -223,15 +216,14 @@ public class IngredientServiceImpl implements IngredientService {
         return ingredientRepository.countNewThisWeek();
     }
 
-
-    //Cập nhật nguyên liệu
+    // Cập nhật nguyên liệu
     @Override
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public void updateIngredient(UUID id, IngredientUpdateRequest request) {
         // 1) Tìm bản ghi
-        Ingredient ing = ingredientRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
+        Ingredient ing =
+                ingredientRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.INGREDIENT_NOT_FOUND));
 
         // 2) Chuẩn hoá tên và kiểm tra trùng
         String normalizedName = normalizeName(request.getName());
@@ -241,9 +233,12 @@ public class IngredientServiceImpl implements IngredientService {
 
         // Nếu tên thay đổi, kiểm tra trùng với bản ghi khác
         if (!normalizedName.equalsIgnoreCase(ing.getName())) {
-            ingredientRepository.findByNameIgnoreCase(normalizedName)
+            ingredientRepository
+                    .findByNameIgnoreCase(normalizedName)
                     .filter(other -> !other.getId().equals(ing.getId()))
-                    .ifPresent(other -> {throw new AppException(ErrorCode.INGREDIENT_NAME_EXISTED); });
+                    .ifPresent(other -> {
+                        throw new AppException(ErrorCode.INGREDIENT_NAME_EXISTED);
+                    });
         }
 
         // 3) Map per100
@@ -303,8 +298,6 @@ public class IngredientServiceImpl implements IngredientService {
         }
     }
 
-
-
     public Optional<Ingredient> resolveOne(String requestedName) {
         if (requestedName == null || requestedName.isBlank()) return Optional.empty();
 
@@ -322,6 +315,7 @@ public class IngredientServiceImpl implements IngredientService {
 
         return Optional.empty();
     }
+
     private String buildCdnUrl(String key) {
         if (key == null || key.isBlank()) return null;
         // tránh trùng dấu '/'
@@ -331,21 +325,23 @@ public class IngredientServiceImpl implements IngredientService {
             return CDN_BASE + "/" + key.replaceFirst("^/+", "");
         }
     }
-    private boolean isMass(Unit u)   { return u == Unit.MG || u == Unit.G; }
-    private boolean isVolume(Unit u) { return u == Unit.ML || u == Unit.L; }
+
+    private boolean isMass(Unit u) {
+        return u == Unit.MG || u == Unit.G;
+    }
+
+    private boolean isVolume(Unit u) {
+        return u == Unit.ML || u == Unit.L;
+    }
     /** Chuẩn hóa về G cho khối lượng, ML cho thể tích; rồi đổi hệ nếu cần; cuối cùng đổi sang đơn vị đích. */
     private BigDecimal convert(BigDecimal amount, Unit from, Unit to, boolean allowApproxDensity) {
         if (amount == null) return BigDecimal.ZERO;
         if (from == null || to == null || from == to) return amount;
         BigDecimal fromBase;
         if (isMass(from)) {
-            fromBase = (from == Unit.MG)
-                    ? amount.divide(THOUSAND, 6, RoundingMode.HALF_UP)
-                    : amount;
+            fromBase = (from == Unit.MG) ? amount.divide(THOUSAND, 6, RoundingMode.HALF_UP) : amount;
         } else if (isVolume(from)) {
-            fromBase = (from == Unit.L)
-                    ? amount.multiply(THOUSAND)
-                    : amount;
+            fromBase = (from == Unit.L) ? amount.multiply(THOUSAND) : amount;
         } else {
             return amount;
         }
@@ -365,13 +361,9 @@ public class IngredientServiceImpl implements IngredientService {
         }
 
         if (isMass(to)) {
-            return (to == Unit.MG)
-                    ? toBase.multiply(THOUSAND)
-                    : toBase;
+            return (to == Unit.MG) ? toBase.multiply(THOUSAND) : toBase;
         } else if (isVolume(to)) {
-            return (to == Unit.L)
-                    ? toBase.divide(THOUSAND, 6, RoundingMode.HALF_UP)
-                    : toBase;
+            return (to == Unit.L) ? toBase.divide(THOUSAND, 6, RoundingMode.HALF_UP) : toBase;
         } else {
             return amount;
         }
@@ -380,9 +372,8 @@ public class IngredientServiceImpl implements IngredientService {
      *  amountInIngredientUnit là lượng đã quy đổi về đúng đơn vị gốc của Ingredient.
      */
     private Nutrition mulPer100ByAmount(Nutrition per100, BigDecimal amountInIngredientUnit) {
-        BigDecimal factor = (amountInIngredientUnit == null)
-                ? BigDecimal.ZERO
-                : amountInIngredientUnit.divide(HUNDRED, SCALE, RM);
+        BigDecimal factor =
+                (amountInIngredientUnit == null) ? BigDecimal.ZERO : amountInIngredientUnit.divide(HUNDRED, SCALE, RM);
         Nutrition n = new Nutrition();
         n.setKcal(z(per100.getKcal()).multiply(factor));
         n.setProteinG(z(per100.getProteinG()).multiply(factor));
@@ -393,6 +384,7 @@ public class IngredientServiceImpl implements IngredientService {
         n.setSugarMg(z(per100.getSugarMg()).multiply(factor));
         return n;
     }
+
     private void add(Nutrition a, Nutrition b) {
         a.setKcal(z(a.getKcal()).add(z(b.getKcal())));
         a.setProteinG(z(a.getProteinG()).add(z(b.getProteinG())));
@@ -402,16 +394,22 @@ public class IngredientServiceImpl implements IngredientService {
         a.setSodiumMg(z(a.getSodiumMg()).add(z(b.getSodiumMg())));
         a.setSugarMg(z(a.getSugarMg()).add(z(b.getSugarMg())));
     }
-    private BigDecimal z(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
+
+    private BigDecimal z(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
+    }
+
     private void safeDeleteObject(String objectKey) {
         if (objectKey != null) {
-            try { s3Service.deleteObject(objectKey); } catch (Exception ignored) {}
+            try {
+                s3Service.deleteObject(objectKey);
+            } catch (Exception ignored) {
+            }
         }
     }
+
     private String normalizeName(String input) {
         if (input == null) return null;
         return input.trim().replaceAll("\\s+", " ");
     }
 }
-
-

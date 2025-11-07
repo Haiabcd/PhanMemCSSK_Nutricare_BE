@@ -1,9 +1,9 @@
 package com.hn.nutricarebe.dto.overview;
 
+import java.util.List;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.util.List;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -12,7 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @Builder
 public class EnergyHistogramDto {
-    List<EnergyBinDto> bins;  // các dải kcal
-    long total;               // tổng số món
+    List<EnergyBinDto> bins; // các dải kcal
+    long total; // tổng số món
     long maxBinCount;
 }

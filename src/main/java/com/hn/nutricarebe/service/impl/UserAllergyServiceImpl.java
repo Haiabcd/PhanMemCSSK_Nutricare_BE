@@ -1,5 +1,10 @@
 package com.hn.nutricarebe.service.impl;
 
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
 import com.hn.nutricarebe.dto.response.UserAllergyResponse;
 import com.hn.nutricarebe.entity.*;
@@ -7,12 +12,10 @@ import com.hn.nutricarebe.mapper.AllergyMapper;
 import com.hn.nutricarebe.repository.AllergyRepository;
 import com.hn.nutricarebe.repository.UserAllergyRepository;
 import com.hn.nutricarebe.service.UserAllergyService;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.stereotype.Service;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,13 +37,10 @@ public class UserAllergyServiceImpl implements UserAllergyService {
     public List<UserAllergyResponse> saveUserAllergy(UserAllergyCreationRequest request) {
         User u = request.getUser();
         List<UserAllergyResponse> response = new ArrayList<>();
-        for(UUID allergyId : request.getAllergyIds()) {
+        for (UUID allergyId : request.getAllergyIds()) {
             Allergy a = allergyRepository.findById(allergyId).orElse(null);
-            if(a != null) {
-                UserAllergy ua = UserAllergy.builder()
-                        .user(u)
-                        .allergy(a)
-                        .build();
+            if (a != null) {
+                UserAllergy ua = UserAllergy.builder().user(u).allergy(a).build();
                 userAllergyRepository.save(ua);
                 response.add(allergyMapper.toUserAllergyResponse(a));
             }
@@ -50,8 +50,7 @@ public class UserAllergyServiceImpl implements UserAllergyService {
 
     @Override
     public boolean updateUserAllergys(UUID userId, Set<UUID> allergyIds) {
-        Set<UUID> newIds = (allergyIds == null) ? Collections.emptySet()
-                : new LinkedHashSet<>(allergyIds);
+        Set<UUID> newIds = (allergyIds == null) ? Collections.emptySet() : new LinkedHashSet<>(allergyIds);
 
         List<UserAllergy> current = userAllergyRepository.findByUser_Id(userId);
         Set<UUID> currentIds = current.stream()
@@ -108,5 +107,4 @@ public class UserAllergyServiceImpl implements UserAllergyService {
 
         return result;
     }
-
 }

@@ -1,16 +1,20 @@
 package com.hn.nutricarebe.entity;
 
-import com.hn.nutricarebe.enums.*;
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import com.hn.nutricarebe.enums.*;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Getter
 @Setter
@@ -21,12 +25,11 @@ import java.util.UUID;
 @Table(
         name = "nutrition_rule",
         indexes = {
-                @Index(name = "idx_rule_condition", columnList = "condition_id"),
-                @Index(name = "idx_rule_target", columnList = "target_type,target_code"),
-                @Index(name = "idx_rule_scope", columnList = "scope"),
-                @Index(name = "idx_rule_active", columnList = "active")
-        }
-)
+            @Index(name = "idx_rule_condition", columnList = "condition_id"),
+            @Index(name = "idx_rule_target", columnList = "target_type,target_code"),
+            @Index(name = "idx_rule_scope", columnList = "scope"),
+            @Index(name = "idx_rule_active", columnList = "active")
+        })
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class NutritionRule {
     @Id
@@ -96,11 +99,8 @@ public class NutritionRule {
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "nutrition_rule_tag_map",
-            joinColumns = @JoinColumn(name = "rule_id",
-                    foreignKey = @ForeignKey(name = "fk_rule_tag_rule")),
-            inverseJoinColumns = @JoinColumn(name = "tag_id",
-                    foreignKey = @ForeignKey(name = "fk_rule_tag_tag"))
-    )
+            joinColumns = @JoinColumn(name = "rule_id", foreignKey = @ForeignKey(name = "fk_rule_tag_rule")),
+            inverseJoinColumns = @JoinColumn(name = "tag_id", foreignKey = @ForeignKey(name = "fk_rule_tag_tag")))
     @Builder.Default
     Set<Tag> tags = new HashSet<>();
 

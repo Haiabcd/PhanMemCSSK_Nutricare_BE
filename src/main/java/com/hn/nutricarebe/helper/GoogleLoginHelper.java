@@ -1,19 +1,18 @@
 package com.hn.nutricarebe.helper;
 
-import com.hn.nutricarebe.dto.response.LoginProfile;
-import com.hn.nutricarebe.dto.response.SupabaseIdentity;
-import com.hn.nutricarebe.dto.response.SupabaseUser;
-
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+
+import com.hn.nutricarebe.dto.response.LoginProfile;
+import com.hn.nutricarebe.dto.response.SupabaseIdentity;
+import com.hn.nutricarebe.dto.response.SupabaseUser;
 
 public final class GoogleLoginHelper {
     private GoogleLoginHelper() {}
 
     public static LoginProfile parse(SupabaseUser u) {
-        Map<String, Object> meta = (u != null && u.getUser_metadata() != null)
-                ? u.getUser_metadata() : Map.of();
+        Map<String, Object> meta = (u != null && u.getUser_metadata() != null) ? u.getUser_metadata() : Map.of();
 
         // --- providerUserId: ưu tiên identities.provider_id ---
         String providerUserId = Optional.ofNullable(u)
@@ -24,9 +23,7 @@ public final class GoogleLoginHelper {
                         .filter(s -> s != null && !s.isBlank())
                         .findFirst())
                 .orElseGet(() ->
-                        safeStr((String) meta.getOrDefault("provider_id",
-                                (String) meta.getOrDefault("sub", "")))
-                );
+                        safeStr((String) meta.getOrDefault("provider_id", (String) meta.getOrDefault("sub", ""))));
 
         // --- email ---
         String email = Optional.ofNullable(u)
@@ -46,12 +43,10 @@ public final class GoogleLoginHelper {
                 .orElseGet(() -> toBoolean(meta.get("email_verified")));
 
         // --- name ---
-        String name = safeStr((String) meta.getOrDefault("full_name",
-                (String) meta.getOrDefault("name", "")));
+        String name = safeStr((String) meta.getOrDefault("full_name", (String) meta.getOrDefault("name", "")));
 
         // --- avatar ---
-        String avatar = safeStr((String) meta.getOrDefault("avatar_url",
-                (String) meta.getOrDefault("picture", "")));
+        String avatar = safeStr((String) meta.getOrDefault("avatar_url", (String) meta.getOrDefault("picture", "")));
 
         return LoginProfile.builder()
                 .providerUserId(providerUserId)
@@ -62,7 +57,9 @@ public final class GoogleLoginHelper {
                 .build();
     }
 
-    private static String safeStr(String s) { return (s == null) ? "" : s.trim(); }
+    private static String safeStr(String s) {
+        return (s == null) ? "" : s.trim();
+    }
 
     private static boolean toBoolean(Object v) {
         if (v instanceof Boolean b) return b;

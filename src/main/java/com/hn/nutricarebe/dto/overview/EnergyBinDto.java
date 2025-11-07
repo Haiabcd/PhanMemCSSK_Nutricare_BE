@@ -11,7 +11,7 @@ import lombok.experimental.FieldDefaults;
 @Builder
 public class EnergyBinDto {
     String label;
-    Integer minKcal;   // null nếu ">1200" hoặc "Thiếu kcal"
-    Integer maxKcal;   // null nếu ">1200" hoặc "Thiếu kcal"
+    Integer minKcal; // null nếu ">1200" hoặc "Thiếu kcal"
+    Integer maxKcal; // null nếu ">1200" hoặc "Thiếu kcal"
     long count;
 }

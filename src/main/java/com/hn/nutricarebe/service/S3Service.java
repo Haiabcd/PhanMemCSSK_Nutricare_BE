@@ -1,7 +1,8 @@
 package com.hn.nutricarebe.service;
 
-import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
+
+import org.springframework.web.multipart.MultipartFile;
 
 public interface S3Service {
     /**
@@ -11,5 +12,6 @@ public interface S3Service {
      * @return objectKey đã lưu trên S3
      */
     String uploadObject(MultipartFile file, String keyPrefix) throws IOException;
+
     void deleteObject(String objectKey);
 }

@@ -7,8 +7,8 @@ spring:
   ai:
     google:
       genai:
-        api-key: "AIzaSyCTOfkePn-zVzNzBQvnq2vevWlMDzRcESw"
-        project-id: "projects/344867174515"
+        api-key: ${AI_KEY}
+        project-id: ${AI_PROJECT_ID}
         chat:
           options:
             model: gemini-2.0-flash
@@ -21,9 +21,9 @@ spring:
     restart:
       enabled: false
   datasource:
-    url: jdbc:postgresql://aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require&preferQueryMode=simple&applicationName=NutriCareBE
-    username: postgres.ewyeishkixdcfhnzxprj
-    password: "nutricareqdrhd@#$"
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 2
@@ -54,12 +54,12 @@ cdn:
   base-url: https://dyfgxhmdeg59a.cloudfront.net/
 
 jwt:
-  signerKey: "y1dxnqQi/A28NV/zHsbVY1dOZhtByCOGUs9mov/l7LlJTnCnLtXvZjHB5jURJm66"
-  valid-duration: 900 # in second
-  refreshable-duration: 2592000 # in seconds
+  signerKey: ${JWT_SIGNERKEY}
+  valid-duration: 900
+  refreshable-duration: 2592000
 supabase:
   host: "https://ewyeishkixdcfhnzxprj.supabase.co"
-  anon-key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3eWVpc2hraXhkY2Zobnp4cHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMDMxMDgsImV4cCI6MjA3MTY3OTEwOH0.E9oUPHv6OmpWXTylXCHSF2ULWxxUM_GBLuPCh3BbOl0"
+  anon-key: ${SUPABASE_ANON_KEY}
 oauth:
   callback-url: "http://192.168.110.187:8080/auths/google/callback"
 logging:
@@ -67,5 +67,3 @@ logging:
     ROOT: INFO
     com.hn.nutricarebe: DEBUG
     com.zaxxer.hikari: DEBUG
-
-

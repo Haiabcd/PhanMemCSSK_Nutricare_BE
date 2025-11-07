@@ -1,14 +1,17 @@
 package com.hn.nutricarebe.dto.request;
 
+import java.util.UUID;
+
+import jakarta.validation.constraints.*;
+
+import org.hibernate.validator.constraints.Range;
+
 import com.hn.nutricarebe.enums.ActivityLevel;
 import com.hn.nutricarebe.enums.Gender;
 import com.hn.nutricarebe.enums.GoalType;
-import jakarta.validation.constraints.*;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.validator.constraints.Range;
-
-import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

@@ -1,5 +1,14 @@
 package com.hn.nutricarebe.service.impl;
 
+import static com.hn.nutricarebe.helper.ProfileHelper.*;
+
+import java.time.LocalDate;
+import java.util.*;
+
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.hn.nutricarebe.dto.ai.ProfileAI;
 import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
@@ -14,18 +23,10 @@ import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
 import com.hn.nutricarebe.service.*;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.util.*;
-
-import static com.hn.nutricarebe.helper.ProfileHelper.*;
-
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
@@ -38,7 +39,6 @@ public class ProfileServiceImpl implements ProfileService {
     MealPlanDayService mealPlanDayService;
     NutritionRuleService nutritionRuleService;
 
-
     @Override
     public ProfileCreationResponse save(ProfileCreationRequest request, User user) {
         Profile profile = profileMapper.toProfile(request);
@@ -49,13 +49,16 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     public ProfileCreationResponse findByUserId(UUID userId) {
-        Profile p =  profileRepository.findByUser_Id(userId).orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+        Profile p = profileRepository
+                .findByUser_Id(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
         return profileMapper.toProfileCreationResponse(p);
     }
 
     @Override
     public ProfileCreationRequest findByUserId_request(UUID userId) {
-        Profile profile = profileRepository.findByUser_Id(userId)
+        Profile profile = profileRepository
+                .findByUser_Id(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
         return profileMapper.toProfileCreationRequest(profile);
     }
@@ -71,7 +74,8 @@ public class ProfileServiceImpl implements ProfileService {
 
         ProfileUpdateRequest profileRequest = request.getProfile();
 
-        Profile profile = profileRepository.findById(profileRequest.getId())
+        Profile profile = profileRepository
+                .findById(profileRequest.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
 
         // 1) Cập nhật allergies/conditions và biết chúng có thay đổi không
@@ -98,15 +102,14 @@ public class ProfileServiceImpl implements ProfileService {
         }
 
         // 3) Kiểm tra các thay đổi "có ý nghĩa" đối với meal plan (bỏ qua name)
-        boolean profileAffectsPlanChanged =
-                !Objects.equals(profile.getHeightCm(),       profileRequest.getHeightCm()) ||
-                        !Objects.equals(profile.getWeightKg(),       profileRequest.getWeightKg()) ||
-                        !Objects.equals(profile.getGender(),         profileRequest.getGender())   ||
-                        !Objects.equals(profile.getBirthYear(),      profileRequest.getBirthYear())||
-                        !Objects.equals(profile.getGoal(),           profileRequest.getGoal())     ||
-                        !Objects.equals(profile.getActivityLevel(),  profileRequest.getActivityLevel()) ||
-                        !Objects.equals(profile.getTargetWeightDeltaKg(), expectedTargetDeltaKg) ||
-                        !Objects.equals(profile.getTargetDurationWeeks(), expectedTargetDurationWeeks);
+        boolean profileAffectsPlanChanged = !Objects.equals(profile.getHeightCm(), profileRequest.getHeightCm())
+                || !Objects.equals(profile.getWeightKg(), profileRequest.getWeightKg())
+                || !Objects.equals(profile.getGender(), profileRequest.getGender())
+                || !Objects.equals(profile.getBirthYear(), profileRequest.getBirthYear())
+                || !Objects.equals(profile.getGoal(), profileRequest.getGoal())
+                || !Objects.equals(profile.getActivityLevel(), profileRequest.getActivityLevel())
+                || !Objects.equals(profile.getTargetWeightDeltaKg(), expectedTargetDeltaKg)
+                || !Objects.equals(profile.getTargetDurationWeeks(), expectedTargetDurationWeeks);
 
         // 4) Gán cập nhật vào profile (bao gồm name)
         profile.setHeightCm(profileRequest.getHeightCm());
@@ -130,7 +133,6 @@ public class ProfileServiceImpl implements ProfileService {
         }
     }
 
-
     @Override
     public ProfileAI getHealthProfile(UUID userId) {
         Profile p = profileRepository.findByUser_Id(userId).orElse(null);
@@ -144,11 +146,13 @@ public class ProfileServiceImpl implements ProfileService {
                 .filter(Objects::nonNull)
                 .toList();
 
-        List<String> conditions = userConditionService.findByUser_Id(userId)
-                .stream().map(UserConditionResponse::getName).toList();
+        List<String> conditions = userConditionService.findByUser_Id(userId).stream()
+                .map(UserConditionResponse::getName)
+                .toList();
 
-        List<String> allergies = userAllergyService.findByUser_Id(userId)
-                .stream().map(UserAllergyResponse::getName).toList();
+        List<String> allergies = userAllergyService.findByUser_Id(userId).stream()
+                .map(UserAllergyResponse::getName)
+                .toList();
 
         // Tính tuổi từ birthYear
         int currentYear = LocalDate.now().getYear();
@@ -181,5 +185,4 @@ public class ProfileServiceImpl implements ProfileService {
 
         return stats;
     }
-
 }

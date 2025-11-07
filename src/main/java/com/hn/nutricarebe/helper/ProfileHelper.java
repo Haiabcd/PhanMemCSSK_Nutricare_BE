@@ -32,7 +32,6 @@ public final class ProfileHelper {
         return String.format("%s cân trong %d tuần", action, weeks);
     }
 
-
     public static String buildGenderText(Gender g) {
         if (g == null) return "Chưa xác định";
         switch (g) {
@@ -70,6 +69,5 @@ public final class ProfileHelper {
                 return "Chưa xác định";
             }
         }
-
     }
 }

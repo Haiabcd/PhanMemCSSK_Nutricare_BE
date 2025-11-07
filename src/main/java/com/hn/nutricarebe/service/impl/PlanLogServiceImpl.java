@@ -1,5 +1,21 @@
 package com.hn.nutricarebe.service.impl;
 
+import static com.hn.nutricarebe.helper.MealPlanHelper.addNut;
+import static com.hn.nutricarebe.helper.PlanLogHelper.aggregateActual;
+import static com.hn.nutricarebe.helper.PlanLogHelper.resolveActualOrFallback;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import jakarta.transaction.Transactional;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
 import com.hn.nutricarebe.dto.overview.FoodLogStatDto;
 import com.hn.nutricarebe.dto.overview.TopUserDto;
 import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
@@ -15,28 +31,16 @@ import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.CdnHelper;
 import com.hn.nutricarebe.mapper.NutritionMapper;
 import com.hn.nutricarebe.mapper.PlanLogMapper;
+import com.hn.nutricarebe.repository.MealPlanItemRepository;
 import com.hn.nutricarebe.repository.PlanLogIngredientRepository;
 import com.hn.nutricarebe.repository.PlanLogRepository;
-import com.hn.nutricarebe.repository.MealPlanItemRepository;
 import com.hn.nutricarebe.service.MealPlanDayService;
 import com.hn.nutricarebe.service.PlanLogService;
-import jakarta.transaction.Transactional;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import java.time.temporal.ChronoUnit;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.hn.nutricarebe.helper.MealPlanHelper.addNut;
-import static com.hn.nutricarebe.helper.PlanLogHelper.aggregateActual;
-import static com.hn.nutricarebe.helper.PlanLogHelper.resolveActualOrFallback;
 
 @Slf4j
 @Service
@@ -60,10 +64,12 @@ public class PlanLogServiceImpl implements PlanLogService {
         }
         UUID userId = UUID.fromString(auth.getName());
 
-        MealPlanItem item = mealPlanItemRepository.findById(req.getMealPlanItemId())
+        MealPlanItem item = mealPlanItemRepository
+                .findById(req.getMealPlanItemId())
                 .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
 
-        if (item.getDay() == null || item.getDay().getUser() == null
+        if (item.getDay() == null
+                || item.getDay().getUser() == null
                 || !userId.equals(item.getDay().getUser().getId())) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
@@ -99,9 +105,7 @@ public class PlanLogServiceImpl implements PlanLogService {
 
         List<PlanLog> logs = logRepository.findByUser_IdAndDateAndMealSlot(userId, date, mealSlot);
 
-        return logs.stream()
-                .map(log -> logMapper.toLogResponse(log, cdnHelper))
-                .toList();
+        return logs.stream().map(log -> logMapper.toLogResponse(log, cdnHelper)).toList();
     }
 
     @Override
@@ -110,7 +114,7 @@ public class PlanLogServiceImpl implements PlanLogService {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         UUID userId = UUID.fromString(auth.getName());
         PlanLog p = logRepository.findById(id).orElse(null);
-        if(p == null || p.getUser() == null || !userId.equals(p.getUser().getId())) {
+        if (p == null || p.getUser() == null || !userId.equals(p.getUser().getId())) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         if (p.getPlanItem() != null) {
@@ -118,7 +122,7 @@ public class PlanLogServiceImpl implements PlanLogService {
             item.setUsed(false);
             mealPlanItemRepository.save(item);
             logRepository.deleteById(id);
-        }else {
+        } else {
             logRepository.deleteById(id);
             mealPlanDayService.updatePlanForOneDay(p.getDate(), userId);
         }
@@ -136,7 +140,7 @@ public class PlanLogServiceImpl implements PlanLogService {
     }
 
     @Override
-    public KcalWarningResponse savePlanLog_Manual(PlanLogManualRequest req){
+    public KcalWarningResponse savePlanLog_Manual(PlanLogManualRequest req) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -146,7 +150,10 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .user(User.builder().id(userId).build())
                 .date(req.getDate())
                 .mealSlot(req.getMealSlot())
-                .food(req.getFoodId() != null ?  Food.builder().id(req.getFoodId()).build() : null)
+                .food(
+                        req.getFoodId() != null
+                                ? Food.builder().id(req.getFoodId()).build()
+                                : null)
                 .nameFood(req.getNameFood())
                 .servingSizeGram(BigDecimal.ZERO)
                 .planItem(null)
@@ -154,12 +161,13 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .portion(req.getConsumedServings())
                 .actualNutrition(nutritionMapper.toNutrition(req.getTotalNutrition()))
                 .build();
-        log =  logRepository.save(log);
-        if(req.getIngredients() != null){
-            for(PlanLogManualRequest.IngredientEntryDTO ingredientDTO : req.getIngredients()){
+        log = logRepository.save(log);
+        if (req.getIngredients() != null) {
+            for (PlanLogManualRequest.IngredientEntryDTO ingredientDTO : req.getIngredients()) {
                 PlanLogIngredient pli = PlanLogIngredient.builder()
                         .planLog(log)
-                        .ingredient(Ingredient.builder().id(ingredientDTO.getId()).build())
+                        .ingredient(
+                                Ingredient.builder().id(ingredientDTO.getId()).build())
                         .quantity(ingredientDTO.getQty())
                         .build();
                 planLogIngredientRepository.save(pli);
@@ -167,22 +175,22 @@ public class PlanLogServiceImpl implements PlanLogService {
         }
         boolean nowDate = req.getDate().isEqual(LocalDate.now());
 
-        //Lấy kcal mục tiêu
+        // Lấy kcal mục tiêu
         double targetKcal = mealPlanDayService.getMealTargetKcal(userId, req.getMealSlot());
 
         List<PlanLog> logAllDay = logRepository.findByUser_IdAndDate(userId, req.getDate());
-        NutritionResponse nr =  aggregateActual(logAllDay);
+        NutritionResponse nr = aggregateActual(logAllDay);
         double actualKcal = nr.getKcal() != null ? nr.getKcal().doubleValue() : 0.0;
         // 5. So sánh và trả về cảnh báo
         double diff = actualKcal - targetKcal;
         KcalWarningResponse.Status status;
         if (diff > 50) {
-            if(nowDate){
+            if (nowDate) {
                 mealPlanDayService.updatePlanForOneDay(req.getDate(), userId);
             }
             status = KcalWarningResponse.Status.OVER;
         } else if (diff < -50) {
-            if(nowDate){
+            if (nowDate) {
                 mealPlanDayService.updatePlanForOneDay(req.getDate(), userId);
             }
             status = KcalWarningResponse.Status.UNDER;
@@ -200,7 +208,7 @@ public class PlanLogServiceImpl implements PlanLogService {
     }
 
     @Override
-    public KcalWarningResponse savePlanLog_Scan(PlanLogScanRequest req){
+    public KcalWarningResponse savePlanLog_Scan(PlanLogScanRequest req) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -218,22 +226,23 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .portion(req.getConsumedServings())
                 .actualNutrition(nutritionMapper.toNutrition(req.getTotalNutrition()))
                 .build();
-        log =  logRepository.save(log);
-        if(req.getIngredients() != null){
-            for(PlanLogScanRequest.IngredientEntryDTO ingredientDTO : req.getIngredients()){
+        log = logRepository.save(log);
+        if (req.getIngredients() != null) {
+            for (PlanLogScanRequest.IngredientEntryDTO ingredientDTO : req.getIngredients()) {
                 PlanLogIngredient pli = PlanLogIngredient.builder()
                         .planLog(log)
-                        .ingredient(Ingredient.builder().id(ingredientDTO.getId()).build())
+                        .ingredient(
+                                Ingredient.builder().id(ingredientDTO.getId()).build())
                         .quantity(ingredientDTO.getQty())
                         .build();
                 planLogIngredientRepository.save(pli);
             }
         }
-        //Lấy kcal mục tiêu
+        // Lấy kcal mục tiêu
         double targetKcal = mealPlanDayService.getMealTargetKcal(userId, req.getMealSlot());
 
         List<PlanLog> logAllDay = logRepository.findByUser_IdAndDate(userId, req.getDate());
-        NutritionResponse nr =  aggregateActual(logAllDay);
+        NutritionResponse nr = aggregateActual(logAllDay);
         double actualKcal = nr.getKcal() != null ? nr.getKcal().doubleValue() : 0.0;
         // 5. So sánh và trả về cảnh báo
         double diff = actualKcal - targetKcal;
@@ -256,7 +265,6 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .build();
     }
 
-
     @Transactional
     @Override
     public KcalWarningResponse updatePlanLog(PlanLogUpdateRequest req, UUID id) {
@@ -266,8 +274,7 @@ public class PlanLogServiceImpl implements PlanLogService {
         }
         UUID userId = UUID.fromString(auth.getName());
 
-        PlanLog logOld = logRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND_PLAN_LOG));
+        PlanLog logOld = logRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND_PLAN_LOG));
 
         if (logOld.getUser() == null || !userId.equals(logOld.getUser().getId())) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -275,7 +282,8 @@ public class PlanLogServiceImpl implements PlanLogService {
 
         // ==== Cập nhật field đơn ====
         logOld.setMealSlot(req.getMealSlot());
-        logOld.setFood(req.getFoodId() != null ? Food.builder().id(req.getFoodId()).build() : null);
+        logOld.setFood(
+                req.getFoodId() != null ? Food.builder().id(req.getFoodId()).build() : null);
         logOld.setNameFood(req.getNameFood());
         logOld.setPortion(req.getConsumedServings());
         logOld.setActualNutrition(nutritionMapper.toNutrition(req.getTotalNutrition()));
@@ -301,21 +309,21 @@ public class PlanLogServiceImpl implements PlanLogService {
         }
         logRepository.saveAndFlush(logOld);
 
-        //Lấy kcal mục tiêu theo bữa
+        // Lấy kcal mục tiêu theo bữa
         double targetKcal = mealPlanDayService.getMealTargetKcal(userId, req.getMealSlot());
         boolean nowDate = logOld.getDate().isEqual(LocalDate.now());
         List<PlanLog> logAllDay = logRepository.findByUser_IdAndDate(userId, logOld.getDate());
-        NutritionResponse nr =  aggregateActual(logAllDay);
+        NutritionResponse nr = aggregateActual(logAllDay);
         double actualKcal = nr.getKcal() != null ? nr.getKcal().doubleValue() : 0.0;
         double diff = actualKcal - targetKcal;
         KcalWarningResponse.Status status;
         if (diff > 50) {
-            if(nowDate){
+            if (nowDate) {
                 mealPlanDayService.updatePlanForOneDay(logOld.getDate(), userId);
             }
             status = KcalWarningResponse.Status.OVER;
         } else if (diff < -50) {
-            if(nowDate){
+            if (nowDate) {
                 mealPlanDayService.updatePlanForOneDay(logOld.getDate(), userId);
             }
             status = KcalWarningResponse.Status.UNDER;
@@ -334,23 +342,18 @@ public class PlanLogServiceImpl implements PlanLogService {
 
     @Override
     public List<TopFoodDto> getTopFoods(UUID userId, LocalDate start, LocalDate end, int limit) {
-        return logRepository.findTopFoodsOfUserBetween(
-                userId, start, end, PageRequest.of(0, limit)
-        );
+        return logRepository.findTopFoodsOfUserBetween(userId, start, end, PageRequest.of(0, limit));
     }
 
     @Override
-    public List<DailyNutritionDto> getDailyNutrition(UUID userId,
-                                                     LocalDate start,
-                                                     LocalDate end,
-                                                     boolean fillMissingDays) {
-        List<DailyNutritionDto> rows =
-                logRepository.sumDailyNutritionByDateBetween(userId, start, end);
+    public List<DailyNutritionDto> getDailyNutrition(
+            UUID userId, LocalDate start, LocalDate end, boolean fillMissingDays) {
+        List<DailyNutritionDto> rows = logRepository.sumDailyNutritionByDateBetween(userId, start, end);
 
         if (!fillMissingDays) return rows;
         // Map theo ngày để fill ngày trống = 0
-        Map<LocalDate, DailyNutritionDto> byDate = rows.stream()
-                .collect(Collectors.toMap(DailyNutritionDto::getDate, x -> x));
+        Map<LocalDate, DailyNutritionDto> byDate =
+                rows.stream().collect(Collectors.toMap(DailyNutritionDto::getDate, x -> x));
         List<DailyNutritionDto> filled = new ArrayList<>();
         for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
             DailyNutritionDto dto = byDate.get(d);
@@ -361,7 +364,6 @@ public class PlanLogServiceImpl implements PlanLogService {
         }
         return filled;
     }
-
 
     @Override
     @Transactional
@@ -395,8 +397,7 @@ public class PlanLogServiceImpl implements PlanLogService {
                             return stat;
                         },
                         (a, b) -> a,
-                        () -> new EnumMap<>(MealSlot.class)
-                ));
+                        () -> new EnumMap<>(MealSlot.class)));
     }
 
     @Override
@@ -424,8 +425,7 @@ public class PlanLogServiceImpl implements PlanLogService {
 
         return Map.of(
                 "manual", manual,
-                "scan", scan
-        );
+                "scan", scan);
     }
 
     @Override
@@ -457,8 +457,7 @@ public class PlanLogServiceImpl implements PlanLogService {
     // Lấy top 10 món ăn được ghi log nhiều nhất từ nguồn PLAN
     @Override
     public List<FoodLogStatDto> getTop10FoodsFromPlan() {
-        return logRepository.findTopFoodsBySource(LogSource.PLAN)
-                .stream()
+        return logRepository.findTopFoodsBySource(LogSource.PLAN).stream()
                 .map(r -> new FoodLogStatDto((String) r[0], ((Number) r[1]).longValue()))
                 .limit(10)
                 .collect(Collectors.toList());
@@ -467,13 +466,9 @@ public class PlanLogServiceImpl implements PlanLogService {
     // Lấy top 15 người dùng có số log nhiều nhất
     @Override
     public List<TopUserDto> getTopUsersByLogCount() {
-        return logRepository.findTopUsersByLogCount()
-                .stream()
+        return logRepository.findTopUsersByLogCount().stream()
                 .limit(10)
-                .map(row -> new TopUserDto(
-                        (String) row[0],
-                        ((Number) row[1]).longValue()
-                ))
+                .map(row -> new TopUserDto((String) row[0], ((Number) row[1]).longValue()))
                 .toList();
     }
 }

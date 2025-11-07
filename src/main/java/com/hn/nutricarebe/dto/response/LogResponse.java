@@ -1,11 +1,13 @@
 package com.hn.nutricarebe.dto.response;
 
-import com.hn.nutricarebe.enums.MealSlot;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
 import java.math.BigDecimal;
 import java.util.Set;
 import java.util.UUID;
+
+import com.hn.nutricarebe.enums.MealSlot;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Getter
 @Setter

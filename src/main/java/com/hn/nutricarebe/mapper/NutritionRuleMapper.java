@@ -1,19 +1,18 @@
 package com.hn.nutricarebe.mapper;
 
-
-
-import com.hn.nutricarebe.dto.response.NutritionRuleResponse;
-import com.hn.nutricarebe.entity.NutritionRule;
-import com.hn.nutricarebe.entity.Tag;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.Named;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Named;
+
+import com.hn.nutricarebe.dto.response.NutritionRuleResponse;
+import com.hn.nutricarebe.entity.NutritionRule;
+import com.hn.nutricarebe.entity.Tag;
 
 @Mapper(componentModel = "spring")
 public interface NutritionRuleMapper {

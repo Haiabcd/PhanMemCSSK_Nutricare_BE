@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.dto.ai;
 
 import com.hn.nutricarebe.entity.Nutrition;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -11,6 +12,6 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @Builder
 public class DailyTargetsAI {
-   Nutrition targets;
-   Integer waterMl;
+    Nutrition targets;
+    Integer waterMl;
 }

@@ -1,5 +1,14 @@
 package com.hn.nutricarebe.service.impl;
 
+import static com.hn.nutricarebe.helper.MealPlanHelper.*;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.*;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.hn.nutricarebe.dto.TagDirectives;
 import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
@@ -16,19 +25,10 @@ import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanItemService;
 import com.hn.nutricarebe.service.NutritionRuleService;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.data.domain.*;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.hn.nutricarebe.helper.MealPlanHelper.*;
-
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +42,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
     FoodMapper foodMapper;
     CdnHelper cdnHelper;
 
-
     @Override
     @Transactional
     public void smartSwapMealItem(UUID itemId) {
@@ -50,16 +49,18 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
         UUID userId = UUID.fromString(auth.getName());
 
-        MealPlanItem item = mealPlanItemRepository.findById(itemId)
+        MealPlanItem item = mealPlanItemRepository
+                .findById(itemId)
                 .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
 
         // Quyền sở hữu item
-        if (item.getDay() == null || item.getDay().getUser() == null
+        if (item.getDay() == null
+                || item.getDay().getUser() == null
                 || !userId.equals(item.getDay().getUser().getId())) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
-        if(item.isUsed()) {
+        if (item.isUsed()) {
             throw new AppException(ErrorCode.MEAL_PLAN_ITEM_USED);
         }
 
@@ -72,8 +73,8 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         // Lướt phân trang ứng viên theo slot
         Pageable pageable = PageRequest.of(0, 50);
 
-        CandidateBest best = null;  //Ứng viên tốt nhất tìm được
-        boolean hasNext;  //Theo dõi còn trang tiếp theo không
+        CandidateBest best = null; // Ứng viên tốt nhất tìm được
+        boolean hasNext; // Theo dõi còn trang tiếp theo không
         do {
             var slice = foodRepository.findByMealSlot(slot, pageable);
             for (var cand : slice.getContent()) {
@@ -84,7 +85,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
 
                 // Tìm portion thuộc {1.5, 1.0, 0.5}
                 PortionScore ps = bestPortionAgainstTarget(n, oldSnap);
-
 
                 // Tính điểm chênh lệch (L1 weighted)
                 double score = ps.distance;
@@ -120,13 +120,12 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
         UUID userId = UUID.fromString(auth.getName());
 
-        Profile profile = profileRepository.findByUser_Id(userId)
+        Profile profile = profileRepository
+                .findByUser_Id(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
         ProfileCreationRequest pReq = profileMapper.toProfileCreationRequest(profile);
-        MealPlanCreationRequest req = MealPlanCreationRequest.builder()
-                .userId(userId)
-                .profile(pReq)
-                .build();
+        MealPlanCreationRequest req =
+                MealPlanCreationRequest.builder().userId(userId).profile(pReq).build();
 
         List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
 
@@ -139,16 +138,12 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         List<Food> pool;
         if (slot != null) {
             pool = foodRepository.selectCandidatesBySlotAndKcalWindow(
-                    slot.name(), MIN_KCAL, MAX_KCAL, PIVOT, CANDIDATE_LIMIT
-            );
+                    slot.name(), MIN_KCAL, MAX_KCAL, PIVOT, CANDIDATE_LIMIT);
         } else {
             pool = new ArrayList<>();
             for (MealSlot s : MealSlot.values()) {
-                pool.addAll(
-                        foodRepository.selectCandidatesBySlotAndKcalWindow(
-                                s.name(), MIN_KCAL, MAX_KCAL, PIVOT, CANDIDATE_LIMIT / 4
-                        )
-                );
+                pool.addAll(foodRepository.selectCandidatesBySlotAndKcalWindow(
+                        s.name(), MIN_KCAL, MAX_KCAL, PIVOT, CANDIDATE_LIMIT / 4));
             }
         }
         if (pool == null) pool = Collections.emptyList();
@@ -173,7 +168,10 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
                 while (step.isPresent()) {
                     double p2 = step.getAsDouble();
                     Nutrition s2 = scaleNutrition(base, p2);
-                    if (passesItemRules(rules, s2, req)) { pass = true; break; }
+                    if (passesItemRules(rules, s2, req)) {
+                        pass = true;
+                        break;
+                    }
                     step = stepDown(p2);
                 }
             }
@@ -181,27 +179,20 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         }
         LinkedHashMap<UUID, Food> dedup = new LinkedHashMap<>();
         for (Food f : allowed) dedup.putIfAbsent(f.getId(), f);
-        List<Food> dsFood =  dedup.values().stream().limit(limit).toList();
-        return dsFood.stream()
-                .map(f -> foodMapper.toFoodResponse(f, cdnHelper))
-                .collect(Collectors.toList());
+        List<Food> dsFood = dedup.values().stream().limit(limit).toList();
+        return dsFood.stream().map(f -> foodMapper.toFoodResponse(f, cdnHelper)).collect(Collectors.toList());
     }
 
     /* ==================== Helpers cho smartSwap ==================== */
 
     // So sánh "y chang" tập tags (không hơn không kém)
-    private static boolean tagsEqual(Set<Tag> a,
-                                     Set<Tag> b) {
+    private static boolean tagsEqual(Set<Tag> a, Set<Tag> b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
         if (a.size() != b.size()) return false;
 
-        Set<UUID> aIds = a.stream()
-                .map(Tag::getId)
-                .collect(Collectors.toSet());
-        Set<UUID> bIds = b.stream()
-                .map(Tag::getId)
-                .collect(Collectors.toSet());
+        Set<UUID> aIds = a.stream().map(Tag::getId).collect(Collectors.toSet());
+        Set<UUID> bIds = b.stream().map(Tag::getId).collect(Collectors.toSet());
         return aIds.equals(bIds);
     }
 
@@ -223,10 +214,10 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
 
     // Khoảng cách L1 có trọng số giữa hai snapshot (kcal ưu tiên, rồi protein/carb/fat)
     private double nutritionDistanceL1Weighted(Nutrition a, Nutrition b) {
-        double dk = Math.abs(safeDouble(a.getKcal())     - safeDouble(b.getKcal()));
+        double dk = Math.abs(safeDouble(a.getKcal()) - safeDouble(b.getKcal()));
         double dp = Math.abs(safeDouble(a.getProteinG()) - safeDouble(b.getProteinG()));
-        double dc = Math.abs(safeDouble(a.getCarbG())    - safeDouble(b.getCarbG()));
-        double df = Math.abs(safeDouble(a.getFatG())     - safeDouble(b.getFatG()));
+        double dc = Math.abs(safeDouble(a.getCarbG()) - safeDouble(b.getCarbG()));
+        double df = Math.abs(safeDouble(a.getFatG()) - safeDouble(b.getFatG()));
         return dk + dp * 0.4 + dc * 0.3 + df * 0.3;
     }
 
@@ -238,7 +229,11 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
     private static class PortionScore {
         final double portion;
         final double distance;
-        PortionScore(double portion, double distance) { this.portion = portion; this.distance = distance; }
+
+        PortionScore(double portion, double distance) {
+            this.portion = portion;
+            this.distance = distance;
+        }
     }
 
     private static class CandidateBest {
@@ -247,8 +242,9 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         final double score;
 
         CandidateBest(Food food, double portion, double score) {
-            this.food = food; this.portion = portion; this.score = score;
+            this.food = food;
+            this.portion = portion;
+            this.score = score;
         }
     }
-
 }

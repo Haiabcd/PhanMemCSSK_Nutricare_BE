@@ -1,7 +1,7 @@
 package com.hn.nutricarebe.dto.request;
 
-
 import jakarta.validation.constraints.NotNull;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -14,5 +14,6 @@ import lombok.experimental.FieldDefaults;
 public class TagCreationRequest {
     @NotNull(message = "Mã tag không được để trống")
     String nameCode;
+
     String description;
 }

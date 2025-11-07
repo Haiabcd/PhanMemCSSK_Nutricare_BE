@@ -1,12 +1,14 @@
 package com.hn.nutricarebe.dto.response;
 
+import java.util.UUID;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hn.nutricarebe.enums.Provider;
 import com.hn.nutricarebe.enums.Role;
 import com.hn.nutricarebe.enums.UserStatus;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

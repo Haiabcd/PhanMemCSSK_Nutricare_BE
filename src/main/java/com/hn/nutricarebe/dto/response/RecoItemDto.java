@@ -1,8 +1,8 @@
 package com.hn.nutricarebe.dto.response;
 
-import lombok.*;
-
 import java.time.Instant;
+
+import lombok.*;
 
 @Getter
 @Setter
@@ -10,10 +10,10 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 public class RecoItemDto {
-    private String type;       // "article" | "video"
+    private String type; // "article" | "video"
     private String title;
-    private String url;        // link gốc
-    private String source;     // ví dụ: "who.int", "cdc.gov"
-    private String imageUrl;   // thumbnail nếu có (YouTube)
+    private String url; // link gốc
+    private String source; // ví dụ: "who.int", "cdc.gov"
+    private String imageUrl; // thumbnail nếu có (YouTube)
     private Instant published;
 }

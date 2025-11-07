@@ -1,21 +1,5 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.dto.request.WaterLogCreationRequest;
-import com.hn.nutricarebe.dto.response.DailyWaterTotalDto;
-import com.hn.nutricarebe.repository.WaterLogRepository;
-import com.hn.nutricarebe.service.WaterLogService;
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
-import org.springframework.stereotype.Service;
-import com.hn.nutricarebe.entity.User;
-import com.hn.nutricarebe.entity.WaterLog;
-import com.hn.nutricarebe.exception.AppException;
-import com.hn.nutricarebe.exception.ErrorCode;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -24,6 +8,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.hn.nutricarebe.dto.request.WaterLogCreationRequest;
+import com.hn.nutricarebe.dto.response.DailyWaterTotalDto;
+import com.hn.nutricarebe.entity.User;
+import com.hn.nutricarebe.entity.WaterLog;
+import com.hn.nutricarebe.exception.AppException;
+import com.hn.nutricarebe.exception.ErrorCode;
+import com.hn.nutricarebe.repository.WaterLogRepository;
+import com.hn.nutricarebe.service.WaterLogService;
+
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 
 @Service
 @RequiredArgsConstructor
@@ -49,7 +51,7 @@ public class WaterLogServiceImpl implements WaterLogService {
                 .drankAt(drankAt)
                 .amountMl(request.getAmountMl())
                 .build();
-       waterLogRepository.save(entity);
+        waterLogRepository.save(entity);
     }
 
     @Override
@@ -64,14 +66,9 @@ public class WaterLogServiceImpl implements WaterLogService {
 
     @Override
     public List<DailyWaterTotalDto> getDailyTotals(
-            UUID userId,
-            LocalDate start,
-            LocalDate end,
-            boolean fillMissingDates
-    ) {
+            UUID userId, LocalDate start, LocalDate end, boolean fillMissingDates) {
         // Lấy dữ liệu đã gộp từ repository
-        List<DailyWaterTotalDto> rows =
-                waterLogRepository.sumDailyByUserAndDateBetween(userId, start, end);
+        List<DailyWaterTotalDto> rows = waterLogRepository.sumDailyByUserAndDateBetween(userId, start, end);
 
         if (!fillMissingDates) {
             return rows;

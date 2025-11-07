@@ -1,16 +1,19 @@
 package com.hn.nutricarebe.dto.request;
 
+import java.util.HashSet;
+import java.util.Set;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+
+import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.hn.nutricarebe.enums.Unit;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.multipart.MultipartFile;
-import java.util.HashSet;
-import java.util.Set;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

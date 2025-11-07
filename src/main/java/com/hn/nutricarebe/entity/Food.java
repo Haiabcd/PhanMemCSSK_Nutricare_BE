@@ -1,17 +1,21 @@
 package com.hn.nutricarebe.entity;
 
-import com.hn.nutricarebe.enums.MealSlot;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import com.hn.nutricarebe.enums.MealSlot;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -31,7 +35,7 @@ public class Food {
     @NotBlank(message = "Tên không được để trống")
     String name;
 
-    @Column(name = "description",columnDefinition = "text")
+    @Column(name = "description", columnDefinition = "text")
     String description;
 
     @Column(name = "image_key", unique = true)
@@ -51,13 +55,13 @@ public class Food {
 
     @Embedded
     @AttributeOverrides({
-            @AttributeOverride(name = "kcal", column = @Column(name = "kcal", precision = 10, scale = 2)),
-            @AttributeOverride(name = "proteinG",  column = @Column(name = "proteinG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "carbG",    column = @Column(name = "carbG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "fatG",      column = @Column(name = "fatG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "fiberG",  column = @Column(name = "fiberG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "sodiumMg",    column = @Column(name = "sodiumMg", precision = 10, scale = 2)),
-            @AttributeOverride(name = "sugarMg",      column = @Column(name = "sugarMg", precision = 10, scale = 2))
+        @AttributeOverride(name = "kcal", column = @Column(name = "kcal", precision = 10, scale = 2)),
+        @AttributeOverride(name = "proteinG", column = @Column(name = "proteinG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "carbG", column = @Column(name = "carbG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "fatG", column = @Column(name = "fatG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "fiberG", column = @Column(name = "fiberG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "sodiumMg", column = @Column(name = "sodiumMg", precision = 10, scale = 2)),
+        @AttributeOverride(name = "sugarMg", column = @Column(name = "sugarMg", precision = 10, scale = 2))
     })
     Nutrition nutrition;
 
@@ -67,32 +71,23 @@ public class Food {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "food_meal_slots",
-            joinColumns = @JoinColumn(
-                    name = "food_id",
-                    foreignKey = @ForeignKey(name = "fk_food_meal_slots_foods")
-            )
-    )
+            joinColumns = @JoinColumn(name = "food_id", foreignKey = @ForeignKey(name = "fk_food_meal_slots_foods")))
     @Enumerated(EnumType.STRING)
     @Column(name = "meal_slot", nullable = false)
     @Builder.Default
     Set<MealSlot> mealSlots = new HashSet<>();
 
-
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "food_tag_map",
-            joinColumns = @JoinColumn(name = "food_id",
-                    foreignKey = @ForeignKey(name = "fk_food_tag_food")),
-            inverseJoinColumns = @JoinColumn(name = "tag_id",
-                    foreignKey = @ForeignKey(name = "fk_food_tag_tag"))
-    )
+            joinColumns = @JoinColumn(name = "food_id", foreignKey = @ForeignKey(name = "fk_food_tag_food")),
+            inverseJoinColumns = @JoinColumn(name = "tag_id", foreignKey = @ForeignKey(name = "fk_food_tag_tag")))
     @Builder.Default
     Set<Tag> tags = new HashSet<>();
 
     @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     Set<RecipeIngredient> ingredients = new HashSet<>();
-
 
     @OneToMany(mappedBy = "food", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<PlanLog> loggedByUsers = new HashSet<>();

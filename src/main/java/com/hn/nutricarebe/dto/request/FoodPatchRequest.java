@@ -1,14 +1,17 @@
 package com.hn.nutricarebe.dto.request;
 
-import com.hn.nutricarebe.enums.MealSlot;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.util.*;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+
+import org.springframework.web.multipart.MultipartFile;
+
+import com.hn.nutricarebe.enums.MealSlot;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -19,15 +22,18 @@ import java.util.*;
 public class FoodPatchRequest {
     @NotBlank(message = "Tên không được để trống")
     String name;
+
     String description;
+
     @NotNull(message = "Số khẩu phần mặc định là bắt buộc")
     @Min(value = 1, message = "Số khẩu phần mặc định phải >= 1")
     @Builder.Default
-    Integer defaultServing = 1 ;
+    Integer defaultServing = 1;
+
     String servingName;
 
-    @Digits(integer=8, fraction=2)
-    @PositiveOrZero(message ="Khối lượng phục vụ phải là số dương hoặc bằng 0")
+    @Digits(integer = 8, fraction = 2)
+    @PositiveOrZero(message = "Khối lượng phục vụ phải là số dương hoặc bằng 0")
     @Builder.Default
     BigDecimal servingGram = BigDecimal.ZERO;
 
@@ -43,7 +49,7 @@ public class FoodPatchRequest {
     Set<MealSlot> mealSlots = new HashSet<>();
 
     @Builder.Default
-    Set<UUID> tags= new HashSet<>();
+    Set<UUID> tags = new HashSet<>();
 
     MultipartFile image;
 

@@ -1,17 +1,21 @@
 package com.hn.nutricarebe.entity;
 
-import com.hn.nutricarebe.enums.Provider;
-import com.hn.nutricarebe.enums.Role;
-import com.hn.nutricarebe.enums.UserStatus;
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import com.hn.nutricarebe.enums.Provider;
+import com.hn.nutricarebe.enums.Role;
+import com.hn.nutricarebe.enums.UserStatus;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -25,7 +29,7 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, name = "id")
-     UUID id;
+    UUID id;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, name = "role")
@@ -65,23 +69,21 @@ public class User {
     @Column(name = "updated_at")
     Instant updatedAt;
 
-
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     Profile profile;
-
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     Set<WaterLog> waterLogs = new HashSet<>();
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<MealPlanDay>  mealPlanDays = new HashSet<>();
+    Set<MealPlanDay> mealPlanDays = new HashSet<>();
 
-    @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     Set<UserCondition> userConditions = new HashSet<>();
 
-    @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     Set<PlanLog> foodLogs = new HashSet<>();
 
-    @OneToMany(mappedBy = "user",fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     Set<UserAllergy> userAllergies = new HashSet<>();
 }

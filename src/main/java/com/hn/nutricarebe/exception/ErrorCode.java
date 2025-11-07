@@ -1,9 +1,10 @@
 package com.hn.nutricarebe.exception;
 
+import org.springframework.http.HttpStatus;
+
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.experimental.FieldDefaults;
-import lombok.AccessLevel;
-import org.springframework.http.HttpStatus;
 
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -39,7 +40,6 @@ public enum ErrorCode {
 
     INVALID_OR_EXPIRED_STATE(9001, "State không hợp lệ hoặc đã hết hạn", HttpStatus.BAD_REQUEST),
 
-
     INTERNAL_ERROR(9002, "Lỗi hệ thống", HttpStatus.INTERNAL_SERVER_ERROR),
 
     UNAUTHENTICATED(9003, "Vui lòng đăng nhập", HttpStatus.UNAUTHORIZED),
@@ -55,7 +55,6 @@ public enum ErrorCode {
 
     NOT_FOUND_PLAN_LOG(9012, "Log không tồn tại", HttpStatus.NOT_FOUND),
 
-
     NUTRITION_RULE_NOT_FOUND(9012, "Quy tắc dinh dưỡng không tồn tại", HttpStatus.NOT_FOUND),
     INVALID_ARGUMENT(9013, "Tham số không hợp lệ", HttpStatus.BAD_REQUEST),
 
@@ -64,14 +63,14 @@ public enum ErrorCode {
 
     THIRD_PARTY_ERROR(10005, "LogMeal: missing imageId", HttpStatus.BAD_REQUEST),
     PROVIDER_ALREADY_LINKED(11001, "Tài khoản google đã được liên kết với tài khoản khác", HttpStatus.CONFLICT),
-    CONVERSION_REQUIRES_DENSITY(11002,"Không thể quy đổi giữa khối lượng và thể tích khi thiếu mật độ (density).", HttpStatus.BAD_REQUEST),
+    CONVERSION_REQUIRES_DENSITY(
+            11002, "Không thể quy đổi giữa khối lượng và thể tích khi thiếu mật độ (density).", HttpStatus.BAD_REQUEST),
     AI_SERVICE_ERROR(12001, "AI đang quá tải. Vui lòng thử lại sau ít phút.", HttpStatus.INTERNAL_SERVER_ERROR),
 
     USER_NAME_NOT_FOUND(13001, "Tên đăng nhập không đúng", HttpStatus.NOT_FOUND),
     PASSWORD_INCORRECT(13002, "Mật khẩu không đúng", HttpStatus.UNAUTHORIZED),
     USERNAME_EXISTED(13003, "Tên đăng nhập đã tồn tại", HttpStatus.CONFLICT),
-    PASSWORD_SAME_AS_OLD(13004, "Mật khẩu mới không được giống mật khẩu cũ", HttpStatus.BAD_REQUEST)
-    ;
+    PASSWORD_SAME_AS_OLD(13004, "Mật khẩu mới không được giống mật khẩu cũ", HttpStatus.BAD_REQUEST);
     int code;
     String message;
     HttpStatus httpStatus;

@@ -1,15 +1,15 @@
 package com.hn.nutricarebe.dto.request;
 
-
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -27,6 +27,7 @@ public class OnboardingRequest {
 
     @Builder.Default
     Set<UUID> conditions = new HashSet<>();
+
     @Builder.Default
     Set<UUID> allergies = new HashSet<>();
 }

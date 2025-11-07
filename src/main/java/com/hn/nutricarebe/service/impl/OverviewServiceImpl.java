@@ -1,22 +1,23 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.dto.overview.*;
-import com.hn.nutricarebe.enums.LogSource;
-import com.hn.nutricarebe.service.*;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.experimental.FieldDefaults;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+
+import com.hn.nutricarebe.dto.overview.*;
+import com.hn.nutricarebe.enums.LogSource;
+import com.hn.nutricarebe.service.*;
+
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
 @Service
-public class OverviewServiceImpl implements OverviewAdminService{
+public class OverviewServiceImpl implements OverviewAdminService {
     FoodService foodService;
     UserService userService;
     PlanLogService planLogService;
@@ -33,8 +34,8 @@ public class OverviewServiceImpl implements OverviewAdminService{
     public OverviewResponse getOverview() {
         long totalUsers = userService.getTotalUsers();
         long totalFoods = foodService.getTotalFoods();
-        List<DailyCountDto> dailyCount  = userService.getNewUsersThisWeek();
-        List<MonthlyCountDto> monthlyCount  = foodService.getNewFoodsByMonth();
+        List<DailyCountDto> dailyCount = userService.getNewUsersThisWeek();
+        List<MonthlyCountDto> monthlyCount = foodService.getNewFoodsByMonth();
         Map<String, Long> getCountBySource = planLogService.getCountBySource();
         Map<String, Long> getPlanLogCountByMealSlot = planLogService.getPlanLogCountByMealSlot();
 
@@ -52,24 +53,23 @@ public class OverviewServiceImpl implements OverviewAdminService{
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     public ClinicalResponse clinical() {
-        List<Map<String, Object>> top5Condition =   userConditionService.getTop5ConditionNames();
-        List<Map<String, Object>> top5Allergy =   userAllergyService.getTop5AllergyNames();
+        List<Map<String, Object>> top5Condition = userConditionService.getTop5ConditionNames();
+        List<Map<String, Object>> top5Allergy = userAllergyService.getTop5AllergyNames();
         long getTotalAllergies = allergyService.getTotalAllergies();
         long getTotalConditions = conditionService.getTotalConditions();
 
-        return  ClinicalResponse.builder()
+        return ClinicalResponse.builder()
                 .top5Condition(top5Condition)
                 .top5Allergy(top5Allergy)
                 .getTotalAllergies(getTotalAllergies)
                 .getTotalConditions(getTotalConditions)
                 .build();
-
     }
 
     // Quan ly nguoi dung
     @Override
     @PreAuthorize("hasRole('ADMIN')")
-    public UserManageResponse userManage(){
+    public UserManageResponse userManage() {
         long totalUsers = userService.getTotalUsers();
         long getNewUsersInLast7Days = userService.getNewUsersInLast7Days();
         Map<String, Long> getUserRoleCounts = userService.getUserRoleCounts();
@@ -90,7 +90,7 @@ public class OverviewServiceImpl implements OverviewAdminService{
     // quản lý món ăn
     @Override
     @PreAuthorize("hasRole('ADMIN')")
-    public MealsManageResponse mealsManage(){
+    public MealsManageResponse mealsManage() {
         long countNewFoodsInLastWeek = foodService.countNewFoodsInLastWeek();
         long totalFoods = foodService.getTotalFoods();
         long countLogsFromPlanSource = planLogService.countLogsFromPlanSource(LogSource.PLAN);
@@ -111,7 +111,7 @@ public class OverviewServiceImpl implements OverviewAdminService{
     // quản lý dinh dưỡng
     @Override
     @PreAuthorize("hasRole('ADMIN')")
-    public NutritionManageResponse nutritionManage(){
+    public NutritionManageResponse nutritionManage() {
         long countFoodsUnder300Kcal = foodService.countFoodsWithLowKcal();
         long countFoodsOver800Kcal = foodService.countFoodsWithHighKcal();
         long countFoodsWithComplete5 = foodService.countFoodsWithComplete5();
@@ -136,7 +136,7 @@ public class OverviewServiceImpl implements OverviewAdminService{
     // quản lý nguyên liệu
     @Override
     @PreAuthorize("hasRole('ADMIN')")
-    public IngredientManageResponse ingredientManage(){
+    public IngredientManageResponse ingredientManage() {
         long countIngredients = ingredientService.countIngredients();
         long countNewIngredientsThisWeek = ingredientService.countNewIngredientsThisWeek();
 
@@ -145,5 +145,4 @@ public class OverviewServiceImpl implements OverviewAdminService{
                 .countNewIngredientsThisWeek(countNewIngredientsThisWeek)
                 .build();
     }
-
 }

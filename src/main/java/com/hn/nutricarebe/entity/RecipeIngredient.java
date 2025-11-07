@@ -1,14 +1,16 @@
 package com.hn.nutricarebe.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -25,18 +27,14 @@ public class RecipeIngredient {
     UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-            name = "food_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_recipe_ingredients_food")
-    )
+    @JoinColumn(name = "food_id", nullable = false, foreignKey = @ForeignKey(name = "fk_recipe_ingredients_food"))
     Food food;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "ingredient_id",
             nullable = false,
-            foreignKey = @ForeignKey(name = "fk_recipe_ingredients_ingredient")
-    )
+            foreignKey = @ForeignKey(name = "fk_recipe_ingredients_ingredient"))
     Ingredient ingredient;
 
     @Column(name = "quantity", precision = 10, scale = 2)

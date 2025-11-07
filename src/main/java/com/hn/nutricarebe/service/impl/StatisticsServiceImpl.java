@@ -1,22 +1,25 @@
 package com.hn.nutricarebe.service.impl;
 
+import static com.hn.nutricarebe.helper.StatisticHelper.*;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
 import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
 import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.service.*;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import static com.hn.nutricarebe.helper.StatisticHelper.*;
-
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
@@ -26,7 +29,6 @@ public class StatisticsServiceImpl implements StatisticsService {
     PlanLogService planLogService;
     WaterLogService waterLogService;
     MealPlanDayService mealPlanDayService;
-
 
     @Override
     public StatisticWeekResponse byWeek() {
@@ -45,15 +47,17 @@ public class StatisticsServiceImpl implements StatisticsService {
 
         List<DailyNutritionDto> dailyNutrition = planLogService.getDailyNutrition(userId, range.start, range.end, true);
 
-        Map<MealSlot, Map<String, Long>> mealSlotSummary = planLogService.getMealSlotSummary(userId, range.start, range.end);
+        Map<MealSlot, Map<String, Long>> mealSlotSummary =
+                planLogService.getMealSlotSummary(userId, range.start, range.end);
 
-        List<DailyWaterTotalDto> dailyWaterTotals = waterLogService.getDailyTotals(userId, range.start, range.end, true);
+        List<DailyWaterTotalDto> dailyWaterTotals =
+                waterLogService.getDailyTotals(userId, range.start, range.end, true);
 
-        List<DayTarget>  dayTargets = mealPlanDayService.getDayTargetsBetween(range.start, range.end, userId);
-        List<DayConsumedTotal> consumedTotals  = planLogService.getConsumedTotalsBetween(range.start, range.end, userId);
+        List<DayTarget> dayTargets = mealPlanDayService.getDayTargetsBetween(range.start, range.end, userId);
+        List<DayConsumedTotal> consumedTotals = planLogService.getConsumedTotalsBetween(range.start, range.end, userId);
         // Đưa consumedTotals vào map để tra nhanh
-        Map<LocalDate, DayConsumedTotal> consumedMap = consumedTotals.stream()
-                .collect(java.util.stream.Collectors.toMap(DayConsumedTotal::getDate, d -> d));
+        Map<LocalDate, DayConsumedTotal> consumedMap =
+                consumedTotals.stream().collect(java.util.stream.Collectors.toMap(DayConsumedTotal::getDate, d -> d));
         // So sánh và sinh cảnh báo
         List<String> warnings = new java.util.ArrayList<>();
         for (DayTarget target : dayTargets) {
@@ -93,25 +97,27 @@ public class StatisticsServiceImpl implements StatisticsService {
 
         // Top món, thống kê theo ngày, theo slot, và nước
         List<TopFoodDto> topFoods = planLogService.getTopFoods(userId, range.start, range.end, 5);
-        Map<MealSlot, Map<String, Long>> mealSlotSummary = planLogService.getMealSlotSummary(userId, range.start, range.end);
+        Map<MealSlot, Map<String, Long>> mealSlotSummary =
+                planLogService.getMealSlotSummary(userId, range.start, range.end);
 
         List<DailyNutritionDto> dailyNutrition = planLogService.getDailyNutrition(userId, range.start, range.end, true);
-        List<MonthlyWeeklyNutritionDto> weeklyNutrition =
-                aggregateMonthByWeeks(dailyNutrition, range.start, range.end);
+        List<MonthlyWeeklyNutritionDto> weeklyNutrition = aggregateMonthByWeeks(dailyNutrition, range.start, range.end);
 
         // === NƯỚC: gộp theo tuần ===
-        List<DailyWaterTotalDto> dailyWaterTotals = waterLogService.getDailyTotals(userId, range.start, range.end, true);
+        List<DailyWaterTotalDto> dailyWaterTotals =
+                waterLogService.getDailyTotals(userId, range.start, range.end, true);
         List<MonthlyWeeklyWaterTotalDto> weeklyWaterTotals =
                 aggregateWaterMonthByWeeks(dailyWaterTotals, range.start, range.end);
 
-       // === CẢNH BÁO: gọn theo tuần ===
+        // === CẢNH BÁO: gọn theo tuần ===
         List<DayTarget> dayTargets = mealPlanDayService.getDayTargetsBetween(range.start, range.end, userId);
         List<DayConsumedTotal> consumedTotals = planLogService.getConsumedTotalsBetween(range.start, range.end, userId);
-        Map<LocalDate, DayConsumedTotal> consumedMap = consumedTotals.stream()
-                .collect(java.util.stream.Collectors.toMap(DayConsumedTotal::getDate, d -> d));
+        Map<LocalDate, DayConsumedTotal> consumedMap =
+                consumedTotals.stream().collect(java.util.stream.Collectors.toMap(DayConsumedTotal::getDate, d -> d));
 
         // mỗi tuần 1 câu tóm tắt gọn
-        List<String> weeklyWarnings = warningsByWeekCompact(dayTargets, consumedMap, range.start, range.end, /*topPerWeek*/2);
+        List<String> weeklyWarnings =
+                warningsByWeekCompact(dayTargets, consumedMap, range.start, range.end, /*topPerWeek*/ 2);
 
         return StatisticMonthResponse.builder()
                 .weightKg(p.getWeightKg())
@@ -126,11 +132,12 @@ public class StatisticsServiceImpl implements StatisticsService {
     }
 
     public record MonthRange(LocalDate start, LocalDate end) {}
+
     public record WeekRange(LocalDate start, LocalDate end) {}
 
     private double calculateBmi(ProfileCreationRequest p) {
-        double heightM = p.getHeightCm() / 100.0;            // cm -> m
-        return p.getWeightKg() / (heightM * heightM);        // kg / m^2
+        double heightM = p.getHeightCm() / 100.0; // cm -> m
+        return p.getWeightKg() / (heightM * heightM); // kg / m^2
     }
 
     private String classifyBmi(double bmi) {
@@ -141,5 +148,4 @@ public class StatisticsServiceImpl implements StatisticsService {
         if (bmi < 35.0) return "Béo phì độ II";
         return "Béo phì độ III";
     }
-
 }

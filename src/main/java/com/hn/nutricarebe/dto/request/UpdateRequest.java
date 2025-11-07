@@ -1,12 +1,13 @@
 package com.hn.nutricarebe.dto.request;
 
-import jakarta.validation.Valid;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
+
+import jakarta.validation.Valid;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Getter
 @Setter
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class UpdateRequest {
     @Valid
     ProfileUpdateRequest profile;
+
     Set<UUID> conditions;
     Set<UUID> allergies;
     LocalDate startDate;

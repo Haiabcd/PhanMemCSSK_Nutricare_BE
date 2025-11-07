@@ -1,13 +1,14 @@
 package com.hn.nutricarebe.dto.response;
 
+import java.time.Instant;
+import java.util.UUID;
+
 import com.hn.nutricarebe.enums.ActivityLevel;
 import com.hn.nutricarebe.enums.Gender;
 import com.hn.nutricarebe.enums.GoalType;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.time.Instant;
-import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

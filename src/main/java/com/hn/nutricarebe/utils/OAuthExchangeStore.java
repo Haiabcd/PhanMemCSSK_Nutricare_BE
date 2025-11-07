@@ -1,16 +1,17 @@
 package com.hn.nutricarebe.utils;
 
-import org.springframework.stereotype.Component;
-
 import java.time.Clock;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.springframework.stereotype.Component;
 
 @Component
 public class OAuthExchangeStore {
     public static final class Entry<T> {
         public final T value;
         public final long expiresAt; // epoch millis
+
         public Entry(T value, long expiresAt) {
             this.value = value;
             this.expiresAt = expiresAt;

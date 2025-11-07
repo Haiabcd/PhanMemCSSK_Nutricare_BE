@@ -1,5 +1,12 @@
 package com.hn.nutricarebe.service.impl;
 
+import java.util.*;
+
+import jakarta.transaction.Transactional;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+
 import com.hn.nutricarebe.dto.ai.CreationRuleAI;
 import com.hn.nutricarebe.dto.ai.NutritionRuleAI;
 import com.hn.nutricarebe.dto.ai.TagCreationRequest;
@@ -13,16 +20,11 @@ import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.NutritionRuleService;
-import jakarta.transaction.Transactional;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-
-import java.util.*;
-
 
 @Log4j2
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -44,14 +46,15 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
         return nutritionRule;
     }
 
-
     @Override
     public List<NutritionRule> getRuleByUserId(UUID userId) {
         Set<UUID> conditionIds = new HashSet<>();
-        userConditionRepository.findByUser_Id(userId)
+        userConditionRepository
+                .findByUser_Id(userId)
                 .forEach(uc -> conditionIds.add(uc.getCondition().getId()));
         Set<UUID> allergyIds = new HashSet<>();
-        userAllergyRepository.findByUser_Id(userId)
+        userAllergyRepository
+                .findByUser_Id(userId)
                 .forEach(ua -> allergyIds.add(ua.getAllergy().getId()));
         Set<NutritionRule> result = new LinkedHashSet<>();
         if (!conditionIds.isEmpty()) {
@@ -70,10 +73,11 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
         List<NutritionRule> saveList = new ArrayList<>();
         for (NutritionRuleAI ruleAI : rules) {
             Set<Tag> tags = new HashSet<>();
-            if(ruleAI.getTargetType() == TargetType.FOOD_TAG){
-                if(ruleAI.getCustomFoodTags() != null && !ruleAI.getCustomFoodTags().isEmpty()){
+            if (ruleAI.getTargetType() == TargetType.FOOD_TAG) {
+                if (ruleAI.getCustomFoodTags() != null
+                        && !ruleAI.getCustomFoodTags().isEmpty()) {
                     List<Tag> tagSave = new ArrayList<>();
-                    for(TagCreationRequest t : ruleAI.getCustomFoodTags()){
+                    for (TagCreationRequest t : ruleAI.getCustomFoodTags()) {
                         Tag newTag = Tag.builder()
                                 .nameCode(t.getNameCode())
                                 .description(t.getDescription())
@@ -83,18 +87,24 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
                     List<Tag> savedTags = tagRepository.saveAllAndFlush(tagSave);
                     tags.addAll(savedTags);
                 }
-                if(ruleAI.getFoodTags() != null && !ruleAI.getFoodTags().isEmpty()){
+                if (ruleAI.getFoodTags() != null && !ruleAI.getFoodTags().isEmpty()) {
                     Set<Tag> existingTags = tagRepository.findByNameCodeInIgnoreCase(ruleAI.getFoodTags());
                     tags.addAll(existingTags);
                 }
             }
             NutritionRule creationRequest = NutritionRule.builder()
-                    .allergy(request.getAllergyId() != null ?
-                            Allergy.builder().id(request.getAllergyId()).build()
-                            : null)
-                    .condition(request.getConditionId() != null ?
-                            Condition.builder().id(request.getConditionId()).build()
-                            : null)
+                    .allergy(
+                            request.getAllergyId() != null
+                                    ? Allergy.builder()
+                                            .id(request.getAllergyId())
+                                            .build()
+                                    : null)
+                    .condition(
+                            request.getConditionId() != null
+                                    ? Condition.builder()
+                                            .id(request.getConditionId())
+                                            .build()
+                                    : null)
                     .active(true)
                     .comparator(ruleAI.getComparator())
                     .scope(ruleAI.getScope())
@@ -117,13 +127,13 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
         nutritionRuleRepository.saveAll(saveList);
     }
 
-
     @Override
     @Transactional
     public void deleteById(UUID id) {
-        NutritionRule rule = nutritionRuleRepository.findById(id)
+        NutritionRule rule = nutritionRuleRepository
+                .findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.NUTRITION_RULE_NOT_FOUND));
-         nutritionRuleRepository.delete(rule);
+        nutritionRuleRepository.delete(rule);
     }
 
     @Override
@@ -177,11 +187,12 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
         }
         nutritionRuleRepository.save(rule);
     }
-    //=========================HELPER METHODS=========================//
+    // =========================HELPER METHODS=========================//
 
     private static String safeUpper(String s) {
         return s == null ? null : s.trim().toUpperCase();
     }
+
     private static Set<String> allowedNutrients() {
         return Set.of("PROTEIN", "CARB", "FAT", "FIBER", "SODIUM", "SUGAR", "WATER");
     }
@@ -230,20 +241,18 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
             // perKg nullable -> default false
             if (dto.getPerKg() == null) dto.setPerKg(Boolean.FALSE);
         } else if (dto.getTargetType() == TargetType.FOOD_TAG) {
-            if (dto.getComparator() != null ||
-                    dto.getThresholdMin() != null ||
-                    dto.getThresholdMax() != null ||
-                    dto.getTargetCode() != null) {
+            if (dto.getComparator() != null
+                    || dto.getThresholdMin() != null
+                    || dto.getThresholdMax() != null
+                    || dto.getTargetCode() != null) {
                 throw new AppException(ErrorCode.INVALID_ARGUMENT);
             }
             dto.setPerKg(Boolean.FALSE);
         } else {
             throw new AppException(ErrorCode.INVALID_ARGUMENT);
         }
-        if (dto.getAgeMin() != null && dto.getAgeMax() != null &&
-                dto.getAgeMin() > dto.getAgeMax()) {
+        if (dto.getAgeMin() != null && dto.getAgeMax() != null && dto.getAgeMin() > dto.getAgeMax()) {
             throw new AppException(ErrorCode.INVALID_ARGUMENT);
         }
     }
-
 }

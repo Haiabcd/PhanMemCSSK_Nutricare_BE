@@ -1,19 +1,22 @@
 package com.hn.nutricarebe.service.impl;
 
-import com.hn.nutricarebe.exception.AppException;
-import com.hn.nutricarebe.exception.ErrorCode;
-import com.hn.nutricarebe.service.S3Service;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.hn.nutricarebe.exception.AppException;
+import com.hn.nutricarebe.exception.ErrorCode;
+import com.hn.nutricarebe.service.S3Service;
+
+import lombok.RequiredArgsConstructor;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Service
 @RequiredArgsConstructor
@@ -37,13 +40,12 @@ public class S3ServiceImpl implements S3Service {
                 .bucket(publicBucket)
                 .key(objectKey)
                 .contentType(contentType)
-                .cacheControl("public, max-age=31536000, immutable") //cache 1 nam
+                .cacheControl("public, max-age=31536000, immutable") // cache 1 nam
                 .build();
 
         s3Client.putObject(putReq, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
         return objectKey;
     }
-
 
     @Override
     public void deleteObject(String objectKey) {
@@ -74,7 +76,7 @@ public class S3ServiceImpl implements S3Service {
         if (contentType == null) return ".bin";
         return switch (contentType) {
             case "image/jpeg" -> ".jpg";
-            case "image/png"  -> ".png";
+            case "image/png" -> ".png";
             case "image/webp" -> ".webp";
             default -> ".bin";
         };

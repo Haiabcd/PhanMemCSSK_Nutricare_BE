@@ -1,10 +1,11 @@
 package com.hn.nutricarebe.dto.response;
 
+import java.time.LocalDate;
+
 import com.hn.nutricarebe.entity.Nutrition;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.time.LocalDate;
 
 @Getter
 @Setter

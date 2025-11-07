@@ -1,15 +1,19 @@
 package com.hn.nutricarebe.entity;
 
-import com.hn.nutricarebe.enums.Unit;
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import com.hn.nutricarebe.enums.Unit;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -30,13 +34,13 @@ public class Ingredient {
 
     @Embedded
     @AttributeOverrides({
-            @AttributeOverride(name = "kcal", column = @Column(name = "per100_kcal", precision = 10, scale = 2)),
-            @AttributeOverride(name = "proteinG",  column = @Column(name = "per100_proteinG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "carbG",    column = @Column(name = "per100_carbG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "fatG",      column = @Column(name = "per100_fatG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "fiberG",  column = @Column(name = "per100_fiberG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "sodiumMg",    column = @Column(name = "per100_sodiumMg", precision = 10, scale = 2)),
-            @AttributeOverride(name = "sugarMg",      column = @Column(name = "per100_sugarMg", precision = 10, scale = 2))
+        @AttributeOverride(name = "kcal", column = @Column(name = "per100_kcal", precision = 10, scale = 2)),
+        @AttributeOverride(name = "proteinG", column = @Column(name = "per100_proteinG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "carbG", column = @Column(name = "per100_carbG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "fatG", column = @Column(name = "per100_fatG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "fiberG", column = @Column(name = "per100_fiberG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "sodiumMg", column = @Column(name = "per100_sodiumMg", precision = 10, scale = 2)),
+        @AttributeOverride(name = "sugarMg", column = @Column(name = "per100_sugarMg", precision = 10, scale = 2))
     })
     Nutrition per100;
 
@@ -46,8 +50,7 @@ public class Ingredient {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "ingredient_aliases",
-            joinColumns = @JoinColumn(name = "ingredient_id", foreignKey = @ForeignKey(name = "fk_aliases_ingredient"))
-    )
+            joinColumns = @JoinColumn(name = "ingredient_id", foreignKey = @ForeignKey(name = "fk_aliases_ingredient")))
     @Column(name = "alias")
     Set<String> aliases;
 

@@ -1,5 +1,17 @@
 package com.hn.nutricarebe.service.impl;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import jakarta.transaction.Transactional;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+
 import com.hn.nutricarebe.dto.request.AllergyRequest;
 import com.hn.nutricarebe.dto.response.AllergyResponse;
 import com.hn.nutricarebe.entity.Allergy;
@@ -12,21 +24,10 @@ import com.hn.nutricarebe.repository.AllergyRepository;
 import com.hn.nutricarebe.repository.NutritionRuleRepository;
 import com.hn.nutricarebe.repository.UserAllergyRepository;
 import com.hn.nutricarebe.service.AllergyService;
-import jakarta.transaction.Transactional;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
-
 
 @Service
 @RequiredArgsConstructor
@@ -38,7 +39,6 @@ public class AllergyServiceImpl implements AllergyService {
     NutritionRuleMapper nutritionRuleMapper;
     UserAllergyRepository userAllergyRepository;
 
-
     // Tạo mới một dị ứng
     @Override
     @PreAuthorize("hasRole('ADMIN')")
@@ -46,15 +46,15 @@ public class AllergyServiceImpl implements AllergyService {
         if (allergyRepository.existsByNameIgnoreCase(request.getName().strip())) {
             throw new AppException(ErrorCode.ALLERGY_EXISTED);
         }
-         allergyRepository.save(allergyMapper.toAllergy(request));
+        allergyRepository.save(allergyMapper.toAllergy(request));
     }
 
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public void deleteById(UUID id) {
-        Allergy allergy = allergyRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
+        Allergy allergy =
+                allergyRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
         // 1) Nếu có user đang dùng -> chặn xóa
         if (userAllergyRepository.existsByAllergy_Id(id)) {
             throw new AppException(ErrorCode.DELETE_ALLERGY_CONFLICT);
@@ -75,24 +75,24 @@ public class AllergyServiceImpl implements AllergyService {
         if (content.isEmpty()) {
             return slice.map(allergyMapper::toAllergyResponse);
         }
-        Set<UUID> ids = content.stream()
-                .map(Allergy::getId)
-                .collect(java.util.stream.Collectors.toSet());
+        Set<UUID> ids = content.stream().map(Allergy::getId).collect(java.util.stream.Collectors.toSet());
         List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndAllergy_IdIn(ids);
         Map<UUID, List<NutritionRule>> rulesByAllergy = rules.stream()
-                .collect(java.util.stream.Collectors.groupingBy(nr -> nr.getAllergy().getId()));
+                .collect(java.util.stream.Collectors.groupingBy(
+                        nr -> nr.getAllergy().getId()));
         return slice.map(a -> allergyMapper.toAllergyResponse(a, rulesByAllergy, nutritionRuleMapper));
     }
 
     // Tìm một dị ứng theo id
     @Override
     public AllergyResponse getById(UUID id) {
-        Allergy allergy = allergyRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
+        Allergy allergy =
+                allergyRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
         Set<UUID> ids = Set.of(allergy.getId());
         List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndAllergy_IdIn(ids);
         Map<UUID, List<NutritionRule>> rulesByAllergy = rules.stream()
-                .collect(java.util.stream.Collectors.groupingBy(nr -> nr.getAllergy().getId()));
+                .collect(java.util.stream.Collectors.groupingBy(
+                        nr -> nr.getAllergy().getId()));
         return allergyMapper.toAllergyResponse(allergy, rulesByAllergy, nutritionRuleMapper);
     }
 
@@ -107,8 +107,8 @@ public class AllergyServiceImpl implements AllergyService {
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     public void update(UUID id, AllergyRequest allergy) {
-        Allergy existing = allergyRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
+        Allergy existing =
+                allergyRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.ALLERGY_NOT_FOUND));
         if (allergy.getName() != null) {
             String newName = allergy.getName().trim();
             if (!newName.equalsIgnoreCase(existing.getName().strip())) {
@@ -125,7 +125,4 @@ public class AllergyServiceImpl implements AllergyService {
     public long getTotalAllergies() {
         return allergyRepository.count();
     }
-
 }
-
-

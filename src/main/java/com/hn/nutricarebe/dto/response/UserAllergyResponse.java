@@ -1,11 +1,11 @@
 package com.hn.nutricarebe.dto.response;
 
+import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

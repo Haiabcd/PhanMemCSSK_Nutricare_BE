@@ -1,13 +1,15 @@
 package com.hn.nutricarebe.controller;
 
-import com.hn.nutricarebe.dto.overview.*;
-import com.hn.nutricarebe.service.OverviewAdminService;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.experimental.FieldDefaults;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.hn.nutricarebe.dto.overview.*;
+import com.hn.nutricarebe.service.OverviewAdminService;
+
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
@@ -51,5 +53,4 @@ public class OverviewController {
     public IngredientManageResponse ingredientManage() {
         return overviewService.ingredientManage();
     }
-
 }

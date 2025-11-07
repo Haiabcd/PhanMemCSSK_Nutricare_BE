@@ -12,7 +12,7 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AdminLoginResponse {
     String accessToken;
-    Long   accessExpiresAt;
+    Long accessExpiresAt;
     String refreshToken;
-    Long   refreshExpiresAt;
+    Long refreshExpiresAt;
 }

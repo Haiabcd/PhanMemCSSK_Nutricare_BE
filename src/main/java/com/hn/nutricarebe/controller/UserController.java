@@ -1,14 +1,15 @@
 package com.hn.nutricarebe.controller;
 
+import org.springframework.web.bind.annotation.*;
+
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.HeaderResponse;
 import com.hn.nutricarebe.dto.response.InfoResponse;
 import com.hn.nutricarebe.service.UserService;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.bind.annotation.*;
-
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
@@ -32,8 +33,4 @@ public class UserController {
                 .data(userService.getHeader())
                 .build();
     }
-
-
-
-
 }

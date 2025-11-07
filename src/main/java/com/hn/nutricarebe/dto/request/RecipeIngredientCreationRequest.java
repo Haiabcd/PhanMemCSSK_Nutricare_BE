@@ -1,13 +1,14 @@
 package com.hn.nutricarebe.dto.request;
 
+import java.math.BigDecimal;
+import java.util.UUID;
+
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.math.BigDecimal;
-import java.util.UUID;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

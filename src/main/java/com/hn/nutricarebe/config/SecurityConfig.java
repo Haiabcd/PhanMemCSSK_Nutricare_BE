@@ -1,5 +1,8 @@
 package com.hn.nutricarebe.config;
 
+import java.util.List;
+import javax.crypto.spec.SecretKeySpec;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,8 +23,6 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.*;
-import javax.crypto.spec.SecretKeySpec;
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -29,25 +30,20 @@ import java.util.List;
 public class SecurityConfig {
 
     private final String[] PUBLIC_POST_ENDPOINTS = {
-            "/auths/onboarding",
-            "/auths/google/start/**",
-            "/auths/refresh",
-            "/auths/logout",
-            "/auths/login",
-            "/ai/plan"
+        "/auths/onboarding", "/auths/google/start/**", "/auths/refresh", "/auths/logout", "/auths/login", "/ai/plan"
     };
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
-            "/auths/google/callback",
-            "/auths/google/redeem",
-            "/ingredients/all",
-            "/ingredients/autocomplete/**",
-            "/foods/autocomplete/**",
-            "/foods/all",
-            "/conditions/all/**",
-            "/conditions/search/**",
-            "/allergies/all/**",
-            "/allergies/search/**",
+        "/auths/google/callback",
+        "/auths/google/redeem",
+        "/ingredients/all",
+        "/ingredients/autocomplete/**",
+        "/foods/autocomplete/**",
+        "/foods/all",
+        "/conditions/all/**",
+        "/conditions/search/**",
+        "/allergies/all/**",
+        "/allergies/search/**",
     };
 
     @Value("${jwt.signerKey}")
@@ -55,20 +51,19 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(Customizer.withDefaults())     // bật CORS
+        http.cors(Customizer.withDefaults()) // bật CORS
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()   // cho preflight
-                        .requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.GET,  PUBLIC_GET_ENDPOINTS).permitAll()
-                        .anyRequest().authenticated()
-                )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .bearerTokenResolver(bearerTokenResolver())
+                .authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.OPTIONS, "/**")
+                        .permitAll() // cho preflight
+                        .requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS)
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS)
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2.bearerTokenResolver(bearerTokenResolver())
                         .jwt(jwt -> jwt.decoder(jwtDecoder()).jwtAuthenticationConverter(jwtAuthenticationConverter()))
-                        .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
-                );
+                        .authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
         return http.build();
     }
 
@@ -76,7 +71,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOrigins(List.of("http://localhost:5173"));
-        cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(false);
         cfg.setMaxAge(3600L);
@@ -111,8 +106,7 @@ public class SecurityConfig {
     @Bean
     JwtDecoder jwtDecoder() {
         SecretKeySpec key = new SecretKeySpec(signerKey.getBytes(), "HS512");
-        NimbusJwtDecoder decoder = NimbusJwtDecoder
-                .withSecretKey(key)
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS512)
                 .build();
 
@@ -129,7 +123,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    PasswordEncoder passwordEncoder(){
+    PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(10);
     }
 }

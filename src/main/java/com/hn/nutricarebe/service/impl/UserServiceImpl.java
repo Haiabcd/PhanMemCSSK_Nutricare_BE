@@ -1,5 +1,13 @@
 package com.hn.nutricarebe.service.impl;
 
+import java.time.*;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
+import java.util.*;
+
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
 import com.hn.nutricarebe.dto.overview.DailyCountDto;
 import com.hn.nutricarebe.dto.response.HeaderResponse;
 import com.hn.nutricarebe.dto.response.InfoResponse;
@@ -17,16 +25,10 @@ import com.hn.nutricarebe.service.ProfileService;
 import com.hn.nutricarebe.service.UserAllergyService;
 import com.hn.nutricarebe.service.UserConditionService;
 import com.hn.nutricarebe.service.UserService;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-
-import java.time.*;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAdjusters;
-import java.util.*;
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
@@ -38,14 +40,15 @@ public class UserServiceImpl implements UserService {
     UserAllergyService userAllergyService;
     UserConditionService userConditionService;
 
-
     @Override
     public User saveOnboarding(String device) {
-        User userOld = userRepository.findTopByDeviceIdAndStatusOrderByCreatedAtDesc(device, UserStatus.ACTIVE).orElse(null);
+        User userOld = userRepository
+                .findTopByDeviceIdAndStatusOrderByCreatedAtDesc(device, UserStatus.ACTIVE)
+                .orElse(null);
         if (userOld != null && userOld.getProvider() == Provider.NONE) {
             userOld.setStatus(UserStatus.DELETED);
             userRepository.save(userOld);
-        }else if(userOld != null && userOld.getProvider() == Provider.SUPABASE_GOOGLE){
+        } else if (userOld != null && userOld.getProvider() == Provider.SUPABASE_GOOGLE) {
             return userOld;
         }
         User user = User.builder()
@@ -59,8 +62,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User getUserById(UUID id) {
-        return  userRepository.findById(id).
-                orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
     @Override
@@ -68,7 +70,6 @@ public class UserServiceImpl implements UserService {
         User saved = userRepository.save(user);
         return userMapper.toUserCreationResponse(saved);
     }
-
 
     @Override
     public InfoResponse getUserByToken() {
@@ -101,7 +102,6 @@ public class UserServiceImpl implements UserService {
         return userRepository.count();
     }
 
-
     @Override
     public List<DailyCountDto> getNewUsersThisWeek() {
         String tz = "Asia/Ho_Chi_Minh";
@@ -110,13 +110,13 @@ public class UserServiceImpl implements UserService {
         ZonedDateTime now = ZonedDateTime.now(zone);
 
         // Thứ Hai của tuần hiện tại (theo TZ)
-        LocalDate monday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                .toLocalDate();
+        LocalDate monday =
+                now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toLocalDate();
         LocalDate endDate = monday.plusDays(7); // [monday, monday+7)
 
         // Đổi LocalDate -> Instant theo TZ
         Instant start = monday.atStartOfDay(zone).toInstant();
-        Instant end   = endDate.atStartOfDay(zone).toInstant();
+        Instant end = endDate.atStartOfDay(zone).toInstant();
 
         // Lấy tất cả createdAt trong tuần
         List<Instant> createdTimes = userRepository.findCreatedAtBetween(start, end);
@@ -140,13 +140,13 @@ public class UserServiceImpl implements UserService {
     private String toVietnameseDayLabel(DayOfWeek dow) {
         if (dow == null) return "N/A";
         return switch (dow) {
-            case MONDAY    -> "Thứ 2";
-            case TUESDAY   -> "Thứ 3";
+            case MONDAY -> "Thứ 2";
+            case TUESDAY -> "Thứ 3";
             case WEDNESDAY -> "Thứ 4";
-            case THURSDAY  -> "Thứ 5";
-            case FRIDAY    -> "Thứ 6";
-            case SATURDAY  -> "Thứ 7";
-            case SUNDAY    -> "Chủ nhật";
+            case THURSDAY -> "Thứ 5";
+            case FRIDAY -> "Thứ 6";
+            case SATURDAY -> "Thứ 7";
+            case SUNDAY -> "Chủ nhật";
         };
     }
 

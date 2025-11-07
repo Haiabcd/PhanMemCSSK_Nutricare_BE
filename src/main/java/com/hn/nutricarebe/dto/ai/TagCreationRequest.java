@@ -1,6 +1,5 @@
 package com.hn.nutricarebe.dto.ai;
 
-
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 

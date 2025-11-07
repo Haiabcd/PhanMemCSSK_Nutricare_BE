@@ -5,5 +5,6 @@ import com.hn.nutricarebe.dto.response.StatisticWeekResponse;
 
 public interface StatisticsService {
     StatisticWeekResponse byWeek();
+
     StatisticMonthResponse byMonth();
 }

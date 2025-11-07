@@ -1,10 +1,9 @@
 package com.hn.nutricarebe.dto.ai;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.util.List;
 
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

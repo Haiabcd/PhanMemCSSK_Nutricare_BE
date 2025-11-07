@@ -1,9 +1,11 @@
 package com.hn.nutricarebe.dto.ai;
 
 import jakarta.annotation.Nullable;
+
+import org.springframework.web.multipart.MultipartFile;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.multipart.MultipartFile;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -11,8 +13,9 @@ import org.springframework.web.multipart.MultipartFile;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class ChatRequest{
+public class ChatRequest {
     String message;
+
     @Nullable
     MultipartFile file;
 }

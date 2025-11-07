@@ -9,5 +9,4 @@ public class NutriCareBeApplication {
     public static void main(String[] args) {
         SpringApplication.run(NutriCareBeApplication.class, args);
     }
-
 }

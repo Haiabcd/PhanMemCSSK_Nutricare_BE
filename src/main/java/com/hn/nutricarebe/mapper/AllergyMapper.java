@@ -1,24 +1,28 @@
 package com.hn.nutricarebe.mapper;
 
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.mapstruct.*;
 
 import com.hn.nutricarebe.dto.request.AllergyRequest;
 import com.hn.nutricarebe.dto.response.AllergyResponse;
 import com.hn.nutricarebe.dto.response.UserAllergyResponse;
 import com.hn.nutricarebe.entity.Allergy;
 import com.hn.nutricarebe.entity.NutritionRule;
-import org.mapstruct.*;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
-@Mapper(componentModel = "spring", uses = {NutritionRuleMapper.class})
-public interface  AllergyMapper {
+@Mapper(
+        componentModel = "spring",
+        uses = {NutritionRuleMapper.class})
+public interface AllergyMapper {
     Allergy toAllergy(AllergyRequest request);
 
     @Mapping(target = "nutritionRules", ignore = true)
-    AllergyResponse toAllergyResponse(Allergy allergy,
-                                      @Context Map<UUID, List<NutritionRule>> rulesByAllergy,
-                                      @Context NutritionRuleMapper ruleMapper);
+    AllergyResponse toAllergyResponse(
+            Allergy allergy,
+            @Context Map<UUID, List<NutritionRule>> rulesByAllergy,
+            @Context NutritionRuleMapper ruleMapper);
 
     UserAllergyResponse toUserAllergyResponse(Allergy allergy);
 
@@ -26,10 +30,11 @@ public interface  AllergyMapper {
     AllergyResponse toAllergyResponse(Allergy allergy);
 
     @AfterMapping
-    default void fillRules(Allergy source,
-                           @MappingTarget AllergyResponse target,
-                           @Context Map<UUID, List<NutritionRule>> rulesByAllergy,
-                           @Context NutritionRuleMapper ruleMapper) {
+    default void fillRules(
+            Allergy source,
+            @MappingTarget AllergyResponse target,
+            @Context Map<UUID, List<NutritionRule>> rulesByAllergy,
+            @Context NutritionRuleMapper ruleMapper) {
         var rules = rulesByAllergy.getOrDefault(source.getId(), List.of());
         target.setNutritionRules(ruleMapper.toResponses(rules));
     }
@@ -39,8 +44,7 @@ public interface  AllergyMapper {
             Allergy source,
             @MappingTarget AllergyResponse.AllergyResponseBuilder target,
             @Context Map<UUID, List<NutritionRule>> rulesByAllergy,
-            @Context NutritionRuleMapper ruleMapper
-    ) {
+            @Context NutritionRuleMapper ruleMapper) {
         var rules = rulesByAllergy.getOrDefault(source.getId(), List.of());
         target.nutritionRules(ruleMapper.toResponses(rules));
     }

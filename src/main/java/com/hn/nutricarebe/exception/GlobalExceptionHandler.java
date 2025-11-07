@@ -1,18 +1,21 @@
 package com.hn.nutricarebe.exception;
 
-import com.hn.nutricarebe.dto.response.ApiResponse;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.support.DefaultMessageSourceResolvable;
-import org.springframework.http.ResponseEntity;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.security.access.AccessDeniedException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import org.springframework.context.support.DefaultMessageSourceResolvable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import com.hn.nutricarebe.dto.response.ApiResponse;
+
+import lombok.extern.slf4j.Slf4j;
 
 @RestControllerAdvice
 @Slf4j
@@ -34,14 +37,11 @@ public class GlobalExceptionHandler {
     // Bean Validation (@Valid) trên @RequestBody
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
-        Map<String, List<String>> errors = ex.getBindingResult()
-                .getFieldErrors()
-                .stream()
+        Map<String, List<String>> errors = ex.getBindingResult().getFieldErrors().stream()
                 .collect(Collectors.groupingBy(
                         FieldError::getField,
                         LinkedHashMap::new, // giữ thứ tự field
-                        Collectors.mapping(DefaultMessageSourceResolvable::getDefaultMessage, Collectors.toList())
-                ));
+                        Collectors.mapping(DefaultMessageSourceResolvable::getDefaultMessage, Collectors.toList())));
 
         ApiResponse<Void> body = ApiResponse.<Void>builder()
                 .code(ErrorCode.VALIDATION_FAILED.getCode())
@@ -57,12 +57,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
         ErrorCode errorCode = ErrorCode.UNAUTHORIZED;
         log.warn("Access denied: {}", ex.getMessage());
-        return ResponseEntity
-                .status(errorCode.getHttpStatus())
+        return ResponseEntity.status(errorCode.getHttpStatus())
                 .body(ApiResponse.<Void>builder()
                         .code(errorCode.getCode())
                         .message(errorCode.getMessage())
                         .build());
     }
-
 }

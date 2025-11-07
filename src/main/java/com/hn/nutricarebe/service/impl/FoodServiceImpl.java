@@ -1,5 +1,21 @@
 package com.hn.nutricarebe.service.impl;
 
+import java.io.IOException;
+import java.math.BigInteger;
+import java.time.*;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.hn.nutricarebe.dto.overview.*;
 import com.hn.nutricarebe.dto.request.FoodCreationRequest;
 import com.hn.nutricarebe.dto.request.FoodPatchRequest;
@@ -19,23 +35,10 @@ import com.hn.nutricarebe.repository.IngredientRepository;
 import com.hn.nutricarebe.repository.TagRepository;
 import com.hn.nutricarebe.service.FoodService;
 import com.hn.nutricarebe.service.S3Service;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.SliceImpl;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException;
-import java.math.BigInteger;
-import java.time.*;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,7 +50,6 @@ public class FoodServiceImpl implements FoodService {
     FoodMapper foodMapper;
     S3Service s3Service;
     CdnHelper cdnHelper;
-
 
     // Tạo món ăn mới
     @Override
@@ -88,7 +90,8 @@ public class FoodServiceImpl implements FoodService {
                 food.addIngredient(ri);
             }
         }
-        boolean hasIngredients = food.getIngredients() != null && !food.getIngredients().isEmpty();
+        boolean hasIngredients =
+                food.getIngredients() != null && !food.getIngredients().isEmpty();
         food.setIngredient(hasIngredients);
         String objectKey = null;
         try {
@@ -108,7 +111,8 @@ public class FoodServiceImpl implements FoodService {
     // Lấy thông tin món ăn theo ID
     @Override
     public FoodResponse getById(UUID id) {
-        Food food = foodRepository.findWithCollectionsById(id)
+        Food food = foodRepository
+                .findWithCollectionsById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
         return foodMapper.toFoodResponse(food, cdnHelper);
     }
@@ -117,8 +121,7 @@ public class FoodServiceImpl implements FoodService {
     @Override
     @Transactional
     public void deleteById(UUID id) {
-        Food food = foodRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
+        Food food = foodRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
         String key = food.getImageKey();
         if (key != null && !key.isBlank()) {
             try {
@@ -144,10 +147,8 @@ public class FoodServiceImpl implements FoodService {
                         .map(food -> foodMapper.toFoodResponse(food, cdnHelper))
                         .toList(),
                 pageable,
-                slice.hasNext()
-        );
+                slice.hasNext());
     }
-
 
     // Lấy tất cả món ăn với phân trang
     @Override
@@ -158,15 +159,15 @@ public class FoodServiceImpl implements FoodService {
                         .map(food -> foodMapper.toFoodResponse(food, cdnHelper))
                         .toList(),
                 pageable,
-                slice.hasNext()
-        );
+                slice.hasNext());
     }
 
     @Override
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public void patchUpdate(UUID id, FoodPatchRequest req) {
-        Food food = foodRepository.findWithCollectionsById(id)
+        Food food = foodRepository
+                .findWithCollectionsById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
         String newName = normalizeName(req.getName());
         if (!newName.equalsIgnoreCase(food.getName())) {
@@ -224,8 +225,8 @@ public class FoodServiceImpl implements FoodService {
             var ingIds = req.getIngredients().stream()
                     .map(RecipeIngredientCreationRequest::getIngredientId)
                     .collect(Collectors.toSet());
-            var ingMap = ingredientRepository.findAllById(ingIds)
-                    .stream().collect(Collectors.toMap(Ingredient::getId, it -> it));
+            var ingMap = ingredientRepository.findAllById(ingIds).stream()
+                    .collect(Collectors.toMap(Ingredient::getId, it -> it));
             if (ingMap.size() != ingIds.size()) {
                 throw new AppException(ErrorCode.INGREDIENT_NOT_FOUND);
             }
@@ -239,7 +240,8 @@ public class FoodServiceImpl implements FoodService {
                 food.addIngredient(ri);
             }
         }
-        boolean hasIngredients = food.getIngredients() != null && !food.getIngredients().isEmpty();
+        boolean hasIngredients =
+                food.getIngredients() != null && !food.getIngredients().isEmpty();
         food.setIngredient(hasIngredients);
         foodRepository.save(food);
         if (newKey != null && oldKey != null && !oldKey.isBlank() && !oldKey.equals(newKey)) {
@@ -251,7 +253,6 @@ public class FoodServiceImpl implements FoodService {
         }
     }
 
-
     @Override
     @Transactional(readOnly = true)
     public List<FoodResponse> autocompleteFoods(String keyword, int limit) {
@@ -259,13 +260,10 @@ public class FoodServiceImpl implements FoodService {
             return List.of();
         }
         Pageable pageable = PageRequest.of(0, Math.min(limit, 20));
-        return  foodRepository.searchByNameUnaccent(keyword.trim(), pageable)
-                .getContent()
-                .stream()
+        return foodRepository.searchByNameUnaccent(keyword.trim(), pageable).getContent().stream()
                 .map(food -> foodMapper.toFoodResponse(food, cdnHelper))
                 .toList();
     }
-
 
     // Chuẩn hoá tên: loại bỏ khoảng trắng thừa
     private String normalizeName(String input) {
@@ -287,10 +285,10 @@ public class FoodServiceImpl implements FoodService {
 
         // [startOfYear, startOfNextYear) theo TZ
         LocalDate startDate = LocalDate.of(y, 1, 1);
-        LocalDate endDate   = startDate.plusYears(1);
+        LocalDate endDate = startDate.plusYears(1);
 
         Instant start = startDate.atStartOfDay(zone).toInstant();
-        Instant end   = endDate.atStartOfDay(zone).toInstant();
+        Instant end = endDate.atStartOfDay(zone).toInstant();
 
         // Lấy tất cả thời điểm tạo món trong năm
         List<Instant> times = foodRepository.findCreatedAtBetween(start, end);
@@ -333,27 +331,19 @@ public class FoodServiceImpl implements FoodService {
     // Lấy 10 món ăn có kcal cao nhất
     @Override
     public List<FoodTopKcalDto> getTop10HighKcalFoods() {
-        return foodRepository.findTop10FoodsByKcalNative()
-                .stream()
-                .map(row -> new FoodTopKcalDto(
-                        (String) row[0],
-                        row[1] != null ? ((Number) row[1]).doubleValue() : 0.0
-                ))
+        return foodRepository.findTop10FoodsByKcalNative().stream()
+                .map(row -> new FoodTopKcalDto((String) row[0], row[1] != null ? ((Number) row[1]).doubleValue() : 0.0))
                 .collect(Collectors.toList());
     }
 
     // Lấy 10 món ăn có protein cao nhất
     @Override
     public List<FoodTopProteinDto> getTop10HighProteinFoods() {
-        return foodRepository.findTop10FoodsByProteinNative()
-                .stream()
-                .map(row -> new FoodTopProteinDto(
-                        (String) row[0],
-                        row[1] != null ? ((Number) row[1]).doubleValue() : 0.0
-                ))
+        return foodRepository.findTop10FoodsByProteinNative().stream()
+                .map(row ->
+                        new FoodTopProteinDto((String) row[0], row[1] != null ? ((Number) row[1]).doubleValue() : 0.0))
                 .collect(Collectors.toList());
     }
-
 
     // Đếm số món ăn có kcal < 300
     @Override
@@ -361,13 +351,11 @@ public class FoodServiceImpl implements FoodService {
         return foodRepository.countFoodsWithLowKcal();
     }
 
-
     // Đếm số món ăn có kcal > 800
     @Override
     public Long countFoodsWithHighKcal() {
         return foodRepository.countFoodsWithHighKcal();
     }
-
 
     // Đếm số món ăn có đầy đủ 5 nhóm dinh dưỡng chính
     @Override
@@ -404,17 +392,18 @@ public class FoodServiceImpl implements FoodService {
         long missing = toLong(cols[7]);
 
         List<EnergyBinDto> bins = new ArrayList<>();
-        bins.add(new EnergyBinDto("0–200",     0,    200,   b1));
-        bins.add(new EnergyBinDto("200–400",   200,  400,   b2));
-        bins.add(new EnergyBinDto("400–600",   400,  600,   b3));
-        bins.add(new EnergyBinDto("600–800",   600,  800,   b4));
-        bins.add(new EnergyBinDto("800–1000",  800,  1000,  b5));
-        bins.add(new EnergyBinDto("1000–1200", 1000, 1200,  b6));
-        bins.add(new EnergyBinDto(">1200",     1200, null,  b7));
+        bins.add(new EnergyBinDto("0–200", 0, 200, b1));
+        bins.add(new EnergyBinDto("200–400", 200, 400, b2));
+        bins.add(new EnergyBinDto("400–600", 400, 600, b3));
+        bins.add(new EnergyBinDto("600–800", 600, 800, b4));
+        bins.add(new EnergyBinDto("800–1000", 800, 1000, b5));
+        bins.add(new EnergyBinDto("1000–1200", 1000, 1200, b6));
+        bins.add(new EnergyBinDto(">1200", 1200, null, b7));
         bins.add(new EnergyBinDto("Thiếu kcal", null, null, missing));
 
         long total = b1 + b2 + b3 + b4 + b5 + b6 + b7 + missing;
-        long max   = Math.max(b1, Math.max(b2, Math.max(b3, Math.max(b4, Math.max(b5, Math.max(b6, Math.max(b7, missing)))))));
+        long max = Math.max(
+                b1, Math.max(b2, Math.max(b3, Math.max(b4, Math.max(b5, Math.max(b6, Math.max(b7, missing)))))));
 
         return new EnergyHistogramDto(bins, total, max);
     }
@@ -423,10 +412,8 @@ public class FoodServiceImpl implements FoodService {
         if (v == null) return 0L;
         return switch (v) {
             case BigInteger bi -> bi.longValue();
-            case Number n      -> n.longValue();
-            default            -> Long.parseLong(v.toString());
+            case Number n -> n.longValue();
+            default -> Long.parseLong(v.toString());
         };
     }
-
-
 }

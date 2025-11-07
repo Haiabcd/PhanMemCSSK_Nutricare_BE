@@ -1,16 +1,17 @@
 package com.hn.nutricarebe.dto.response;
 
-import com.hn.nutricarebe.dto.request.TagDto;
-import com.hn.nutricarebe.enums.MealSlot;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
-
 import java.math.BigDecimal;
 import java.util.Set;
 import java.util.UUID;
 
-@Getter @Setter
+import com.hn.nutricarebe.dto.request.TagDto;
+import com.hn.nutricarebe.enums.MealSlot;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+
+@Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder

@@ -1,9 +1,8 @@
 package com.hn.nutricarebe.dto.request;
 
+import java.util.UUID;
 
 import lombok.*;
-
-import java.util.UUID;
 
 @Getter
 @Setter

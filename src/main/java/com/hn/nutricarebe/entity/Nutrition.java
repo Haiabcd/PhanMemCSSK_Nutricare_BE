@@ -1,10 +1,11 @@
 package com.hn.nutricarebe.entity;
 
+import java.math.BigDecimal;
 
 import jakarta.persistence.Embeddable;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import java.math.BigDecimal;
 
 @Embeddable
 @Getter

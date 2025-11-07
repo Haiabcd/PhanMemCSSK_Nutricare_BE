@@ -1,16 +1,19 @@
 package com.hn.nutricarebe.controller;
 
+import java.util.UUID;
+
+import jakarta.validation.Valid;
+
+import org.springframework.web.bind.annotation.*;
+
 import com.hn.nutricarebe.dto.request.NutritionRuleUpdateDto;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.entity.NutritionRule;
 import com.hn.nutricarebe.service.NutritionRuleService;
-import jakarta.validation.Valid;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -36,8 +39,7 @@ public class NutritionRuleController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<Void> update(@PathVariable UUID id,
-                                    @RequestBody @Valid NutritionRuleUpdateDto dto) {
+    public ApiResponse<Void> update(@PathVariable UUID id, @RequestBody @Valid NutritionRuleUpdateDto dto) {
         nutritionRuleService.update(id, dto);
         return ApiResponse.<Void>builder()
                 .message("Cập nhật quy tắc dinh dưỡng thành công")

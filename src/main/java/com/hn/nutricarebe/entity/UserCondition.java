@@ -1,11 +1,14 @@
 package com.hn.nutricarebe.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
 import java.time.Instant;
 import java.util.UUID;
+
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -16,11 +19,10 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "user_conditions",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_user_condition_user_condition",
-                columnNames = {"user_id", "condition_id"}
-        )
-)
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_user_condition_user_condition",
+                        columnNames = {"user_id", "condition_id"}))
 public class UserCondition {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

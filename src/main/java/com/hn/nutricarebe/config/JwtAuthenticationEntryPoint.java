@@ -1,19 +1,22 @@
 package com.hn.nutricarebe.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hn.nutricarebe.dto.response.ApiResponse;
-import com.hn.nutricarebe.exception.ErrorCode;
+import java.io.IOException;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
-import java.io.IOException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hn.nutricarebe.dto.response.ApiResponse;
+import com.hn.nutricarebe.exception.ErrorCode;
 
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
     @Override
-    public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
+    public void commence(
+            HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
             throws IOException {
         ErrorCode errorCode = ErrorCode.UNAUTHENTICATED;
 

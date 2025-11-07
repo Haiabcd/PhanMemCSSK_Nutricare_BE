@@ -1,11 +1,11 @@
 package com.hn.nutricarebe.dto.response;
 
-
-import com.hn.nutricarebe.enums.MealSlot;
-import lombok.*;
-
 import java.util.List;
 import java.util.Map;
+
+import com.hn.nutricarebe.enums.MealSlot;
+
+import lombok.*;
 
 @Getter
 @Setter

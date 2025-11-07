@@ -1,10 +1,11 @@
 package com.hn.nutricarebe.dto.ai;
 
+import java.math.BigDecimal;
+
 import com.hn.nutricarebe.enums.Unit;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.math.BigDecimal;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

@@ -1,9 +1,9 @@
 package com.hn.nutricarebe.utils;
 
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Base64;
 
 public class PkceUtil {
     private static final SecureRandom RNG = new SecureRandom();
@@ -19,7 +19,9 @@ public class PkceUtil {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] digest = md.digest(verifier.getBytes(StandardCharsets.US_ASCII));
             return base64Url(digest);
-        } catch (Exception e) { throw new RuntimeException(e); }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static String base64Url(byte[] bytes) {

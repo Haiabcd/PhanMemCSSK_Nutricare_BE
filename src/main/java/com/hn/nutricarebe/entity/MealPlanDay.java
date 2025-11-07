@@ -1,16 +1,18 @@
 package com.hn.nutricarebe.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -21,10 +23,7 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "meal_plan_days",
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"user_id", "date"})
-        }
-)
+        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "date"})})
 public class MealPlanDay {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -40,13 +39,13 @@ public class MealPlanDay {
 
     @Embedded
     @AttributeOverrides({
-            @AttributeOverride(name = "kcal", column = @Column(name = "target_kcal")),
-            @AttributeOverride(name = "proteinG",  column = @Column(name = "target_proteinG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "carbG",    column = @Column(name = "target_carbG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "fatG",      column = @Column(name = "target_fatG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "fiberG",  column = @Column(name = "target_fiberG", precision = 10, scale = 2)),
-            @AttributeOverride(name = "sodiumMg",    column = @Column(name = "target_sodiumMg")),
-            @AttributeOverride(name = "sugarMg",      column = @Column(name = "target_sugarMg", precision = 10, scale = 2))
+        @AttributeOverride(name = "kcal", column = @Column(name = "target_kcal")),
+        @AttributeOverride(name = "proteinG", column = @Column(name = "target_proteinG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "carbG", column = @Column(name = "target_carbG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "fatG", column = @Column(name = "target_fatG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "fiberG", column = @Column(name = "target_fiberG", precision = 10, scale = 2)),
+        @AttributeOverride(name = "sodiumMg", column = @Column(name = "target_sodiumMg")),
+        @AttributeOverride(name = "sugarMg", column = @Column(name = "target_sugarMg", precision = 10, scale = 2))
     })
     Nutrition targetNutrition;
 

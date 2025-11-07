@@ -1,14 +1,16 @@
 package com.hn.nutricarebe.dto.request;
 
-import com.hn.nutricarebe.enums.*;
-import jakarta.validation.constraints.NotNull;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
+import jakarta.validation.constraints.NotNull;
+
+import com.hn.nutricarebe.enums.*;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -28,7 +30,7 @@ public class NutritionRuleUpdateDto {
     TargetType targetType;
     // Chỉ có giá trị khi targetType = NUTRIENT chỉ thuộc các (PROTEIN, CARB,FAT,FIBER, SODIUM,SUGAR,WATER)
     String targetCode;
-    //LT,LTE,EQ,GTE,GT,BETWEEN
+    // LT,LTE,EQ,GTE,GT,BETWEEN
     // comparator,thresholdMin,thresholdMax chỉ có giá trị khi targetType = NUTRIENT
     // Nếu comparator = BETWEEN thì cả thresholdMin và thresholdMax đều có giá trị
     // Nếu comparator = LT , LTE thì chỉ có thresholdMax có giá trị
@@ -49,5 +51,6 @@ public class NutritionRuleUpdateDto {
     // Tag món ăn có sẵn trong hệ thống
     @Builder.Default
     Set<UUID> foodTags = new HashSet<>();
+
     String message;
 }

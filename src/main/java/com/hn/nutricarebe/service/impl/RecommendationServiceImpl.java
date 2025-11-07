@@ -1,5 +1,22 @@
 package com.hn.nutricarebe.service.impl;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.Year;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.Locale;
+import java.util.stream.Collectors;
+
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
 import com.hn.nutricarebe.dto.response.ProfileDto;
 import com.hn.nutricarebe.dto.response.RecoItemDto;
 import com.hn.nutricarebe.entity.Profile;
@@ -11,25 +28,10 @@ import com.hn.nutricarebe.repository.ProfileRepository;
 import com.hn.nutricarebe.repository.UserAllergyRepository;
 import com.hn.nutricarebe.repository.UserConditionRepository;
 import com.hn.nutricarebe.service.RecommendationService;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-
-import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.Year;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.Locale;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -46,8 +48,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             "https://tuoitre.vn/rss/suc-khoe.rss",
             "https://znews.vn/rss/suc-khoe.rss",
             "https://vtc.vn/rss/song-khoe.rss",
-            "https://phunuvietnam.vn/rss/dinh-duong.rss"
-    );
+            "https://phunuvietnam.vn/rss/dinh-duong.rss");
 
     /* ========================= Google News RSS ========================= */
     private static String googleNewsRssUrl(String query, String lang, String country) {
@@ -69,11 +70,11 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         for (Element it : items) {
             String title = text(it, "title");
-            String link  = text(it, "link");
-            String pub   = text(it, "pubDate");
-            Element src  = it.selectFirst("source");
+            String link = text(it, "link");
+            String pub = text(it, "pubDate");
+            Element src = it.selectFirst("source");
             String sourceName = (src != null) ? src.text() : hostOf(link);
-            String img   = firstImgFromHtml(text(it, "description"));
+            String img = firstImgFromHtml(text(it, "description"));
 
             if (isBlank(link) || isBlank(title)) continue;
 
@@ -94,16 +95,14 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     /* ========================= PubMed (tin nghiên cứu) ========================= */
     private static String pubmedSearchUrl(String query) {
-        return "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi" +
-                "?db=pubmed&retmode=json&retmax=10&term=" +
-                URLEncoder.encode(query, StandardCharsets.UTF_8);
+        return "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi" + "?db=pubmed&retmode=json&retmax=10&term="
+                + URLEncoder.encode(query, StandardCharsets.UTF_8);
     }
 
     @Override
     public List<RecoItemDto> find(int limit) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated())
-            throw new AppException(ErrorCode.UNAUTHORIZED);
+        if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
         UUID userId = UUID.fromString(auth.getName());
 
         Optional<Profile> p = profileRepository.findByUser_Id(userId);
@@ -132,8 +131,14 @@ public class RecommendationServiceImpl implements RecommendationService {
                         .goal(mapGoalToString(pr.getGoal()))
                         .activity(mapActivityToString(pr.getActivityLevel()))
                         .age(calcAge(pr.getBirthYear()))
-                        .heightCm(pr.getHeightCm() == null ? null : pr.getHeightCm().doubleValue())
-                        .weightKg(pr.getWeightKg() == null ? null : pr.getWeightKg().doubleValue())
+                        .heightCm(
+                                pr.getHeightCm() == null
+                                        ? null
+                                        : pr.getHeightCm().doubleValue())
+                        .weightKg(
+                                pr.getWeightKg() == null
+                                        ? null
+                                        : pr.getWeightKg().doubleValue())
                         .conditions(conditionNames)
                         .allergies(allergyNames)
                         .locale("vi")
@@ -147,15 +152,27 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         // Query cho tin tức
         String generalQuery = buildGeneralNewsQuery();
-        String goalQuery    = buildGoalNewsQuery(profile);
+        String goalQuery = buildGoalNewsQuery(profile);
         List<String> condQueries = buildConditionNewsQueries(profile);
 
         // 1) Google News theo goal + conditions + general
-        try { items.addAll(fetchGoogleNews(goalQuery)); } catch (Exception e) { System.err.println("[GN goal] " + e.getMessage()); }
-        for (String q : condQueries) {
-            try { items.addAll(fetchGoogleNews(q)); } catch (Exception e) { System.err.println("[GN cond] " + e.getMessage()); }
+        try {
+            items.addAll(fetchGoogleNews(goalQuery));
+        } catch (Exception e) {
+            System.err.println("[GN goal] " + e.getMessage());
         }
-        try { items.addAll(fetchGoogleNews(generalQuery)); } catch (Exception e) { System.err.println("[GN general] " + e.getMessage()); }
+        for (String q : condQueries) {
+            try {
+                items.addAll(fetchGoogleNews(q));
+            } catch (Exception e) {
+                System.err.println("[GN cond] " + e.getMessage());
+            }
+        }
+        try {
+            items.addAll(fetchGoogleNews(generalQuery));
+        } catch (Exception e) {
+            System.err.println("[GN general] " + e.getMessage());
+        }
 
         // 2) RSS báo VN (bổ sung coverage)
         for (String rss : ARTICLE_FEEDS) {
@@ -256,10 +273,16 @@ public class RecommendationServiceImpl implements RecommendationService {
     /** Query chung về dinh dưỡng/sức khỏe để lấp đầy */
     private static String buildGeneralNewsQuery() {
         List<String> parts = new ArrayList<>(List.of(
-                "dinh dưỡng", "sức khỏe", "khuyến cáo", "cảnh báo",
-                "ăn kiêng", "thực phẩm", "chế độ ăn", "bác sĩ",
-                "viện dinh dưỡng", "WHO"
-        ));
+                "dinh dưỡng",
+                "sức khỏe",
+                "khuyến cáo",
+                "cảnh báo",
+                "ăn kiêng",
+                "thực phẩm",
+                "chế độ ăn",
+                "bác sĩ",
+                "viện dinh dưỡng",
+                "WHO"));
         return join(parts, " ");
     }
 
@@ -318,21 +341,49 @@ public class RecommendationServiceImpl implements RecommendationService {
     private static List<String> nutritionKeywords() {
         return Arrays.asList(
                 // VI
-                "dinh dưỡng","sức khỏe","thực phẩm","ăn kiêng","chế độ ăn",
-                "khuyến cáo","cảnh báo","bác sĩ","bệnh viện","viện dinh dưỡng",
-                "vitamin","khoáng chất","đạm","protein","carb","chất béo","cholesterol",
-                "đái tháo đường","tiểu đường","huyết áp","mỡ máu","tim mạch","béo phì",
+                "dinh dưỡng",
+                "sức khỏe",
+                "thực phẩm",
+                "ăn kiêng",
+                "chế độ ăn",
+                "khuyến cáo",
+                "cảnh báo",
+                "bác sĩ",
+                "bệnh viện",
+                "viện dinh dưỡng",
+                "vitamin",
+                "khoáng chất",
+                "đạm",
+                "protein",
+                "carb",
+                "chất béo",
+                "cholesterol",
+                "đái tháo đường",
+                "tiểu đường",
+                "huyết áp",
+                "mỡ máu",
+                "tim mạch",
+                "béo phì",
                 // EN
-                "nutrition","diet","healthy","meal","intake","nutrient","vitamin","mineral",
-                "cholesterol","hypertension","diabetes","obesity","cardio","heart"
-        );
+                "nutrition",
+                "diet",
+                "healthy",
+                "meal",
+                "intake",
+                "nutrient",
+                "vitamin",
+                "mineral",
+                "cholesterol",
+                "hypertension",
+                "diabetes",
+                "obesity",
+                "cardio",
+                "heart");
     }
 
     /** TỪ NHẠY CẢM cần lọc bỏ (VD: “giòi”) */
     private static List<String> sensitiveKeywords() {
-        return Arrays.asList(
-                "con dòi","giòi","dòi","ấu trùng","bọ gậy","thối rữa","ruồi bọ"
-        );
+        return Arrays.asList("con dòi", "giòi", "dòi", "ấu trùng", "bọ gậy", "thối rữa", "ruồi bọ");
     }
 
     /** Tạo boost keywords theo goal */
@@ -341,11 +392,29 @@ public class RecommendationServiceImpl implements RecommendationService {
         if (p == null || isBlank(p.getGoal())) return out;
         String g = p.getGoal().toLowerCase(Locale.ROOT);
         if (g.contains("tăng cơ") || g.contains("tăng cân")) {
-            Collections.addAll(out, "tăng cân","tăng cơ","hypertrophy","build muscle","muscle","protein cao","high protein","lean mass");
+            Collections.addAll(
+                    out,
+                    "tăng cân",
+                    "tăng cơ",
+                    "hypertrophy",
+                    "build muscle",
+                    "muscle",
+                    "protein cao",
+                    "high protein",
+                    "lean mass");
         } else if (g.contains("giảm")) {
-            Collections.addAll(out, "giảm cân","giảm mỡ","đốt mỡ","weight loss","fat loss","low calorie","calo thấp","calorie deficit");
+            Collections.addAll(
+                    out,
+                    "giảm cân",
+                    "giảm mỡ",
+                    "đốt mỡ",
+                    "weight loss",
+                    "fat loss",
+                    "low calorie",
+                    "calo thấp",
+                    "calorie deficit");
         } else if (g.contains("giữ cân")) {
-            Collections.addAll(out, "giữ cân","duy trì","balanced diet","cân bằng","maintenance");
+            Collections.addAll(out, "giữ cân", "duy trì", "balanced diet", "cân bằng", "maintenance");
         } else {
             out.add(g);
         }
@@ -359,11 +428,28 @@ public class RecommendationServiceImpl implements RecommendationService {
         for (String c : p.getConditions()) {
             String lc = c == null ? "" : c.toLowerCase(Locale.ROOT);
             if (lc.contains("tiểu đường") || lc.contains("đái tháo đường") || lc.contains("diabetes")) {
-                Collections.addAll(out, "tiểu đường","đái tháo đường","diabetes","đường huyết","glycemic","low glycemic","insulin");
+                Collections.addAll(
+                        out,
+                        "tiểu đường",
+                        "đái tháo đường",
+                        "diabetes",
+                        "đường huyết",
+                        "glycemic",
+                        "low glycemic",
+                        "insulin");
             } else if (lc.contains("huyết áp") || lc.contains("hypertension")) {
-                Collections.addAll(out, "huyết áp","hypertension","ít muối","tim mạch","heart","sodium");
+                Collections.addAll(out, "huyết áp", "hypertension", "ít muối", "tim mạch", "heart", "sodium");
             } else if (lc.contains("mỡ máu") || lc.contains("cholesterol") || lc.contains("dyslipidemia")) {
-                Collections.addAll(out, "cholesterol","mỡ máu","hdl","ldl","triglyceride","ít chất béo bão hòa","statin","heart");
+                Collections.addAll(
+                        out,
+                        "cholesterol",
+                        "mỡ máu",
+                        "hdl",
+                        "ldl",
+                        "triglyceride",
+                        "ít chất béo bão hòa",
+                        "statin",
+                        "heart");
             } else if (!isBlank(c)) {
                 out.add(c);
             }
@@ -426,7 +512,6 @@ public class RecommendationServiceImpl implements RecommendationService {
         return out;
     }
 
-
     private List<RecoItemDto> fetchPubMed(String query) throws Exception {
         Document d1 = fetchDoc(pubmedSearchUrl(query));
         org.json.JSONObject search = new org.json.JSONObject(d1.text());
@@ -441,8 +526,8 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
         String ids = join(idsArr, ",");
 
-        String sumUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi" +
-                "?db=pubmed&retmode=json&id=" + ids;
+        String sumUrl =
+                "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi" + "?db=pubmed&retmode=json&id=" + ids;
         Document d2 = fetchDoc(sumUrl);
         org.json.JSONObject root = new org.json.JSONObject(d2.text());
         org.json.JSONObject sum = root.optJSONObject("result");
@@ -471,9 +556,8 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     private Document fetchDoc(String url) throws Exception {
         return Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                        "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                        "Chrome/124.0 Safari/537.36")
+                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) " + "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        + "Chrome/124.0 Safari/537.36")
                 .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                 .referrer("https://www.google.com")
                 .ignoreContentType(true)
@@ -495,16 +579,21 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     private static Instant parsePub(String s) {
         if (s == null || s.trim().isEmpty()) return null;
-        try { return Instant.parse(s); } catch (Exception ignore) {}
+        try {
+            return Instant.parse(s);
+        } catch (Exception ignore) {
+        }
         try {
             ZonedDateTime zdt = ZonedDateTime.parse(s, DateTimeFormatter.RFC_1123_DATE_TIME);
             return zdt.toInstant();
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
         try {
             String t = s.replaceAll("\\(.*?\\)", "").trim();
             ZonedDateTime zdt = ZonedDateTime.parse(t, DateTimeFormatter.RFC_1123_DATE_TIME);
             return zdt.toInstant();
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
         return null;
     }
 
@@ -555,21 +644,22 @@ public class RecommendationServiceImpl implements RecommendationService {
     private static double domainBoost(String host) {
         if (host == null) return 0;
         String h = host.toLowerCase(Locale.ROOT);
-        if (h.contains("vnexpress"))      return 2.0;
-        if (h.contains("tuoitre"))        return 1.6;
+        if (h.contains("vnexpress")) return 2.0;
+        if (h.contains("tuoitre")) return 1.6;
         if (h.contains("znews") || h.contains("zing")) return 1.2;
-        if (h.contains("vtc"))            return 1.0;
-        if (h.contains("phunuvietnam"))   return 0.8;
-        if (h.contains("pubmed"))         return 0.5; // nghiên cứu (không "đè" tin thời sự)
-        if (h.contains("google"))         return 0.5; // news.google.com
+        if (h.contains("vtc")) return 1.0;
+        if (h.contains("phunuvietnam")) return 0.8;
+        if (h.contains("pubmed")) return 0.5; // nghiên cứu (không "đè" tin thời sự)
+        if (h.contains("google")) return 0.5; // news.google.com
         return 0.0;
     }
 
     /** Độ mới ưu tiên cao (0..3) */
     private static double recencyBoost(Instant published) {
         if (published == null) return 0;
-        long days = Math.max(0, (java.time.Duration.between(published, Instant.now()).toDays()));
-        if (days <= 7)  return 3.0;
+        long days = Math.max(
+                0, (java.time.Duration.between(published, Instant.now()).toDays()));
+        if (days <= 7) return 3.0;
         if (days <= 30) return 2.0;
         if (days <= 90) return 1.0;
         return 0.3;
@@ -599,19 +689,19 @@ public class RecommendationServiceImpl implements RecommendationService {
         if (s == null) return null;
         String t = s.trim().toLowerCase(Locale.ROOT);
         return switch (t) {
-            case "giảm cân"          -> "weight loss";
-            case "tăng cân"          -> "weight gain";
-            case "tăng cơ"           -> "muscle gain";
-            case "giữ cân"           -> "maintenance";
-            case "dinh dưỡng"        -> "nutrition";
-            case "thực đơn"          -> "meal plan";
-            case "dị ứng"            -> "allergy";
-            case "bệnh nền"          -> "chronic disease";
+            case "giảm cân" -> "weight loss";
+            case "tăng cân" -> "weight gain";
+            case "tăng cơ" -> "muscle gain";
+            case "giữ cân" -> "maintenance";
+            case "dinh dưỡng" -> "nutrition";
+            case "thực đơn" -> "meal plan";
+            case "dị ứng" -> "allergy";
+            case "bệnh nền" -> "chronic disease";
             case "tiểu đường", "đái tháo đường" -> "diabetes";
             case "cao huyết áp", "tăng huyết áp" -> "hypertension";
-            case "rối loạn mỡ máu"   -> "dyslipidemia";
-            case "béo phì"           -> "obesity";
-            case "tim mạch"          -> "cardiovascular";
+            case "rối loạn mỡ máu" -> "dyslipidemia";
+            case "béo phì" -> "obesity";
+            case "tim mạch" -> "cardiovascular";
             default -> null;
         };
     }
@@ -629,7 +719,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                     parts.add(en != null ? en : c);
                 }
             }
-            parts.addAll(Arrays.asList("nutrition","diet","meal plan","health"));
+            parts.addAll(Arrays.asList("nutrition", "diet", "meal plan", "health"));
         }
         return join(parts, " ");
     }
@@ -641,14 +731,20 @@ public class RecommendationServiceImpl implements RecommendationService {
         String t = safeLower(title);
 
         // Domain phổ biến của video
-        if (h.contains("youtube.com") || h.contains("youtu.be") ||
-                h.contains("vimeo.com") || h.contains("dailymotion.com") ||
-                h.contains("facebook.com") || h.contains("fb.watch") ||
-                h.contains("tiktok.com")) return true;
+        if (h.contains("youtube.com")
+                || h.contains("youtu.be")
+                || h.contains("vimeo.com")
+                || h.contains("dailymotion.com")
+                || h.contains("facebook.com")
+                || h.contains("fb.watch")
+                || h.contains("tiktok.com")) return true;
 
         // title/source ám chỉ clip
-        if (t.contains("video") || t.contains("clip") || t.contains("livestream") ||
-                t.contains("trực tiếp") || t.contains("phát trực tiếp")) return true;
+        if (t.contains("video")
+                || t.contains("clip")
+                || t.contains("livestream")
+                || t.contains("trực tiếp")
+                || t.contains("phát trực tiếp")) return true;
 
         return s.contains("youtube") || s.contains("tiktok") || s.contains("facebook");
     }
@@ -700,9 +796,9 @@ public class RecommendationServiceImpl implements RecommendationService {
     private String mapGoalToString(com.hn.nutricarebe.enums.GoalType goal) {
         if (goal == null) return null;
         return switch (goal) {
-            case LOSE      -> "giảm cân";
-            case GAIN      -> "tăng cân";
-            case MAINTAIN  -> "giữ cân";
+            case LOSE -> "giảm cân";
+            case GAIN -> "tăng cân";
+            case MAINTAIN -> "giữ cân";
         };
     }
 
@@ -710,11 +806,11 @@ public class RecommendationServiceImpl implements RecommendationService {
     private String mapActivityToString(com.hn.nutricarebe.enums.ActivityLevel act) {
         if (act == null) return null;
         return switch (act) {
-            case SEDENTARY         -> "Ít vận động";
-            case LIGHTLY_ACTIVE    -> "Vận động nhẹ";
+            case SEDENTARY -> "Ít vận động";
+            case LIGHTLY_ACTIVE -> "Vận động nhẹ";
             case MODERATELY_ACTIVE -> "Vận động vừa phải";
-            case VERY_ACTIVE       -> "Vận động nhiều";
-            case EXTRA_ACTIVE      -> "Vận động rất nhiều";
+            case VERY_ACTIVE -> "Vận động nhiều";
+            case EXTRA_ACTIVE -> "Vận động rất nhiều";
         };
     }
 }

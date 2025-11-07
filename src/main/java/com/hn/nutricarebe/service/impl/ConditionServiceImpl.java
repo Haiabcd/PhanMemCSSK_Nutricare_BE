@@ -1,5 +1,17 @@
 package com.hn.nutricarebe.service.impl;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.hn.nutricarebe.dto.request.ConditionRequest;
 import com.hn.nutricarebe.dto.response.ConditionResponse;
 import com.hn.nutricarebe.entity.Condition;
@@ -12,21 +24,11 @@ import com.hn.nutricarebe.repository.ConditionRepository;
 import com.hn.nutricarebe.repository.NutritionRuleRepository;
 import com.hn.nutricarebe.repository.UserConditionRepository;
 import com.hn.nutricarebe.service.ConditionService;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -44,10 +46,10 @@ public class ConditionServiceImpl implements ConditionService {
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     public void save(ConditionRequest request) {
-       if(conditionRepository.existsByNameIgnoreCase(request.getName().strip())) {
-           throw new AppException(ErrorCode.CONDITION_EXISTED);
-       }
-       conditionRepository.save(conditionMapper.toCondition(request));
+        if (conditionRepository.existsByNameIgnoreCase(request.getName().strip())) {
+            throw new AppException(ErrorCode.CONDITION_EXISTED);
+        }
+        conditionRepository.save(conditionMapper.toCondition(request));
     }
 
     // Xóa một bệnh nền theo id
@@ -55,8 +57,8 @@ public class ConditionServiceImpl implements ConditionService {
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteById(UUID id) {
-        Condition con = conditionRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
+        Condition con =
+                conditionRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
 
         // 1) Có user đang gán bệnh nền -> chặn xoá
         if (userConditionRepository.existsByCondition_Id(id)) {
@@ -77,9 +79,7 @@ public class ConditionServiceImpl implements ConditionService {
         if (content.isEmpty()) {
             return slice.map(conditionMapper::toConditionResponse);
         }
-        Set<UUID> ids = content.stream()
-                .map(Condition::getId)
-                .collect(Collectors.toSet());
+        Set<UUID> ids = content.stream().map(Condition::getId).collect(Collectors.toSet());
         List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndCondition_IdIn(ids);
         Map<UUID, List<NutritionRule>> rulesByCondition = rules.stream()
                 .collect(Collectors.groupingBy(nr -> nr.getCondition().getId()));
@@ -89,8 +89,8 @@ public class ConditionServiceImpl implements ConditionService {
     // Tìm một bệnh nền theo id
     @Override
     public ConditionResponse getById(UUID id) {
-        Condition c = conditionRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
+        Condition c =
+                conditionRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
         Set<UUID> ids = Set.of(c.getId());
         List<NutritionRule> rules = nutritionRuleRepository.findByActiveTrueAndCondition_IdIn(ids);
         Map<UUID, List<NutritionRule>> rulesByCondition = rules.stream()
@@ -115,8 +115,8 @@ public class ConditionServiceImpl implements ConditionService {
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     public void update(UUID id, ConditionRequest condition) {
-        Condition existing = conditionRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
+        Condition existing =
+                conditionRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.CONDITION_NOT_FOUND));
         if (condition.getName() != null) {
             String newName = condition.getName().trim();
             if (!newName.equalsIgnoreCase(existing.getName().strip())) {

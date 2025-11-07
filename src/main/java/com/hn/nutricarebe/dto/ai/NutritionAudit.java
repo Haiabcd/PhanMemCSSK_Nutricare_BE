@@ -1,11 +1,12 @@
 package com.hn.nutricarebe.dto.ai;
 
-import com.hn.nutricarebe.entity.Nutrition;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.math.BigDecimal;
 import java.util.List;
+
+import com.hn.nutricarebe.entity.Nutrition;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -18,5 +19,5 @@ public class NutritionAudit {
     String servingName;
     BigDecimal servingGram;
     List<IngredientBreakdown> items; // bảng chi tiết từng nguyên liệu
-    Nutrition totalFromDB;           // tổng dinh dưỡng tính từ DB
+    Nutrition totalFromDB; // tổng dinh dưỡng tính từ DB
 }

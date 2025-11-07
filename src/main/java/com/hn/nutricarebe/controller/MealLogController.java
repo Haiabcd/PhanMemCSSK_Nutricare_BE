@@ -1,5 +1,15 @@
 package com.hn.nutricarebe.controller;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.*;
+
 import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
 import com.hn.nutricarebe.dto.request.PlanLogScanRequest;
 import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
@@ -7,21 +17,13 @@ import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.KcalWarningResponse;
 import com.hn.nutricarebe.dto.response.LogResponse;
-import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.dto.response.NutritionResponse;
+import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.service.PlanLogService;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
+
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.*;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
-
-
 
 @RestController
 @RequiredArgsConstructor
@@ -40,12 +42,8 @@ public class MealLogController {
 
     @GetMapping
     public ApiResponse<List<LogResponse>> getLogs(
-            @RequestParam @NotNull
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate date,
-            @RequestParam @NotNull
-            MealSlot mealSlot
-    ) {
+            @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam @NotNull MealSlot mealSlot) {
         List<LogResponse> data = logService.getLog(date, mealSlot);
         return ApiResponse.<List<LogResponse>>builder()
                 .message("Lấy danh sách log theo ngày thành công")
@@ -55,8 +53,7 @@ public class MealLogController {
 
     @GetMapping("/nutriLog")
     public ApiResponse<NutritionResponse> getNutritionLogByDate(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
-    ) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ApiResponse.<NutritionResponse>builder()
                 .message("Lấy log theo kế hoạch thành công")
                 .data(logService.getNutritionLogByDate(date))
@@ -66,15 +63,11 @@ public class MealLogController {
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deletePlanLog(@PathVariable UUID id) {
         logService.deleteById(id);
-        return ApiResponse.<Void>builder()
-                .message("Xóa PlanLog thành công")
-                .build();
+        return ApiResponse.<Void>builder().message("Xóa PlanLog thành công").build();
     }
 
     @PostMapping("/save/manual")
-    public ApiResponse<KcalWarningResponse> create(
-            @Valid @RequestBody PlanLogManualRequest request
-    ) {
+    public ApiResponse<KcalWarningResponse> create(@Valid @RequestBody PlanLogManualRequest request) {
 
         return ApiResponse.<KcalWarningResponse>builder()
                 .message("Ghi log thủ công thành công")
@@ -83,9 +76,7 @@ public class MealLogController {
     }
 
     @PostMapping("/save/scan")
-    public ApiResponse<KcalWarningResponse> createScan(
-            @Valid @RequestBody PlanLogScanRequest request
-    ) {
+    public ApiResponse<KcalWarningResponse> createScan(@Valid @RequestBody PlanLogScanRequest request) {
         return ApiResponse.<KcalWarningResponse>builder()
                 .message("Ghi log scan thành công")
                 .data(logService.savePlanLog_Scan(request))
@@ -94,9 +85,7 @@ public class MealLogController {
 
     @PutMapping("/{id}")
     public ApiResponse<KcalWarningResponse> updatePlanLog(
-            @PathVariable("id") UUID planLogId,
-            @Valid @RequestBody PlanLogUpdateRequest req
-    ) {
+            @PathVariable("id") UUID planLogId, @Valid @RequestBody PlanLogUpdateRequest req) {
         return ApiResponse.<KcalWarningResponse>builder()
                 .message("Cập nhật PlanLog thành công")
                 .data(logService.updatePlanLog(req, planLogId))

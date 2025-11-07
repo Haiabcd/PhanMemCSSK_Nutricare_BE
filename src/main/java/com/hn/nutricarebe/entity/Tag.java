@@ -1,17 +1,20 @@
 package com.hn.nutricarebe.entity;
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
 import java.util.UUID;
 
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+
 @Entity
-@Table(name = "tags", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_tags_name_code", columnNames = "name_code")
-})
+@Table(
+        name = "tags",
+        uniqueConstraints = {@UniqueConstraint(name = "uk_tags_name_code", columnNames = "name_code")})
 @Getter
 @Setter
 @NoArgsConstructor

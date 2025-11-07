@@ -1,12 +1,14 @@
 package com.hn.nutricarebe.dto.request;
 
-import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.annotation.Nulls;
+import java.math.BigDecimal;
+
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.PositiveOrZero;
-import lombok.*;
 
-import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
+
+import lombok.*;
 
 @Getter
 @Setter
@@ -41,18 +43,18 @@ public class NutritionRequest {
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
     @PositiveOrZero(message = "fiberG phải >= 0")
-    @Digits(integer = 8, fraction = 2,message = "fiberG tối đa 8 số nguyên và 2 số thập phân")
-    BigDecimal fiberG= BigDecimal.ZERO;
+    @Digits(integer = 8, fraction = 2, message = "fiberG tối đa 8 số nguyên và 2 số thập phân")
+    BigDecimal fiberG = BigDecimal.ZERO;
 
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
     @PositiveOrZero(message = "sodiumMg phải >= 0")
-    @Digits(integer = 8, fraction = 2,message = "sodiumMg tối đa 8 số nguyên và 2 số thập phân")
-    BigDecimal sodiumMg= BigDecimal.ZERO;
+    @Digits(integer = 8, fraction = 2, message = "sodiumMg tối đa 8 số nguyên và 2 số thập phân")
+    BigDecimal sodiumMg = BigDecimal.ZERO;
 
     @Builder.Default
     @JsonSetter(nulls = Nulls.SKIP)
     @PositiveOrZero(message = "sugarMg phải >= 0")
     @Digits(integer = 8, fraction = 2, message = "sugarMg tối đa 8 số nguyên và 2 số thập phân")
-    BigDecimal sugarMg= BigDecimal.ZERO;
+    BigDecimal sugarMg = BigDecimal.ZERO;
 }
