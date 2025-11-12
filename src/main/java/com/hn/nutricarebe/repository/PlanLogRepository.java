@@ -83,14 +83,14 @@ where pl.user.id = :userId
     List<Object[]> countByMealSlotAndSource(@Param("source") LogSource source);
 
     // Tìm các món ăn được ghi log nhiều nhất theo nguồn
-    @Query(
-            """
-		SELECT p.nameFood AS name, COUNT(p) AS count
-		FROM PlanLog p
-		WHERE p.source = :source AND p.nameFood IS NOT NULL
-		GROUP BY p.nameFood
-		ORDER BY COUNT(p) DESC
-	""")
+    @Query("""
+    SELECT f.name AS name, COUNT(p) AS count
+    FROM PlanLog p
+    JOIN p.food f
+    WHERE p.source = :source AND p.food IS NOT NULL
+    GROUP BY f.name
+    ORDER BY COUNT(p) DESC
+""")
     List<Object[]> findTopFoodsBySource(@Param("source") LogSource source);
 
     // Tìm 15 người dùng có số log nhiều nhất

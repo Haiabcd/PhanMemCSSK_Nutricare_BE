@@ -15,6 +15,7 @@ import lombok.experimental.FieldDefaults;
 public class UserManageResponse {
     long totalUsers;
     long getNewUsersInLast7Days;
+    long totalUserArchived;
     Map<String, Long> getUserRoleCounts;
     Map<String, Long> getGoalStats;
     List<TopUserDto> getTopUsersByLogCount;

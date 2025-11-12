@@ -28,6 +28,7 @@ public class ProfileCreationResponse {
     String avatarUrl;
     Integer targetWeightDeltaKg;
     Integer targetDurationWeeks;
+    boolean goalReached;
     Instant createdAt;
     Instant updatedAt;
 }

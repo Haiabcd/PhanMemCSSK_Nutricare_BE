@@ -3,18 +3,14 @@ package com.hn.nutricarebe.service.tools;
 import static com.hn.nutricarebe.helper.MealPlanHelper.caculateNutrition;
 import static com.hn.nutricarebe.helper.MealPlanHelper.deriveAggregateConstraintsFromRules;
 
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
+import java.util.*;
+import com.hn.nutricarebe.dto.ai.*;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-import com.hn.nutricarebe.dto.ai.DailyTargetsAI;
-import com.hn.nutricarebe.dto.ai.DailyTargetsOverrides;
-import com.hn.nutricarebe.dto.ai.PlanningContextAI;
 import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
 import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.MealSlot;
@@ -246,6 +242,7 @@ public class MealPlanTool {
                 .hasNext(hasNext)
                 .build();
     }
+
 
     private static Double toD(java.math.BigDecimal x) {
         return x == null ? null : x.doubleValue();

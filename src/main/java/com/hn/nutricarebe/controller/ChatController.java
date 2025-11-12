@@ -43,4 +43,5 @@ public class ChatController {
         DishVisionResult vision = chatService.analyzeDishFromImage(image, hint);
         return ingredientService.audit(vision, strict);
     }
+
 }

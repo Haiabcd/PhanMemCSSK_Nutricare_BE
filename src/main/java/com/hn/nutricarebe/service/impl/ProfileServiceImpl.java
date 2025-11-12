@@ -5,6 +5,8 @@ import static com.hn.nutricarebe.helper.ProfileHelper.*;
 import java.time.LocalDate;
 import java.util.*;
 
+import com.hn.nutricarebe.entity.WeightLog;
+import com.hn.nutricarebe.repository.WeightLogRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,11 +35,13 @@ import lombok.experimental.FieldDefaults;
 @Service
 public class ProfileServiceImpl implements ProfileService {
     ProfileRepository profileRepository;
+    WeightLogRepository weightLogRepository;
     ProfileMapper profileMapper;
     UserAllergyService userAllergyService;
     UserConditionService userConditionService;
     MealPlanDayService mealPlanDayService;
     NutritionRuleService nutritionRuleService;
+
 
     @Override
     public ProfileCreationResponse save(ProfileCreationRequest request, User user) {
@@ -122,13 +126,77 @@ public class ProfileServiceImpl implements ProfileService {
         profile.setTargetWeightDeltaKg(expectedTargetDeltaKg);
         profile.setTargetDurationWeeks(expectedTargetDurationWeeks);
 
+        // 5) Lưu
+        if(profileRequest.getGoal() != GoalType.MAINTAIN) {
+            WeightLog weightLog = WeightLog.builder()
+                    .profile(profile)
+                    .loggedAt(LocalDate.now())
+                    .weightKg(profileRequest.getWeightKg())
+                    .build();
+            weightLogRepository.save(weightLog);
+        }
+
+        if(profileRequest.getGoal() == GoalType.LOSE) {
+            int delta = Math.abs(profile.getTargetWeightDeltaKg());
+            int currentWeight = profileRequest.getWeightKg();
+            profile.setGoalReached(currentWeight <= profile.getSnapWeightKg() - delta);
+        } else if(profileRequest.getGoal() == GoalType.GAIN) {
+            int delta = Math.abs(profile.getTargetWeightDeltaKg());
+            int currentWeight = profileRequest.getWeightKg();
+            profile.setGoalReached(currentWeight >= profile.getSnapWeightKg() + delta);
+        }else{
+            profile.setGoalReached(true);
+        }
+
         profileRepository.save(profile);
-
         boolean shouldRecreateMealPlan = allergyUpdated || conditionUpdated || profileAffectsPlanChanged;
-
         if (shouldRecreateMealPlan) {
             mealPlanDayService.updatePlanForOneDay(request.getStartDate(), userId);
             LocalDate tomorrow = request.getStartDate().plusDays(1);
+            mealPlanDayService.removeFromDate(tomorrow, userId);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateWeight(WeightUpdateRequest request) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UUID userId = UUID.fromString(auth.getName());
+
+        Profile profile = profileRepository
+                .findByUser_Id(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+
+        Integer oldDisplayWeight = profile.getWeightKg();
+
+        var dateNow = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        profile.setWeightKg(request.getWeightKg());
+        if(profile.getGoal() != GoalType.MAINTAIN) {
+            WeightLog weightLog = WeightLog.builder()
+                    .profile(profile)
+                    .loggedAt(dateNow)
+                    .weightKg(request.getWeightKg())
+                    .build();
+            weightLogRepository.save(weightLog);
+        }
+
+        int delta = Math.abs(profile.getTargetWeightDeltaKg());
+        int currentWeight = request.getWeightKg();
+        if(profile.getGoal() == GoalType.LOSE) {
+            profile.setGoalReached(currentWeight <= profile.getSnapWeightKg() - delta);
+        } else if(profile.getGoal() == GoalType.GAIN) {
+            profile.setGoalReached(currentWeight >= profile.getSnapWeightKg() + delta);
+        }else{
+            profile.setGoalReached(true);
+        }
+        profileRepository.save(profile);
+        boolean weightChanged = !Objects.equals(oldDisplayWeight, request.getWeightKg());
+        if (weightChanged) {
+            mealPlanDayService.updatePlanForOneDay(dateNow, userId);
+            LocalDate tomorrow = dateNow.plusDays(1);
             mealPlanDayService.removeFromDate(tomorrow, userId);
         }
     }
@@ -184,5 +252,12 @@ public class ProfileServiceImpl implements ProfileService {
         stats.put("maintain", maintain);
 
         return stats;
+    }
+
+
+    //Thống kê số người dùng đạt mục tiêu
+    @Override
+    public long getCompletedGoalsCount() {
+        return profileRepository.countCompletedGoals();
     }
 }

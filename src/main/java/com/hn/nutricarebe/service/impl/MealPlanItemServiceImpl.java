@@ -1,31 +1,29 @@
 package com.hn.nutricarebe.service.impl;
 
 import static com.hn.nutricarebe.helper.MealPlanHelper.*;
-
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.hn.nutricarebe.dto.TagDirectives;
+import com.hn.nutricarebe.dto.ai.MealPlanItemLite;
+import com.hn.nutricarebe.dto.ai.SwapContext;
+import com.hn.nutricarebe.dto.response.*;
+import com.hn.nutricarebe.helper.SuggestionHelper;
+import com.hn.nutricarebe.service.MealPlanDayService;
+import com.hn.nutricarebe.service.NutritionRuleService;
 import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.hn.nutricarebe.dto.TagDirectives;
-import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
-import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
-import com.hn.nutricarebe.dto.response.FoodResponse;
 import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.MealSlot;
 import com.hn.nutricarebe.exception.AppException;
 import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.helper.MealPlanHelper;
-import com.hn.nutricarebe.mapper.CdnHelper;
-import com.hn.nutricarebe.mapper.FoodMapper;
-import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.*;
 import com.hn.nutricarebe.service.MealPlanItemService;
-import com.hn.nutricarebe.service.NutritionRuleService;
-
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -35,12 +33,11 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class MealPlanItemServiceImpl implements MealPlanItemService {
     MealPlanItemRepository mealPlanItemRepository;
-    NutritionRuleService nutritionRuleService;
-    ProfileRepository profileRepository;
     FoodRepository foodRepository;
-    ProfileMapper profileMapper;
-    FoodMapper foodMapper;
-    CdnHelper cdnHelper;
+    MealPlanDayRepository mealPlanDayRepository;
+    PlanLogRepository planLogRepository;
+    MealPlanDayService mealPlanDayService;
+    NutritionRuleService nutritionRuleService;
 
     @Override
     @Transactional
@@ -113,77 +110,133 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         mealPlanItemRepository.save(item);
     }
 
+
     @Override
-    @Transactional
-    public List<FoodResponse> suggestAllowedFoodsInternal(MealSlot slot, int limit) {
+    public List<SwapSuggestion> suggest() {
+        SwapContext ctx =getSwapContext();
+        List<SwapSuggestion> out = new ArrayList<>();
+        Set<UUID> recent = Optional.ofNullable(ctx.getRecentFoodIds()).orElse(Set.of());
+        Set<String> avoid = Optional.ofNullable(ctx.getAvoidTags()).orElse(Set.of());
+    for (var item : ctx.getItems()) {
+        NutritionResponse target = item.getNutrition();
+        int targetKcal = (int)Math.round(SuggestionHelper.d(target.getKcal()));
+        // cửa sổ kcal 0.5x–2.0x
+        int minK = Math.max(20, (int)Math.round(targetKcal * 0.5));
+        int maxK = Math.max(minK + 10, (int)Math.round(targetKcal * 2.0));
+        var foods = foodRepository.findCandidatesBySlotAndKcal(
+                item.getSlot(), minK, maxK, targetKcal, PageRequest.of(0, 300)
+        );
+        // lọc cứng
+        var filtered = foods.stream()
+                .filter(f -> !f.getId().equals(item.getCurrentFoodId()))
+                .filter(f -> !recent.contains(f.getId()))
+                .filter(f -> f.getTags() == null || f.getTags().stream()
+                        .map(Tag::getNameCode).noneMatch(avoid::contains))
+                .toList();
+        record Cand(Food f, double portion, double distance) {}
+        List<Cand> scored = new ArrayList<>();
+
+        for (var f : filtered) {
+            Nutrition base = f.getNutrition();
+            double bestDist = Double.POSITIVE_INFINITY;
+            double bestPortion = 1.0;
+            for (double p : SuggestionHelper.PORTIONS) {
+                var scaled = SuggestionHelper.scale(base, p);
+                double dist = SuggestionHelper.dist(scaled, target);
+                if (dist < bestDist) { bestDist = dist; bestPortion = p; }
+            }
+            if (SuggestionHelper.isGoodEnough(bestDist, target)) {
+                scored.add(new Cand(f, bestPortion, bestDist));
+            }
+        }
+
+        var top = scored.stream()
+                .sorted(Comparator.comparingDouble(c -> c.distance))
+                .limit(SuggestionHelper.TOP_K)
+                .toList();
+
+        List<SwapCandidate> candidates = top.stream().map(c -> {
+            double kcalRel = Math.abs(
+                    SuggestionHelper.d(SuggestionHelper.scale(c.f.getNutrition(), c.portion).getKcal()) - SuggestionHelper.d(target.getKcal())
+            ) / Math.max(1.0, SuggestionHelper.d(target.getKcal()));
+            double protRel = Math.abs(
+                    SuggestionHelper.d(SuggestionHelper.scale(c.f.getNutrition(), c.portion).getProteinG()) - SuggestionHelper.d(target.getProteinG())
+            ) / Math.max(1.0, SuggestionHelper.d(target.getProteinG()));
+
+            return SwapCandidate.builder()
+                    .foodId(c.f.getId())
+                    .foodName(c.f.getName())
+                    .portion(BigDecimal.valueOf(c.portion))
+                    .reason(String.format("Tương đương kcal/protein (lệch ~%d%%/~%d%%).",
+                            Math.round(kcalRel*100), Math.round(protRel*100)))
+                    .build();
+        }).toList();
+
+        out.add(SwapSuggestion.builder()
+                .itemId(item.getItemId())
+                .slot(item.getSlot())
+                .originalFoodId(item.getCurrentFoodId())
+                .originalFoodName(item.getCurrentFoodName())
+                .originalPortion(item.getPortion())
+                .candidates(candidates)
+                .build());
+    }
+    return out;
+}
+
+
+    /* ==================== Helpers cho smartSwap ==================== */
+    public SwapContext getSwapContext() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
         UUID userId = UUID.fromString(auth.getName());
-
-        Profile profile = profileRepository
-                .findByUser_Id(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
-        ProfileCreationRequest pReq = profileMapper.toProfileCreationRequest(profile);
-        MealPlanCreationRequest req =
-                MealPlanCreationRequest.builder().userId(userId).profile(pReq).build();
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        MealPlanDay day = mealPlanDayRepository
+                .findByUser_IdAndDate(userId, today)
+                .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
+        Set<MealPlanItemResponse> items = mealPlanDayService.getMealPlanByDate(today).getItems();
+        final int NO_REPEAT_DAYS = 2;
+        Set<UUID> recent = new HashSet<>();
+        LocalDate startRecent = today.minusDays(NO_REPEAT_DAYS);
+        List<PlanLog> logsRecent = planLogRepository.findByUser_IdAndDateBetween(userId, startRecent, today);
+        logsRecent.stream()
+                .map(PlanLog::getFood)
+                .filter(Objects::nonNull)
+                .map(Food::getId)
+                .forEach(recent::add);
+        Set<UUID> plannedPast =
+                mealPlanItemRepository.findDistinctFoodIdsPlannedBetween(userId, startRecent, today.minusDays(1));
+        if (plannedPast != null) recent.addAll(plannedPast);
+        items.stream().map(i -> i.getFood().getId()).forEach(recent::add);
+        LocalDate endFuture = today.plusDays(NO_REPEAT_DAYS);
+        Set<UUID> plannedFuture =
+                mealPlanItemRepository.findDistinctFoodIdsPlannedBetween(userId, today.plusDays(1), endFuture);
+        if (plannedFuture != null) recent.addAll(plannedFuture);
 
         List<NutritionRule> rules = nutritionRuleService.getRuleByUserId(userId);
+        TagDirectives tagDir = MealPlanHelper.buildTagDirectives(
+                rules, com.hn.nutricarebe.dto.request.MealPlanCreationRequest.builder().userId(userId).build());
+        Set<String> avoidTags = tagDir.getAvoid();
+        List<MealPlanItemLite> liteItems = items.stream().map(i -> {
+            FoodResponse f = i.getFood();
+            return MealPlanItemLite.builder()
+                    .itemId(i.getId())
+                    .slot(i.getMealSlot())
+                    .currentFoodId(f.getId())
+                    .currentFoodName(f.getName())
+                    .portion(i.getPortion())
+                    .nutrition(i.getNutrition())
+                    .build();
+        }).collect(Collectors.toList());
 
-        TagDirectives tagDir = buildTagDirectives(rules, req);
-
-        // 3) Pool món rộng (theo slot nếu có)
-        final int CANDIDATE_LIMIT = Math.max(limit * 6, 200);
-        final int MIN_KCAL = 20, MAX_KCAL = 2000, PIVOT = 500;
-
-        List<Food> pool;
-        if (slot != null) {
-            pool = foodRepository.selectCandidatesBySlotAndKcalWindow(
-                    slot.name(), MIN_KCAL, MAX_KCAL, PIVOT, CANDIDATE_LIMIT);
-        } else {
-            pool = new ArrayList<>();
-            for (MealSlot s : MealSlot.values()) {
-                pool.addAll(foodRepository.selectCandidatesBySlotAndKcalWindow(
-                        s.name(), MIN_KCAL, MAX_KCAL, PIVOT, CANDIDATE_LIMIT / 4));
-            }
-        }
-        if (pool == null) pool = Collections.emptyList();
-
-        pool = pool.stream()
-                .filter(f -> Collections.disjoint(tagsOf(f), tagDir.getAvoid()))
-                .collect(Collectors.toCollection(ArrayList::new));
-
-        List<Food> allowed = new ArrayList<>(pool.size());
-        for (Food f : pool) {
-            Nutrition base = f.getNutrition();
-            if (base == null) continue;
-
-            boolean pass = false;
-            double portion = 1.0;
-            Nutrition snap = scaleNutrition(base, portion);
-
-            if (passesItemRules(rules, snap, req)) {
-                pass = true;
-            } else {
-                var step = stepDown(portion);
-                while (step.isPresent()) {
-                    double p2 = step.getAsDouble();
-                    Nutrition s2 = scaleNutrition(base, p2);
-                    if (passesItemRules(rules, s2, req)) {
-                        pass = true;
-                        break;
-                    }
-                    step = stepDown(p2);
-                }
-            }
-            if (pass) allowed.add(f);
-        }
-        LinkedHashMap<UUID, Food> dedup = new LinkedHashMap<>();
-        for (Food f : allowed) dedup.putIfAbsent(f.getId(), f);
-        List<Food> dsFood = dedup.values().stream().limit(limit).toList();
-        return dsFood.stream().map(f -> foodMapper.toFoodResponse(f, cdnHelper)).collect(Collectors.toList());
+        return SwapContext.builder()
+                .dayId(day.getId())
+                .date(day.getDate())
+                .items(liteItems)
+                .avoidTags(avoidTags == null ? Set.of() : avoidTags)
+                .recentFoodIds(recent)
+                .build();
     }
-
-    /* ==================== Helpers cho smartSwap ==================== */
 
     // So sánh "y chang" tập tags (không hơn không kém)
     private static boolean tagsEqual(Set<Tag> a, Set<Tag> b) {
@@ -200,7 +253,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
     private PortionScore bestPortionAgainstTarget(Nutrition cand, Nutrition target) {
         double bestDist = Double.POSITIVE_INFINITY;
         double bestStep = 1.0;
-
         for (double step : PORTION_STEPS) {
             Nutrition s = scaleNutrition(cand, step);
             double dist = nutritionDistanceL1Weighted(s, target);

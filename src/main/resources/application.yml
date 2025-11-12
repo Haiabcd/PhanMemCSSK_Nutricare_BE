@@ -61,7 +61,7 @@ supabase:
   host: "https://ewyeishkixdcfhnzxprj.supabase.co"
   anon-key: ${SUPABASE_ANON_KEY}
 oauth:
-  callback-url: "http://192.168.110.187:8080/auths/google/callback"
+  callback-url: "http://13.229.127.84:8080/auths/google/callback"
 logging:
   level:
     ROOT: INFO

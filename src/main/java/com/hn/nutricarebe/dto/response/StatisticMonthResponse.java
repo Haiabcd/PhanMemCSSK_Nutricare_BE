@@ -20,5 +20,6 @@ public class StatisticMonthResponse {
     List<MonthlyWeeklyNutritionDto> weeklyNutrition;
     Map<MealSlot, Map<String, Long>> mealSlotSummary;
     List<MonthlyWeeklyWaterTotalDto> weeklyWaterTotals;
+    List<DailyWeightDto> weeklyWeightTrend;
     List<String> warnings;
 }

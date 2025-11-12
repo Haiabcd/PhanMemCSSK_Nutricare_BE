@@ -1,6 +1,7 @@
 package com.hn.nutricarebe.entity;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import jakarta.persistence.*;
@@ -23,7 +24,6 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @Entity
 @Table(name = "profiles")
-@ToString(exclude = "user")
 public class Profile {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -74,4 +74,10 @@ public class Profile {
     @UpdateTimestamp
     @Column(name = "updated_at")
     Instant updatedAt;
+
+    @Column(name = "goal_reached", nullable = false)
+    boolean goalReached;
+
+    @Column(name = "snap_weight", nullable = false)
+    Integer snapWeightKg;
 }

@@ -135,7 +135,6 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
             Map<UUID, Double> score = new HashMap<>();
             for (Food f : pool) {
                 double s = scoreFoodHeuristic(f, slotTarget);
-                s += scoreFoodByLLMIfAny(f, slot, slotTarget);
                 if (!globalTagDir.getPreferBonus().isEmpty()) {
                     long cnt = f.getTags().stream()
                             .filter(globalTagDir.getPreferBonus()::containsKey)
@@ -883,9 +882,5 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         }
 
         return -ratioPenalty + (kcalDensityScore / 300.0) + (fiberBonus * 0.2) - sodiumPenalty - sugarPenalty;
-    }
-
-    private double scoreFoodByLLMIfAny(Food food, MealSlot slot, Nutrition slotTarget) {
-        return 0.0;
     }
 }

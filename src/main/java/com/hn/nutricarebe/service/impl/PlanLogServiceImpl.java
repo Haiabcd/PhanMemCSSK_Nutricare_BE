@@ -81,6 +81,7 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .food(item.getFood())
                 .servingSizeGram(BigDecimal.ZERO)
                 .source(LogSource.PLAN)
+                .nameFood(item.getFood().getName() != null ? item.getFood().getName() : null)
                 .planItem(item)
                 .portion(item.getPortion())
                 .actualNutrition(snap)
@@ -179,7 +180,10 @@ public class PlanLogServiceImpl implements PlanLogService {
         double targetKcal = mealPlanDayService.getMealTargetKcal(userId, req.getMealSlot());
 
         List<PlanLog> logAllDay = logRepository.findByUser_IdAndDate(userId, req.getDate());
-        NutritionResponse nr = aggregateActual(logAllDay);
+        List<PlanLog> logsThisSlot = logAllDay.stream()
+                .filter(l -> l.getMealSlot() == req.getMealSlot())
+                .toList();
+        NutritionResponse nr = aggregateActual(logsThisSlot);
         double actualKcal = nr.getKcal() != null ? nr.getKcal().doubleValue() : 0.0;
         // 5. So sánh và trả về cảnh báo
         double diff = actualKcal - targetKcal;
@@ -242,7 +246,10 @@ public class PlanLogServiceImpl implements PlanLogService {
         double targetKcal = mealPlanDayService.getMealTargetKcal(userId, req.getMealSlot());
 
         List<PlanLog> logAllDay = logRepository.findByUser_IdAndDate(userId, req.getDate());
-        NutritionResponse nr = aggregateActual(logAllDay);
+        List<PlanLog> logsThisSlot = logAllDay.stream()
+                .filter(l -> l.getMealSlot() == req.getMealSlot())
+                .toList();
+        NutritionResponse nr = aggregateActual(logsThisSlot);
         double actualKcal = nr.getKcal() != null ? nr.getKcal().doubleValue() : 0.0;
         // 5. So sánh và trả về cảnh báo
         double diff = actualKcal - targetKcal;
@@ -313,7 +320,10 @@ public class PlanLogServiceImpl implements PlanLogService {
         double targetKcal = mealPlanDayService.getMealTargetKcal(userId, req.getMealSlot());
         boolean nowDate = logOld.getDate().isEqual(LocalDate.now());
         List<PlanLog> logAllDay = logRepository.findByUser_IdAndDate(userId, logOld.getDate());
-        NutritionResponse nr = aggregateActual(logAllDay);
+        List<PlanLog> logsThisSlot = logAllDay.stream()
+                .filter(l -> l.getMealSlot() == req.getMealSlot())
+                .toList();
+        NutritionResponse nr = aggregateActual(logsThisSlot);
         double actualKcal = nr.getKcal() != null ? nr.getKcal().doubleValue() : 0.0;
         double diff = actualKcal - targetKcal;
         KcalWarningResponse.Status status;

@@ -33,9 +33,22 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 	""")
     long countUsersCreatedAfter(Instant startDate);
 
+    @Query("""
+        SELECT COUNT(u)
+        FROM User u
+        WHERE u.role <> com.hn.nutricarebe.enums.Role.ADMIN
+    """)
+    long countNonAdminUsers();
+
     // đếm số user theo vai trò
     long countByRole(Role role);
 
     // đếm số user theo trạng thái
-    long countByStatus(UserStatus status);
+    @Query("""
+     SELECT COUNT(u)
+     FROM User u
+     WHERE u.status = :status
+       AND u.role <> com.hn.nutricarebe.enums.Role.ADMIN
+     """)
+    long countByStatus(@Param("status") UserStatus status);
 }

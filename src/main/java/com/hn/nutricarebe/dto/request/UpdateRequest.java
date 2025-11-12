@@ -18,7 +18,6 @@ import lombok.experimental.FieldDefaults;
 public class UpdateRequest {
     @Valid
     ProfileUpdateRequest profile;
-
     Set<UUID> conditions;
     Set<UUID> allergies;
     LocalDate startDate;

@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.hn.nutricarebe.service.WeightCheckService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
@@ -31,6 +32,7 @@ import lombok.experimental.FieldDefaults;
 @RequestMapping("/logs")
 public class MealLogController {
     PlanLogService logService;
+    WeightCheckService weightCheckService;
 
     @PostMapping("/plan")
     public ApiResponse<Void> savePlanLog(@RequestBody @Valid SaveLogRequest req) {
@@ -89,6 +91,14 @@ public class MealLogController {
         return ApiResponse.<KcalWarningResponse>builder()
                 .message("Cập nhật PlanLog thành công")
                 .data(logService.updatePlanLog(req, planLogId))
+                .build();
+    }
+
+    @GetMapping("/need-update-weight")
+    public ApiResponse<Boolean> needUpdate() {
+        return ApiResponse.<Boolean>builder()
+                .message("Kiểm tra cần cập nhật cân nặng thành công")
+                .data(weightCheckService.mustUpdateWeight())
                 .build();
     }
 }

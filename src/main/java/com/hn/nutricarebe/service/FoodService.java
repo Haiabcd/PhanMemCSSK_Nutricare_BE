@@ -49,4 +49,6 @@ public interface FoodService {
     long countFoodsWithComplete5();
 
     double getDataCompletenessRate();
+
+    List<String> nameFoodsWithComplete5();
 }

@@ -1,5 +1,6 @@
 package com.hn.nutricarebe.controller;
 
+import com.hn.nutricarebe.dto.request.WeightUpdateRequest;
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.PutMapping;
@@ -27,6 +28,14 @@ public class ProfileController {
         profileService.updateProfile(request);
         return ApiResponse.<Void>builder()
                 .message("Update profile successfully")
+                .build();
+    }
+
+    @PutMapping("/update-weight")
+    public ApiResponse<Void> updateWeight(@Valid @RequestBody WeightUpdateRequest request) {
+        profileService.updateWeight(request);
+        return ApiResponse.<Void>builder()
+                .message("Update weight successfully")
                 .build();
     }
 }

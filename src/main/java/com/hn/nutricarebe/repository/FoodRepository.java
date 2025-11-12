@@ -157,4 +157,33 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
 		AND f.nutrition.fiberG   IS NOT NULL AND f.nutrition.fiberG   >= 0
 	""")
     long countFoodsWithComplete5();
+
+    // Danh sách tên các món KHÔNG đủ 5 chỉ số dinh dưỡng (null hoặc < 0)
+    @Query("""
+    SELECT f.name
+    FROM Food f
+    WHERE (f.nutrition.kcal    IS NULL OR f.nutrition.kcal    < 0)
+       OR (f.nutrition.proteinG IS NULL OR f.nutrition.proteinG < 0)
+       OR (f.nutrition.carbG   IS NULL OR f.nutrition.carbG   < 0)
+       OR (f.nutrition.fatG    IS NULL OR f.nutrition.fatG    < 0)
+       OR (f.nutrition.fiberG  IS NULL OR f.nutrition.fiberG  < 0)
+    ORDER BY f.name ASC
+    """)
+    List<String> findFoodNamesWithIncomplete5();
+
+
+    @Query("""
+        select f from Food f
+        join f.mealSlots ms
+        where ms = :slot
+          and f.nutrition.kcal between :minKcal and :maxKcal
+        order by abs(f.nutrition.kcal - :pivotKcal) asc
+    """)
+    List<Food> findCandidatesBySlotAndKcal(
+            @Param("slot") String slot,
+            @Param("minKcal") int minKcal,
+            @Param("maxKcal") int maxKcal,
+            @Param("pivotKcal") int pivotKcal,
+            Pageable pageable
+    );
 }

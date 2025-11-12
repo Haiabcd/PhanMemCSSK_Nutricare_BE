@@ -15,7 +15,6 @@ import lombok.experimental.FieldDefaults;
 @Builder
 public class ChatRequest {
     String message;
-
     @Nullable
     MultipartFile file;
 }

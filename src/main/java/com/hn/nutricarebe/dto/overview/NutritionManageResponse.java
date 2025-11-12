@@ -20,4 +20,5 @@ public class NutritionManageResponse {
     List<FoodTopKcalDto> getTop10HighestKcalFoods;
     List<FoodTopProteinDto> getTop10HighestProteinFoods;
     EnergyHistogramDto getEnergyHistogramFixed;
+    List<String> nameFoodsWithIncompleteData;
 }

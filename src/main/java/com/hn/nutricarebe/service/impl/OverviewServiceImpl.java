@@ -72,14 +72,17 @@ public class OverviewServiceImpl implements OverviewAdminService {
     public UserManageResponse userManage() {
         long totalUsers = userService.getTotalUsers();
         long getNewUsersInLast7Days = userService.getNewUsersInLast7Days();
+        long totalUserArchived = profileService.getCompletedGoalsCount();
         Map<String, Long> getUserRoleCounts = userService.getUserRoleCounts();
         Map<String, Long> getGoalStats = profileService.getGoalStats();
         List<TopUserDto> getTopUsersByLogCount = planLogService.getTopUsersByLogCount();
         Map<String, Long> countUsersByStatus = userService.countUsersByStatus();
 
+
         return UserManageResponse.builder()
                 .totalUsers(totalUsers)
                 .getNewUsersInLast7Days(getNewUsersInLast7Days)
+                .totalUserArchived(totalUserArchived)
                 .getUserRoleCounts(getUserRoleCounts)
                 .getGoalStats(getGoalStats)
                 .getTopUsersByLogCount(getTopUsersByLogCount)
@@ -116,6 +119,7 @@ public class OverviewServiceImpl implements OverviewAdminService {
         long countFoodsOver800Kcal = foodService.countFoodsWithHighKcal();
         long countFoodsWithComplete5 = foodService.countFoodsWithComplete5();
         long totalFoods = foodService.getTotalFoods();
+        List<String> nameFoodsWithIncompleteData = foodService.nameFoodsWithComplete5();
         double getDataCompletenessRate = foodService.getDataCompletenessRate();
         List<FoodTopKcalDto> getTop10HighestKcalFoods = foodService.getTop10HighKcalFoods();
         List<FoodTopProteinDto> getTop10HighestProteinFoods = foodService.getTop10HighProteinFoods();
@@ -126,6 +130,7 @@ public class OverviewServiceImpl implements OverviewAdminService {
                 .countFoodsOver800Kcal(countFoodsOver800Kcal)
                 .countFoodsWithComplete5(countFoodsWithComplete5)
                 .totalFoods(totalFoods)
+                .nameFoodsWithIncompleteData(nameFoodsWithIncompleteData)
                 .getDataCompletenessRate(getDataCompletenessRate)
                 .getTop10HighestKcalFoods(getTop10HighestKcalFoods)
                 .getTop10HighestProteinFoods(getTop10HighestProteinFoods)

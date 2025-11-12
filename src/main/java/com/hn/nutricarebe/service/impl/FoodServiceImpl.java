@@ -363,6 +363,11 @@ public class FoodServiceImpl implements FoodService {
         return foodRepository.countFoodsWithComplete5();
     }
 
+    @Override
+    public List<String> nameFoodsWithComplete5() {
+        return foodRepository.findFoodNamesWithIncomplete5();
+    }
+
     // Tỷ lệ hoàn thiện dữ liệu dinh dưỡng (5 chỉ số chính)
     @Override
     public double getDataCompletenessRate() {

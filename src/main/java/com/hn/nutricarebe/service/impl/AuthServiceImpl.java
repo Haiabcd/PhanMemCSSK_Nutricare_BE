@@ -4,9 +4,12 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
+import com.hn.nutricarebe.entity.WeightLog;
+import com.hn.nutricarebe.repository.WeightLogRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -54,7 +57,7 @@ public class AuthServiceImpl implements AuthService {
     ProfileMapper profileMapper;
     ProfileRepository profileRepository;
     UserRepository userRepository;
-
+    WeightLogRepository weightLogRepository;
     UserAllergyService userAllergyService;
     MealPlanDayService mealPlanDayService;
     UserConditionService userConditionService;
@@ -62,6 +65,7 @@ public class AuthServiceImpl implements AuthService {
     PkceStore pkceStore;
     WebClient webClient;
     RefreshTokenService refreshTokenService;
+
 
     @NonFinal
     @Value("${supabase.host}")
@@ -95,10 +99,21 @@ public class AuthServiceImpl implements AuthService {
         // B2: Lưu profile
         Profile profile = profileMapper.toProfile(request.getProfile());
         profile.setUser(savedUser);
+        profile.setSnapWeightKg(request.getProfile().getWeightKg());
+        profile.setGoalReached(request.getProfile().getGoal() == GoalType.MAINTAIN);
+        var today = LocalDate.now();
         if (savedUser.getProvider() == Provider.SUPABASE_GOOGLE) {
             profile.setAvatarUrl(savedUser.getProviderImageUrl());
         }
         profileRepository.save(profile);
+        if (request.getProfile().getGoal() != GoalType.MAINTAIN) {
+            WeightLog wl = WeightLog.builder()
+                    .profile(profile)
+                    .loggedAt(today)
+                    .weightKg(request.getProfile().getWeightKg())
+                    .build();
+            weightLogRepository.save(wl);
+        }
         // B3: Lưu bệnh nền
         Set<UUID> conditionIds = request.getConditions();
         if (conditionIds != null && !conditionIds.isEmpty()) {

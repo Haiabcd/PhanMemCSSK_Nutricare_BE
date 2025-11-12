@@ -47,6 +47,7 @@ public class UserServiceImpl implements UserService {
                 .orElse(null);
         if (userOld != null && userOld.getProvider() == Provider.NONE) {
             userOld.setStatus(UserStatus.DELETED);
+            userOld.setDeviceId(null);
             userRepository.save(userOld);
         } else if (userOld != null && userOld.getProvider() == Provider.SUPABASE_GOOGLE) {
             return userOld;
@@ -99,7 +100,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public long getTotalUsers() {
-        return userRepository.count();
+        return userRepository.countNonAdminUsers();
     }
 
     @Override
