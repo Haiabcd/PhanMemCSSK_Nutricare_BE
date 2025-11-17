@@ -150,7 +150,7 @@ RÀNG BUỘC:
 • Cần ≥1 tag trong foodTags hoặc customFoodTags.
 4) frequencyPerScope: null hoặc số nguyên dương.
 5) ageMin≤ageMax nếu cả hai có.
-6) Nếu nhiều rule chỉ khác về tag/message → gộp (union tag, message đại diện).
+LƯU Ý: Nếu nhiều rule chỉ khác về tag/message → gộp (union tag, message đại diện).
 """;
     private static final String VISION_SYSTEM_PROMPT =
             """
@@ -398,7 +398,6 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
             r.setCustomFoodTags(Set.of());
             return;
         }
-
         List<String> existing = tagService.findNameCodeByNormal(normalized);
         Set<String> known =
                 new HashSet<>(existing.stream().map(this::toNameCode).toList());

@@ -70,7 +70,7 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
     @Transactional
     public void saveRules(CreationRuleAI request, List<NutritionRuleAI> rules) {
         if (rules == null || rules.isEmpty()) return;
-        List<NutritionRule> saveList = new ArrayList<>();
+        Map<String, NutritionRule> ruleMap = new LinkedHashMap<>();
         for (NutritionRuleAI ruleAI : rules) {
             Set<Tag> tags = new HashSet<>();
             if (ruleAI.getTargetType() == TargetType.FOOD_TAG) {
@@ -88,22 +88,19 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
                     tags.addAll(savedTags);
                 }
                 if (ruleAI.getFoodTags() != null && !ruleAI.getFoodTags().isEmpty()) {
-                    Set<Tag> existingTags = tagRepository.findByNameCodeInIgnoreCase(ruleAI.getFoodTags());
+                    Set<Tag> existingTags =
+                            tagRepository.findByNameCodeInIgnoreCase(ruleAI.getFoodTags());
                     tags.addAll(existingTags);
                 }
             }
             NutritionRule creationRequest = NutritionRule.builder()
                     .allergy(
                             request.getAllergyId() != null
-                                    ? Allergy.builder()
-                                            .id(request.getAllergyId())
-                                            .build()
+                                    ? Allergy.builder().id(request.getAllergyId()).build()
                                     : null)
                     .condition(
                             request.getConditionId() != null
-                                    ? Condition.builder()
-                                            .id(request.getConditionId())
-                                            .build()
+                                    ? Condition.builder().id(request.getConditionId()).build()
                                     : null)
                     .active(true)
                     .comparator(ruleAI.getComparator())
@@ -118,13 +115,19 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
                     .ageMax(ruleAI.getAgeMax())
                     .ageMin(ruleAI.getAgeMin())
                     .applicableSex(ruleAI.getApplicableSex())
-                    .tags(tags)
+                    .tags(new HashSet<>(tags))
                     .message(ruleAI.getMessage())
                     .source(null)
                     .build();
-            saveList.add(creationRequest);
+            String key = buildRuleKey(creationRequest);
+            NutritionRule existing = ruleMap.get(key);
+            if (existing == null) {
+                ruleMap.put(key, creationRequest);
+            } else {
+                existing.getTags().addAll(tags);
+            }
         }
-        nutritionRuleRepository.saveAll(saveList);
+        nutritionRuleRepository.saveAll(ruleMap.values());
     }
 
     @Override
@@ -254,5 +257,27 @@ public class NutritionRuleServiceImpl implements NutritionRuleService {
         if (dto.getAgeMin() != null && dto.getAgeMax() != null && dto.getAgeMin() > dto.getAgeMax()) {
             throw new AppException(ErrorCode.INVALID_ARGUMENT);
         }
+    }
+
+    private String buildRuleKey(NutritionRule r) {
+        UUID allergyId = r.getAllergy() != null ? r.getAllergy().getId() : null;
+        UUID conditionId = r.getCondition() != null ? r.getCondition().getId() : null;
+
+        return String.join("|",
+                String.valueOf(allergyId),
+                String.valueOf(conditionId),
+                String.valueOf(r.getRuleType()),
+                String.valueOf(r.getScope()),
+                String.valueOf(r.getTargetType()),
+                String.valueOf(r.getTargetCode()),
+                String.valueOf(r.getComparator()),
+                String.valueOf(r.getPerKg()),
+                String.valueOf(r.getThresholdMin()),
+                String.valueOf(r.getThresholdMax()),
+                String.valueOf(r.getAgeMin()),
+                String.valueOf(r.getAgeMax()),
+                String.valueOf(r.getApplicableSex()),
+                String.valueOf(r.getFrequencyPerScope())
+        );
     }
 }

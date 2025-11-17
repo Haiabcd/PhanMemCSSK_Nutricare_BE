@@ -64,8 +64,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         MealPlanItem item = mealPlanItemRepository
                 .findById(itemId)
                 .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
-
-        // Quyền sở hữu item
         if (item.getDay() == null
                 || item.getDay().getUser() == null
                 || !userId.equals(item.getDay().getUser().getId())) {
@@ -116,12 +114,10 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         if (best == null) {
             throw new AppException(ErrorCode.FOOD_NOT_FOUND);
         }
-
         // Cập nhật item ngay tại chỗ
         item.setFood(best.food);
         item.setPortion(MealPlanHelper.bd(best.portion, 2));
         item.setNutrition(scaleNutrition(best.food.getNutrition(), best.portion));
-
         mealPlanItemRepository.save(item);
     }
 

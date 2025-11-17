@@ -458,7 +458,9 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
 
         // ===== 3) Đọc log hôm nay + gần đây (để né món và tính consumed) =====
         final int NO_REPEAT_DAYS = 3;
+        final int NO_REPEAT_FUTURE_DAYS = 2;
         LocalDate startRecent = date.minusDays(NO_REPEAT_DAYS);
+        LocalDate endRecent   = date.plusDays(NO_REPEAT_FUTURE_DAYS);
 
         List<PlanLog> todayLogs = planLogRepository.findByUser_IdAndDate(userId, date);
         List<PlanLog> recentLogs =
@@ -484,21 +486,16 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
         recentFoods.addAll(eatenFoodToday);
 
         Set<UUID> plannedRecently =
-                mealPlanItemRepository.findDistinctFoodIdsPlannedBetween(userId, startRecent, date.minusDays(1));
+                mealPlanItemRepository.findDistinctFoodIdsPlannedBetween(userId, startRecent, endRecent);
         recentFoods.addAll(plannedRecently);
-
         // ===== 4) Xóa item cũ chưa dùng (tránh FK & rác) =====
         mealPlanItemRepository.deleteUnusedItemsByDay(day.getId());
-
         // ===== 5) Tag directives để lọc avoid/limit/prefer =====
         TagDirectives tagDir = buildTagDirectives(rules, mReq);
-
-        // số thứ tự tiếp theo cho rank
         int rankBase = 1
                 + mealPlanItemRepository
                         .findByDay_User_IdAndDay_Date(userId, date)
                         .size();
-
         // ===== 6) Helper local cho chọn theo vector =====
         // Kiểm đủ gần theo % kcal của slot (chỉ xét kcal, protein, carb, fat, fiber)
         java.util.function.BiPredicate<Nutrition, Double> isSatisfiedSlot = (rem, pct) -> {
@@ -508,9 +505,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                     && safeDouble(rem.getCarbG()) <= Math.max(2.0, EPS_CARB * scale)
                     && safeDouble(rem.getFatG()) <= Math.max(1.0, EPS_FAT * scale)
                     && safeDouble(rem.getFiberG()) <= Math.max(1.0, EPS_FIBER * scale);
-            // Sodium/Sugar: giữ nguyên cách kiểm soát cũ qua rule/target, không ép “điền đủ”.
         };
-
         // Khoảng cách còn thiếu (L1, trọng số) cho 5 chất chính
         java.util.function.Function<Nutrition, Double> dist = (rem) -> {
             double wK = 1.0 / Math.max(1.0, EPS_KCAL);
@@ -524,18 +519,15 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                     + wF * Math.max(0, safeDouble(rem.getFatG()))
                     + wFi * Math.max(0, safeDouble(rem.getFiberG()));
         };
-
         // ===== 7) Với từng slot: tính target MEAL → remaining → chọn theo gain vector =====
         for (MealSlot slot : MealSlot.values()) {
             int targetItems = SLOT_ITEM_COUNTS.get(slot);
             double pct = SLOT_KCAL_PCT.get(slot);
-
             // 7.1) Meal target & remaining
             Nutrition mealTarget = approxMacroTargetForMeal(dayTarget, pct, rules, weight, mReq);
             Nutrition consumed = consumedBySlot.getOrDefault(slot, new Nutrition());
             Nutrition remaining = subNutClamp0(mealTarget, consumed);
             if (isSatisfiedSlot.test(remaining, pct)) continue;
-
             // 7.2) Pool ứng viên theo slot
             final int CANDIDATE_LIMIT = 120;
             final int MIN_KCAL = 20, MAX_KCAL = 2000, PIVOT = 500;
@@ -614,7 +606,7 @@ public class MealPlanDayServiceImpl implements MealPlanDayService {
                     }
                 }
 
-                if (bestFood == null || bestGain <= 0) break; // không cải thiện thêm
+                if (bestFood == null || bestGain <= 0) break;
 
                 // Lưu item
                 mealPlanItemRepository.save(MealPlanItem.builder()
