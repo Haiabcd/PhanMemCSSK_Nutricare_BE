@@ -226,26 +226,29 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public GoogleCallbackResponse googleCallback(String code, String state, String device, Boolean upgrade) {
+        // 1. Kiểm tra state (PKCE)
         String verifier = pkceStore.consume(state);
         if (verifier == null) {
             throw new AppException(ErrorCode.INVALID_OR_EXPIRED_STATE);
         }
 
+        // 2. Đổi code lấy token từ Supabase
         SupabaseTokenResponse tokenRes;
         try {
-            // Đổi code lấy token
             tokenRes = exchangeCodeForToken(code, verifier, CALLBACK_URL);
         } catch (Exception e) {
             throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
         }
 
-        // Lấy thông tin user từ token
+        // 3. Parse user từ token Supabase
         SupabaseUser su = tokenRes.getUser();
         LoginProfile gp = GoogleLoginHelper.parse(su);
 
-        if (gp.getProviderUserId().isBlank()) {
+        if (gp.getProviderUserId() == null || gp.getProviderUserId().isBlank()) {
             throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
         }
+
+        // 4. Tìm user theo providerUserId
         User user = userRepository.findByProviderUserId(gp.getProviderUserId()).orElse(null);
 
         AuthFlowOutcome outcome;
@@ -255,29 +258,44 @@ public class AuthServiceImpl implements AuthService {
         long accessExp = 0;
         long refreshExp = 0;
 
+        // =============== Trường hợp chưa có user ứng với Google này =============== //
         if (user == null) {
+            // Thử upgrade guest theo deviceId
             Optional<User> userDevice =
                     userRepository.findTopByDeviceIdAndStatusOrderByCreatedAtDesc(device, UserStatus.ACTIVE);
+
             if (userDevice.isPresent() && userDevice.get().getRole() == Role.GUEST) {
-                user = new User();
-                user.setRole(Role.USER);
-                user.setProviderUserId(gp.getProviderUserId());
-                user.setProvider(Provider.SUPABASE_GOOGLE);
-                user.setStatus(UserStatus.ACTIVE);
-                user.setDeviceId(null);
-                if (user.getEmail() == null
-                        || user.getEmail().isBlank()
-                        || user.getEmail().equalsIgnoreCase(gp.getEmail())) {
-                    user.setEmail((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null);
+                // ---- GUEST_UPGRADE: nâng user guest hiện tại thành user thật ----
+                User guest = userDevice.get();
+
+                guest.setRole(Role.USER);
+                guest.setProviderUserId(gp.getProviderUserId());
+                guest.setProvider(Provider.SUPABASE_GOOGLE);
+                guest.setProviderImageUrl(gp.getAvatar());
+                guest.setStatus(UserStatus.ACTIVE);
+                guest.setDeviceId(null);
+
+                if (guest.getEmail() == null
+                        || guest.getEmail().isBlank()
+                        || guest.getEmail().equalsIgnoreCase(gp.getEmail())) {
+                    guest.setEmail(
+                            (gp.getEmail() != null && !gp.getEmail().isBlank())
+                                    ? gp.getEmail()
+                                    : null
+                    );
                 }
+
                 Profile profile = profileRepository
-                        .findByUser_Id(user.getId())
+                        .findByUser_Id(guest.getId())
                         .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
                 profile.setName(gp.getName());
                 profile.setAvatarUrl(gp.getAvatar());
                 profileRepository.save(profile);
+
+                user = guest;
                 outcome = AuthFlowOutcome.GUEST_UPGRADE;
             } else {
+                // ---- FIRST_TIME_GOOGLE: tạo user mới từ Google ----
                 user = User.builder()
                         .deviceId(null)
                         .email((gp.getEmail() != null && !gp.getEmail().isBlank()) ? gp.getEmail() : null)
@@ -287,32 +305,45 @@ public class AuthServiceImpl implements AuthService {
                         .providerImageUrl(gp.getAvatar())
                         .status(UserStatus.ACTIVE)
                         .build();
-                outcome = AuthFlowOutcome.FIRST_TIME_GOOGLE;
-            }
-        } else {
-            if (user.getRole() == Role.USER && upgrade == Boolean.FALSE) {
-                Profile profile = profileRepository.findByUser_Id(user.getId()).orElse(null);
-                if (profile != null) {
-                    outcome = AuthFlowOutcome.RETURNING_GOOGLE;
-                    access = createAccessToken(user);
-                    refresh = createRefreshToken(user, familyId);
-                    accessExp = getClaims(parseJwt(access))
-                            .getExpirationTime()
-                            .toInstant()
-                            .getEpochSecond();
-                    refreshExp = getClaims(parseJwt(refresh))
-                            .getExpirationTime()
-                            .toInstant()
-                            .getEpochSecond();
-                    saveRefreshRecord(user.getId(), refresh);
-                } else {
-                    outcome = AuthFlowOutcome.FIRST_TIME_GOOGLE;
-                }
-            } else {
-                throw new AppException(ErrorCode.PROVIDER_ALREADY_LINKED);
+
+                outcome = AuthFlowOutcome.FIRST_TIME_GOOGLE; // FE cũng sẽ đẩy sang Onboarding
             }
         }
+        // =============== Trường hợp đã có user link với Google này =============== //
+        else {
+            // Nếu FE cố "upgrade/link" nhưng account đã link rồi → báo lỗi
+            if (Boolean.TRUE.equals(upgrade)) {
+                throw new AppException(ErrorCode.PROVIDER_ALREADY_LINKED);
+            }
+
+            Profile profile = profileRepository.findByUser_Id(user.getId()).orElse(null);
+
+            if (profile != null) {
+                // ---- RETURNING_GOOGLE: user đã onboarding đầy đủ, trả token luôn ----
+                outcome = AuthFlowOutcome.RETURNING_GOOGLE;
+
+                access = createAccessToken(user);
+                refresh = createRefreshToken(user, familyId);
+
+                accessExp = getClaims(parseJwt(access))
+                        .getExpirationTime()
+                        .toInstant()
+                        .getEpochSecond();
+                refreshExp = getClaims(parseJwt(refresh))
+                        .getExpirationTime()
+                        .toInstant()
+                        .getEpochSecond();
+
+                saveRefreshRecord(user.getId(), refresh);
+            } else {
+                // Có user nhưng chưa có profile → vẫn coi là FIRST_TIME_GOOGLE để đi Onboarding
+                outcome = AuthFlowOutcome.FIRST_TIME_GOOGLE;
+            }
+        }
+
+        // Lưu / cập nhật user (hàm này của bạn đã có sẵn)
         userService.saveGG(user);
+
         TokenPairResponse tokenPair = TokenPairResponse.builder()
                 .tokenType("Bearer")
                 .accessToken(access)

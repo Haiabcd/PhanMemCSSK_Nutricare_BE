@@ -52,6 +52,9 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
     @NonFinal
     Map<String, SuggestCacheEntry> suggestCache = new ConcurrentHashMap<>();
 
+    @NonFinal
+    Map<UUID, Deque<UUID>> swapHistoryPerItem = new ConcurrentHashMap<>();
+
     static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     @Override
@@ -60,7 +63,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
         UUID userId = UUID.fromString(auth.getName());
-
         MealPlanItem item = mealPlanItemRepository
                 .findById(itemId)
                 .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
@@ -73,12 +75,39 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         if (item.isUsed()) {
             throw new AppException(ErrorCode.MEAL_PLAN_ITEM_USED);
         }
-
         // Dữ liệu tham chiếu cũ
         MealSlot slot = item.getMealSlot();
         var oldFood = item.getFood();
         var oldSnap = item.getNutrition();
         var oldFoodId = oldFood.getId();
+        // ========= LỊCH SỬ ĐỔI MÓN THEO ITEM (PHẦN MỚI) =========
+        Deque<UUID> history = swapHistoryPerItem
+                .computeIfAbsent(itemId, k -> new ArrayDeque<>());
+        Set<UUID> recentFoods = new HashSet<>();
+        LocalDate baseDate = Optional.ofNullable(item.getDay())
+                .map(MealPlanDay::getDate)
+                .orElse(LocalDate.now(VN_ZONE));
+        final int NO_REPEAT_DAYS = 3;
+        LocalDate startRecent = baseDate.minusDays(NO_REPEAT_DAYS);
+        LocalDate endRecent   = baseDate.plusDays(NO_REPEAT_DAYS);
+        // 1) Món đã ăn +/- 3 ngày
+        List<PlanLog> logsRecent =
+                planLogRepository.findByUser_IdAndDateBetween(userId, startRecent, endRecent);
+        logsRecent.stream()
+                .map(PlanLog::getFood)
+                .filter(Objects::nonNull)
+                .map(Food::getId)
+                .forEach(recentFoods::add);
+        // 2) Món đã/đang nằm trong plan +/- 3 ngày
+        Set<UUID> planned =
+                mealPlanItemRepository.findDistinctFoodIdsPlannedBetween(userId, startRecent, endRecent);
+        if (planned != null) {
+            recentFoods.addAll(planned);
+        }
+        // 3) Không bao giờ chọn lại món hiện tại
+        recentFoods.add(oldFoodId);
+        // 4) TRÁNH CÁC MÓN ĐÃ TỪNG GẮN VỚI ITEM NÀY TRONG QUÁ KHỨ GẦN (A ↔ B ↔ A)
+        recentFoods.addAll(history);
 
         // Lướt phân trang ứng viên theo slot
         Pageable pageable = PageRequest.of(0, 50);
@@ -88,39 +117,35 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         do {
             var slice = foodRepository.findByMealSlot(slot, pageable);
             for (var cand : slice.getContent()) {
-                if (cand.getId().equals(oldFoodId)) continue;
+                if (recentFoods.contains(cand.getId())) continue;
                 if (!tagsEqual(cand.getTags(), oldFood.getTags())) continue;
-
                 var n = cand.getNutrition();
-
                 // Tìm portion thuộc {1.5, 1.0, 0.5}
                 PortionScore ps = bestPortionAgainstTarget(n, oldSnap);
-
                 // Tính điểm chênh lệch (L1 weighted)
                 double score = ps.distance;
-
                 if (best == null || score < best.score) {
                     best = new CandidateBest(cand, ps.portion, score);
                 }
             }
-
             hasNext = slice.hasNext();
             if (hasNext) pageable = slice.nextPageable();
-
-            // Nếu đã có ứng viên rất sát (ví dụ sai khác kcal < 5%) thì dừng sớm
             if (best != null && isGoodEnough(best.score, oldSnap)) break;
         } while (hasNext);
 
         if (best == null) {
             throw new AppException(ErrorCode.FOOD_NOT_FOUND);
         }
-        // Cập nhật item ngay tại chỗ
+        // ===== Cập nhật lịch sử swap cho item này =====
+        history.addLast(oldFoodId);
+        while (history.size() > 5) {
+            history.removeFirst();
+        }
         item.setFood(best.food);
         item.setPortion(MealPlanHelper.bd(best.portion, 2));
         item.setNutrition(scaleNutrition(best.food.getNutrition(), best.portion));
         mealPlanItemRepository.save(item);
     }
-
 
     @Override
     @Transactional
@@ -231,7 +256,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         return out;
     }
 
-
     @Override
     public void updateCache(UUID userId, MealPlanItem itemOld) {
         MealPlanDay day = itemOld.getDay();
@@ -261,7 +285,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
             }
         }
     }
-
     /* ==================== Helpers cho smartSwap ==================== */
     private SwapContext getSwapContext(UUID userId) {
         LocalDate today = LocalDate.now(VN_ZONE);
@@ -313,8 +336,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
                 .recentFoodIds(recent)
                 .build();
     }
-
-
 
     // So sánh "y chang" tập tags (không hơn không kém)
     private static boolean tagsEqual(Set<Tag> a, Set<Tag> b) {

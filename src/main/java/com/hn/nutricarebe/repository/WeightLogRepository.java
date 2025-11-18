@@ -13,4 +13,5 @@ public interface WeightLogRepository extends JpaRepository<WeightLog, UUID> {
     Optional<WeightLog> findTopByProfileOrderByLoggedAtDesc(Profile profile);
     List<WeightLog> findByProfile_User_IdAndLoggedAtBetweenOrderByLoggedAt(
             UUID userId, LocalDate start, LocalDate end);
+    Optional<WeightLog> findByProfile_IdAndLoggedAt(UUID profileId, LocalDate loggedAt);
 }

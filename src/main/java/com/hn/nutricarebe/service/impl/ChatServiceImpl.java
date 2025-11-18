@@ -40,6 +40,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatClient chatClient;
     private final TagService tagService;
     private final NutritionRuleService nutritionRuleService;
+    private final ProfileTool profileTool;
 
     // === SYSTEM PROMPT NGẮN + HƯỚNG DẪN GỌI TOOL ===
     private static final String NUTRICARE_SYSTEM_PROMPT =
@@ -177,6 +178,7 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
             NutritionLookupTool nutritionLookupTool) {
         this.tagService = tagService;
         this.nutritionRuleService = nutritionRuleService;
+        this.profileTool = profileTool;
 
 
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
@@ -192,7 +194,7 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
 
     @Override
     public String chat(MultipartFile file, String message) {
-        if(message == null && (file == null || file.isEmpty())) {
+        if (message == null && (file == null || file.isEmpty())) {
             return "Bạn vui lòng nhập tin nhắn hoặc tải lên một tệp để trò chuyện nhé!";
         }
 
@@ -201,19 +203,27 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         UUID userId = UUID.fromString(auth.getName());
-
         String conversationId = userId.toString();
 
         ChatOptions chatOptions = ChatOptions.builder().temperature(0D).build();
 
+        // NEW: luôn build profileText từ ProfileTool
+        String profileText = buildProfileTextForAi();
+
         var prompt = chatClient
                 .prompt()
                 .options(chatOptions)
-                .system(NUTRICARE_SYSTEM_PROMPT)
+                .system(
+                        NUTRICARE_SYSTEM_PROMPT
+                                + "\n\n=== HỒ SƠ NGƯỜI DÙNG (BACKEND ĐÃ LẤY SẴN, HÃY DÙNG SỐ NÀY) ===\n"
+                                + profileText
+                )
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId));
 
         String safeMsg =
-                (message != null && !message.isBlank()) ? message : "Phân tích ảnh/trao đổi theo hướng dẫn hệ thống.";
+                (message != null && !message.isBlank())
+                        ? message
+                        : "Phân tích ảnh/trao đổi theo hướng dẫn hệ thống.";
 
         if (file != null && !file.isEmpty() && file.getContentType() != null) {
             var media = Media.builder()
@@ -224,15 +234,21 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
         } else {
             prompt.user(safeMsg);
         }
+
         try {
             return prompt.call().content();
-        } catch (com.google.genai.errors.ClientException ex) {
-            if (ex.getMessage() != null && ex.getMessage().contains("429")) {
+        } catch (RuntimeException ex) {
+            Throwable cause = ex.getCause();
+            if (cause instanceof com.google.genai.errors.ClientException ce &&
+                    ce.getMessage() != null &&
+                    ce.getMessage().contains("429")) {
+
                 throw new AppException(ErrorCode.AI_SERVICE_ERROR);
             }
             throw ex;
         }
     }
+
 
     @Override
     @PreAuthorize("hasRole('ADMIN')")
@@ -435,4 +451,50 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
         if (n.getSodiumMg() == null) n.setSodiumMg(java.math.BigDecimal.ZERO);
         if (n.getSugarMg() == null) n.setSugarMg(java.math.BigDecimal.ZERO);
     }
+
+    private String buildProfileTextForAi() {
+        ProfileAI p;
+        try {
+            p = profileTool.get(); // dùng lại hàm bạn đã có
+        } catch (AppException e) {
+            // nếu chưa login hoặc lỗi gì đó thì fallback
+            return "Chưa có hồ sơ dinh dưỡng của người dùng. " +
+                    "Khi cần tính toán chính xác (BMI/TDEE/kcal), hãy hỏi người dùng cung cấp chiều cao/cân nặng/tuổi/giới tính.";
+        }
+
+        if (p == null) {
+            return "Chưa có hồ sơ dinh dưỡng của người dùng.";
+        }
+
+        StringBuilder sb = new StringBuilder("Hồ sơ dinh dưỡng hiện tại của người dùng:\n");
+        sb.append("• Chiều cao: ").append(nvl(p.getHeightCm(), "?")).append(" cm\n");
+        sb.append("• Cân nặng: ").append(nvl(p.getWeightKg(), "?")).append(" kg\n");
+        sb.append("• Tuổi: ").append(nvl(p.getAge(), "?")).append("\n");
+        sb.append("• Giới tính: ").append(nvl(p.getGender(), "?")).append("\n");
+        sb.append("• Mục tiêu: ").append(nvl(p.getGoal(), "?")).append("\n");
+        sb.append("• Mức độ vận động: ").append(nvl(p.getActivityLevel(), "?")).append("\n");
+
+        if (p.getConditions() != null && !p.getConditions().isEmpty()) {
+            sb.append("• Bệnh nền: ")
+                    .append(String.join(", ", p.getConditions()))
+                    .append("\n");
+        }
+        if (p.getAllergies() != null && !p.getAllergies().isEmpty()) {
+            sb.append("• Dị ứng: ")
+                    .append(String.join(", ", p.getAllergies()))
+                    .append("\n");
+        }
+        if (p.getNutritionRules() != null && !p.getNutritionRules().isEmpty()) {
+            sb.append("• Một số rule dinh dưỡng áp dụng: ")
+                    .append(String.join("; ", p.getNutritionRules()))
+                    .append("\n");
+        }
+
+        return sb.toString();
+    }
+
+    private static String nvl(Object v, String fallback) {
+        return v == null ? fallback : v.toString();
+    }
+
 }
