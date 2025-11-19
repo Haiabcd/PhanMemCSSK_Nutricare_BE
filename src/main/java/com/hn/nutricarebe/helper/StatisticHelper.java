@@ -5,9 +5,10 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Map;
-
 import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.service.impl.StatisticsServiceImpl;
+
+import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 
 public final class StatisticHelper {
     private StatisticHelper() {}
@@ -26,59 +27,42 @@ public final class StatisticHelper {
         return new StatisticsServiceImpl.MonthRange(start, end);
     }
 
-    // === Chính sách cảnh báo mới:
-    // - KHÔNG cảnh báo sugar (đường)
-    // - Sodium chỉ cảnh báo khi DƯ; thiếu sodium thì bỏ qua
+    //Cảnh báo
     public static String compareDay(DayTarget target, DayConsumedTotal consumed) {
         var t = target.getTarget();
         var c = consumed.getTotal();
-
         double dKcal = safe(c.getKcal()) - safe(t.getKcal());
-        double dProt = safe(c.getProteinG()) - safe(t.getProteinG());
-        double dCarb = safe(c.getCarbG()) - safe(t.getCarbG());
-        double dFat = safe(c.getFatG()) - safe(t.getFatG());
-        double dFiber = safe(c.getFiberG()) - safe(t.getFiberG());
-        double dNa = safe(c.getSodiumMg()) - safe(t.getSodiumMg());
-
         StringBuilder sb = new StringBuilder();
-
-        if (!withinKcal(t.getKcal(), dKcal))
-            sb.append(dKcal < 0 ? "Thiếu kcal " + fmt(-dKcal) : "Dư kcal " + fmt(dKcal))
-                    .append("; ");
-        if (!withinG(t.getProteinG(), dProt))
-            sb.append(dProt < 0 ? "Thiếu protein " + fmt(-dProt) : "Dư protein " + fmt(dProt))
-                    .append("; ");
-        if (!withinG(t.getCarbG(), dCarb))
-            sb.append(dCarb < 0 ? "Thiếu carb " + fmt(-dCarb) : "Dư carb " + fmt(dCarb))
-                    .append("; ");
-        if (!withinG(t.getFatG(), dFat))
-            sb.append(dFat < 0 ? "Thiếu fat " + fmt(-dFat) : "Dư fat " + fmt(dFat))
-                    .append("; ");
-        if (!withinG(t.getFiberG(), dFiber))
-            sb.append(dFiber < 0 ? "Thiếu fiber " + fmt(-dFiber) : "Dư fiber " + fmt(dFiber))
-                    .append("; ");
-
-        // Sodium: chỉ cảnh báo khi DƯ và vượt ngưỡng
-        if (dNa > 0 && !withinSodium(t.getSodiumMg(), dNa)) {
-            sb.append("Dư sodium ").append(fmt(dNa)).append("; ");
+        if (!withinKcal(t.getKcal(), dKcal)) {
+            sb.append(dKcal < 0 ? "Thiếu kcal " + fmt(-dKcal) : "Dư kcal " + fmt(dKcal));
         }
-
-        // Sugar: KHÔNG cảnh báo → bỏ hẳn
-
         if (sb.isEmpty()) return null;
         return "Ngày " + target.getDate() + ": " + sb.toString().trim();
     }
 
+    // Trả về NỘI DUNG cảnh báo kcal cho 1 ngày (không kèm "Ngày ...")
+    public static String compareDayBody(DayTarget target, DayConsumedTotal consumed) {
+        var t = target.getTarget();
+        var c = consumed.getTotal();
+        double dKcal = safe(c.getKcal()) - safe(t.getKcal());
+
+        if (!withinKcal(t.getKcal(), dKcal)) {
+            return dKcal < 0
+                    ? "Thiếu kcal " + fmt(-dKcal)
+                    : "Dư kcal " + fmt(dKcal);
+        }
+        return null;
+    }
+
+
+
     public static boolean withinKcal(Number tgt, double d) {
-        return Math.abs(d) <= Math.max(60, safe(tgt) * 0.07);
-    }
-
-    public static boolean withinG(Number tgt, double d) {
-        return Math.abs(d) <= Math.max(5, safe(tgt) * 0.07);
-    }
-
-    public static boolean withinSodium(Number tgt, double d) {
-        return Math.abs(d) <= Math.max(200, safe(tgt) * 0.07);
+        double target = safe(tgt);
+        double actual = target + d;
+        if (target <= 0) {
+            return true;
+        }
+        return isWithinRatio(actual, target, KCAL_MIN_RATIO, KCAL_MAX_RATIO);
     }
 
     public static double safe(Number n) {
@@ -203,6 +187,8 @@ public final class StatisticHelper {
     public static List<String> warningsByWeekCompact(
             List<DayTarget> dayTargets,
             Map<LocalDate, DayConsumedTotal> consumedMap,
+            Map<LocalDate, Long> waterActualMap,
+            Map<LocalDate, Integer> waterTargetMap,
             LocalDate monthStart,
             LocalDate monthEnd,
             int topPerWeek) {
@@ -217,39 +203,48 @@ public final class StatisticHelper {
         for (StatisticsServiceImpl.WeekRange w : weeks) {
             record ScoredWarn(String text, double score) {}
             List<ScoredWarn> scored = new java.util.ArrayList<>();
-            int noLogDays = 0;
+            int noFoodLogDays = 0;
+            int noWaterLogDays = 0;
 
             LocalDate d = w.start();
             while (!d.isAfter(w.end())) {
                 DayTarget t = targetByDate.get(d);
+
+                // --------- ĂN UỐNG (kcal) ----------
                 if (t != null) {
                     DayConsumedTotal c = consumedMap.get(d);
                     if (c == null) {
-                        noLogDays++;
-                        scored.add(new ScoredWarn("Không có log", 0.5));
+                        noFoodLogDays++;
+                        scored.add(new ScoredWarn("Không có log ăn uống", 1.0));
                     } else {
-                        String msg = compareDay(t, c);
-                        if (msg != null) {
+                        String kcalBody = compareDayBody(t, c); // chỉ nội dung kcal
+                        if (kcalBody != null) {
                             var tv = t.getTarget();
                             var cv = c.getTotal();
                             double dKcal = safe(cv.getKcal()) - safe(tv.getKcal());
-                            double dProt = safe(cv.getProteinG()) - safe(tv.getProteinG());
-                            double dCarb = safe(cv.getCarbG()) - safe(tv.getCarbG());
-                            double dFat = safe(cv.getFatG()) - safe(tv.getFatG());
-                            double dFiber = safe(cv.getFiberG()) - safe(tv.getFiberG());
-                            double dNa = safe(cv.getSodiumMg()) - safe(tv.getSodiumMg());
-                            // double dSug = safe(cv.getSugarMg()) - safe(tv.getSugarMg()); // bỏ sugar
-
-                            // Điểm: bỏ sugar; sodium chỉ tính khi DƯ
-                            double score = Math.abs(dKcal) / 100.0
-                                    + Math.abs(dProt) / 5.0
-                                    + Math.abs(dCarb) / 10.0
-                                    + Math.abs(dFat) / 5.0
-                                    + Math.abs(dFiber) / 5.0
-                                    + (dNa > 0 ? Math.abs(dNa) / 300.0 : 0.0);
-
-                            scored.add(new ScoredWarn(msg, score));
+                            double score = Math.abs(dKcal) / 100.0; // chỉ tính điểm theo kcal
+                            scored.add(new ScoredWarn(kcalBody, score));
                         }
+                    }
+                }
+
+
+                // --------- NƯỚC ----------
+                Long actualWater = (waterActualMap != null) ? waterActualMap.get(d) : null;
+                Integer targetWater = (waterTargetMap != null) ? waterTargetMap.get(d) : null;
+
+                long actual = (actualWater == null ? 0L : actualWater);
+                if (actualWater == null) {
+                    noWaterLogDays++;
+                }
+
+                if (targetWater != null && targetWater > 0) {
+                    long deficit = targetWater - actual;
+                    if (deficit > 0) {
+                        String msg = "Ngày " + d + ": Thiếu nước " + deficit
+                                + " ml (uống " + actual + "/" + targetWater + " ml)";
+                        double score = deficit / 250.0; // thiếu càng nhiều, score càng cao
+                        scored.add(new ScoredWarn(msg, score));
                     }
                 }
                 d = d.plusDays(1);
@@ -263,7 +258,8 @@ public final class StatisticHelper {
 
             String period = w.start() + "–" + w.end();
             StringBuilder sb = new StringBuilder("Tuần " + (idx++) + " (" + period + "): ");
-            if (noLogDays > 0) sb.append(noLogDays).append(" ngày không có log; ");
+            if (noFoodLogDays > 0) sb.append(noFoodLogDays).append(" ngày không có log ăn uống; ");
+            if (noWaterLogDays > 0) sb.append(noWaterLogDays).append(" ngày không có log nước; ");
             if (!topMsgs.isEmpty()) sb.append(String.join(" | ", topMsgs));
             String line = sb.toString().trim();
             if (line.endsWith(";")) line = line.substring(0, line.length() - 1);
@@ -271,6 +267,7 @@ public final class StatisticHelper {
         }
         return lines;
     }
+
 
     public static String shortenWarn(String full) {
         int idx = full.indexOf(':');

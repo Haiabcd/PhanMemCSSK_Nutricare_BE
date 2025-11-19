@@ -5,12 +5,12 @@ import java.math.RoundingMode;
 import java.time.Year;
 import java.util.*;
 import java.util.stream.Collectors;
-
 import com.hn.nutricarebe.dto.TagDirectives;
 import com.hn.nutricarebe.dto.request.MealPlanCreationRequest;
 import com.hn.nutricarebe.dto.request.ProfileCreationRequest;
 import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.*;
+
 
 public final class MealPlanHelper {
     private MealPlanHelper() {}
@@ -28,6 +28,25 @@ public final class MealPlanHelper {
             MealSlot.LUNCH, 3,
             MealSlot.DINNER, 3,
             MealSlot.SNACK, 1)));
+
+    // Biên độ chấp nhận tính theo tỷ lệ actual/target
+    public static final double KCAL_MIN_RATIO   = 0.95;
+    public static final double KCAL_MAX_RATIO   = 1.05;
+    public static final double CARB_MIN_RATIO   = 0.85;
+    public static final double CARB_MAX_RATIO   = 1.15;
+    public static final double FIBER_MIN_RATIO  = 0.90;
+    public static final double FIBER_MAX_RATIO  = 1.50;
+    public static final double PROT_MIN_RATIO   = 0.90;
+    public static final double PROT_MAX_RATIO   = 1.10;
+    public static final double FAT_MIN_RATIO    = 0.80;
+    public static final double FAT_MAX_RATIO    = 1.10;
+
+
+    public static final double EPS_KCAL = 30.0;
+    public static final double EPS_PROT = 3.0;
+    public static final double EPS_CARB = 6.0;
+    public static final double EPS_FAT = 3.0;
+    public static final double EPS_FIBER = 3.0;
 
     public static BigDecimal bd(double value, int scale) {
         return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP);
@@ -190,37 +209,36 @@ public final class MealPlanHelper {
     public static boolean passesItemRules(List<NutritionRule> rules, Nutrition snap, MealPlanCreationRequest request) {
         if (rules == null || rules.isEmpty()) return true;
         for (NutritionRule r : rules) {
-            // Bỏ qua nếu rule không phải là từng món
             if (r.getScope() != RuleScope.ITEM) continue;
             if (!isApplicableToDemographics(r, request)) continue;
-
             if (r.getTargetType() == TargetType.NUTRIENT) {
                 BigDecimal value = nutrientValueOf(r.getTargetCode(), snap);
-                if (value == null) break;
-
+                if (value == null) continue;
                 BigDecimal min = r.getThresholdMin();
                 BigDecimal max = r.getThresholdMax();
-
                 if (Boolean.TRUE.equals(r.getPerKg())) {
                     int weight = Math.max(1, request.getProfile().getWeightKg());
                     if (min != null) min = min.multiply(BigDecimal.valueOf(weight));
                     if (max != null) max = max.multiply(BigDecimal.valueOf(weight));
                 }
-
-                return switch (r.getComparator()) {
-                    case LT -> (max != null) && value.compareTo(max) < 0;
-                    case LTE -> (max != null) && value.compareTo(max) <= 0;
-                    case GT -> (min != null) && value.compareTo(min) > 0;
-                    case GTE -> (min != null) && value.compareTo(min) >= 0;
-                    case EQ -> (min != null) && value.compareTo(min) == 0;
+                boolean ok = switch (r.getComparator()) {
+                    case LT   -> (max != null) && value.compareTo(max) < 0;
+                    case LTE  -> (max != null) && value.compareTo(max) <= 0;
+                    case GT   -> (min != null) && value.compareTo(min) > 0;
+                    case GTE  -> (min != null) && value.compareTo(min) >= 0;
+                    case EQ   -> (min != null) && value.compareTo(min) == 0;
                     case BETWEEN -> (min != null && max != null)
                             && value.compareTo(min) >= 0
                             && value.compareTo(max) <= 0;
                 };
+                if (!ok) {
+                    return false;
+                }
             }
         }
         return true;
     }
+
     /* ===== KIỂM TRA LẠI MÓN ĐƯỢC CHỌN ===== */
 
     /* ===== CHỌN KHẨU PHẦN ===== */
@@ -452,4 +470,73 @@ public final class MealPlanHelper {
                 .sugarMg(sugar)
                 .build();
     }
+
+
+    public static boolean isWithinRatio(double actual, double target, double minRatio, double maxRatio) {
+        if (target <= 0) {
+            return Math.abs(actual) <= 1e-6;
+        }
+        double ratio = actual / target;
+        return ratio >= minRatio && ratio <= maxRatio;
+    }
+
+    public static boolean isSatisfiedSlot(Nutrition remaining, Nutrition slotTarget) {
+        double tK  = safeDouble(slotTarget.getKcal());
+        double tP  = safeDouble(slotTarget.getProteinG());
+        double tC  = safeDouble(slotTarget.getCarbG());
+        double tF  = safeDouble(slotTarget.getFatG());
+        double tFi = safeDouble(slotTarget.getFiberG());
+
+        double rK  = safeDouble(remaining.getKcal());
+        double rP  = safeDouble(remaining.getProteinG());
+        double rC  = safeDouble(remaining.getCarbG());
+        double rF  = safeDouble(remaining.getFatG());
+        double rFi = safeDouble(remaining.getFiberG());
+
+        // actual = target - remaining
+        double aK  = tK  - rK;
+        double aP  = tP  - rP;
+        double aC  = tC  - rC;
+        double aF  = tF  - rF;
+        double aFi = tFi - rFi;
+
+        // Nếu target rất nhỏ thì fallback về EPS tuyệt đối (tránh ratio điên)
+        boolean kcalOk;
+        if (tK < 80) {
+            kcalOk = Math.abs(rK) <= EPS_KCAL;
+        } else {
+            kcalOk = isWithinRatio(aK, tK, KCAL_MIN_RATIO, KCAL_MAX_RATIO);
+        }
+
+        boolean protOk;
+        if (tP < 5) {
+            protOk = Math.abs(rP) <= EPS_PROT;
+        } else {
+            protOk = isWithinRatio(aP, tP, PROT_MIN_RATIO, PROT_MAX_RATIO);
+        }
+
+        boolean carbOk;
+        if (tC < 10) {
+            carbOk = Math.abs(rC) <= EPS_CARB;
+        } else {
+            carbOk = isWithinRatio(aC, tC, CARB_MIN_RATIO, CARB_MAX_RATIO);
+        }
+
+        boolean fatOk;
+        if (tF < 5) {
+            fatOk = Math.abs(rF) <= EPS_FAT;
+        } else {
+            fatOk = isWithinRatio(aF, tF, FAT_MIN_RATIO, FAT_MAX_RATIO);
+        }
+
+        boolean fiberOk;
+        if (tFi < 5) {
+            fiberOk = Math.abs(rFi) <= EPS_FIBER;
+        } else {
+            fiberOk = isWithinRatio(aFi, tFi, FIBER_MIN_RATIO, FIBER_MAX_RATIO);
+        }
+
+        return kcalOk && protOk && carbOk && fatOk && fiberOk;
+    }
+
 }

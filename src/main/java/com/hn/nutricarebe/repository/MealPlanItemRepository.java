@@ -33,6 +33,7 @@ public interface MealPlanItemRepository extends JpaRepository<MealPlanItem, UUID
     void deleteUnusedItemsByDay(@Param("dayId") UUID dayId);
 
     List<MealPlanItem> findByDay_User_IdAndDay_Date(UUID userId, LocalDate date);
+    List<MealPlanItem> findByDay_Id(UUID dayId);
 
     @Query(
             """

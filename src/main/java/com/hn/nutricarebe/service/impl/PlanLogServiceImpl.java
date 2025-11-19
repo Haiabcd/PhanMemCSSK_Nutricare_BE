@@ -6,6 +6,7 @@ import static com.hn.nutricarebe.helper.PlanLogHelper.resolveActualOrFallback;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -14,6 +15,7 @@ import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.repository.FoodRepository;
 import jakarta.transaction.Transactional;
 
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -34,7 +36,6 @@ import com.hn.nutricarebe.repository.PlanLogIngredientRepository;
 import com.hn.nutricarebe.repository.PlanLogRepository;
 import com.hn.nutricarebe.service.MealPlanDayService;
 import com.hn.nutricarebe.service.PlanLogService;
-
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -54,6 +55,8 @@ public class PlanLogServiceImpl implements PlanLogService {
     MealPlanDayService mealPlanDayService;
     MealPlanItemServiceImpl mealPlanItemService;
     CdnHelper cdnHelper;
+
+    static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     @Override
     @Transactional
@@ -179,7 +182,6 @@ public class PlanLogServiceImpl implements PlanLogService {
 
     }
 
-
     @Override
     public NutritionResponse getNutritionLogByDate(LocalDate date) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
@@ -225,38 +227,7 @@ public class PlanLogServiceImpl implements PlanLogService {
                 planLogIngredientRepository.save(pli);
             }
         }
-
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
-        boolean nowDate = req.getDate().isEqual(today);
-
-        // 3. Tính target & actual kcal cho slot
-        double targetKcal = computeTargetKcalForSlot(userId, req.getDate(), req.getMealSlot());
-        double actualKcal = computeActualKcalForSlot(userId, req.getDate(), req.getMealSlot());
-
-        // 4. So sánh và trả về cảnh báo
-        double diff = actualKcal - targetKcal;
-        KcalWarningResponse.Status status;
-        if (diff > 50) {
-            if (nowDate) {
-                mealPlanDayService.updatePlanForOneDay(req.getDate(), userId);
-            }
-            status = KcalWarningResponse.Status.OVER;
-        } else if (diff < -50) {
-            if (nowDate) {
-                mealPlanDayService.updatePlanForOneDay(req.getDate(), userId);
-            }
-            status = KcalWarningResponse.Status.UNDER;
-        } else {
-            status = KcalWarningResponse.Status.OK;
-        }
-
-        return KcalWarningResponse.builder()
-                .mealSlot(req.getMealSlot().name())
-                .targetKcal(targetKcal)
-                .actualKcal(actualKcal)
-                .diff(diff)
-                .status(status)
-                .build();
+        return buildKcalWarning(userId, req.getDate(), req.getMealSlot());
     }
 
     @Override
@@ -292,38 +263,7 @@ public class PlanLogServiceImpl implements PlanLogService {
                 planLogIngredientRepository.save(pli);
             }
         }
-
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
-        boolean nowDate = req.getDate().isEqual(today);
-
-        // 2. Tính target & actual kcal cho slot
-        double targetKcal = computeTargetKcalForSlot(userId, req.getDate(), req.getMealSlot());
-        double actualKcal = computeActualKcalForSlot(userId, req.getDate(), req.getMealSlot());
-
-        // 3. So sánh và trả về cảnh báo
-        double diff = actualKcal - targetKcal;
-        KcalWarningResponse.Status status;
-        if (diff > 50) {
-            if (nowDate) {
-                mealPlanDayService.updatePlanForOneDay(req.getDate(), userId);
-            }
-            status = KcalWarningResponse.Status.OVER;
-        } else if (diff < -50) {
-            if (nowDate) {
-                mealPlanDayService.updatePlanForOneDay(req.getDate(), userId);
-            }
-            status = KcalWarningResponse.Status.UNDER;
-        } else {
-            status = KcalWarningResponse.Status.OK;
-        }
-
-        return KcalWarningResponse.builder()
-                .mealSlot(req.getMealSlot().name())
-                .targetKcal(targetKcal)
-                .actualKcal(actualKcal)
-                .diff(diff)
-                .status(status)
-                .build();
+        return buildKcalWarning(userId, req.getDate(), req.getMealSlot());
     }
 
     @Transactional
@@ -348,17 +288,14 @@ public class PlanLogServiceImpl implements PlanLogService {
         logOld.setNameFood(req.getNameFood());
         logOld.setPortion(req.getConsumedServings());
         logOld.setActualNutrition(nutritionMapper.toNutrition(req.getTotalNutrition()));
-
         // Lazy-init collection
-        logOld.getIngredients().size();
-
+        Hibernate.initialize(logOld.getIngredients());
         // Xóa các ingredient cũ
         for (PlanLogIngredient child : new HashSet<>(logOld.getIngredients())) {
             child.setPlanLog(null);
         }
         logOld.getIngredients().clear();
         logRepository.flush();
-
         // Thêm ingredient mới
         if (req.getIngredients() != null) {
             for (PlanLogManualRequest.IngredientEntryDTO dto : req.getIngredients()) {
@@ -371,37 +308,7 @@ public class PlanLogServiceImpl implements PlanLogService {
             }
         }
         logRepository.saveAndFlush(logOld);
-
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
-        boolean nowDate = logOld.getDate().isEqual(today);
-
-        // Dùng helper để tính target/actual cho slot mới
-        double targetKcal = computeTargetKcalForSlot(userId, logOld.getDate(), req.getMealSlot());
-        double actualKcal = computeActualKcalForSlot(userId, logOld.getDate(), req.getMealSlot());
-
-        double diff = actualKcal - targetKcal;
-        KcalWarningResponse.Status status;
-        if (diff > 50) {
-            if (nowDate) {
-                mealPlanDayService.updatePlanForOneDay(logOld.getDate(), userId);
-            }
-            status = KcalWarningResponse.Status.OVER;
-        } else if (diff < -50) {
-            if (nowDate) {
-                mealPlanDayService.updatePlanForOneDay(logOld.getDate(), userId);
-            }
-            status = KcalWarningResponse.Status.UNDER;
-        } else {
-            status = KcalWarningResponse.Status.OK;
-        }
-
-        return KcalWarningResponse.builder()
-                .mealSlot(req.getMealSlot().name())
-                .targetKcal(targetKcal)
-                .actualKcal(actualKcal)
-                .diff(diff)
-                .status(status)
-                .build();
+        return buildKcalWarning(userId, logOld.getDate(), req.getMealSlot());
     }
 
 
@@ -496,20 +403,15 @@ public class PlanLogServiceImpl implements PlanLogService {
     @Override
     public Map<String, Long> getPlanLogCountByMealSlot() {
         List<Object[]> rows = logRepository.countByMealSlotAndSource(LogSource.PLAN);
-
         Map<String, Long> result = new LinkedHashMap<>();
-        // Khởi tạo mặc định 0 cho các bữa
         for (MealSlot slot : MealSlot.values()) {
             result.put(slot.name(), 0L);
         }
-
-        // Ghi đè giá trị có trong DB
         for (Object[] row : rows) {
             MealSlot slot = (MealSlot) row[0];
             Long count = (Long) row[1];
             result.put(slot.name(), count);
         }
-
         return result;
     }
 
@@ -566,6 +468,40 @@ public class PlanLogServiceImpl implements PlanLogService {
 
         NutritionResponse nr = aggregateActual(logsThisSlot);
         return nr.getKcal() != null ? nr.getKcal().doubleValue() : 0.0;
+    }
+
+
+    private KcalWarningResponse buildKcalWarning(UUID userId, LocalDate date, MealSlot slot) {
+        LocalDate today = LocalDate.now(VN_ZONE);
+        boolean nowDate = date.isEqual(today);
+
+        double targetKcal = computeTargetKcalForSlot(userId, date, slot);
+        double actualKcal = computeActualKcalForSlot(userId, date, slot);
+
+        double diff = actualKcal - targetKcal;
+        KcalWarningResponse.Status status;
+
+        // Dùng đúng tolerance KCAL_MIN_RATIO / KCAL_MAX_RATIO từ MealPlanHelper
+        if (isWithinRatio(actualKcal, targetKcal, KCAL_MIN_RATIO, KCAL_MAX_RATIO)) {
+            status = KcalWarningResponse.Status.OK;
+        } else if (actualKcal > targetKcal) {
+            if (nowDate) {
+                mealPlanDayService.updatePlanForOneDay(date, userId);
+            }
+            status = KcalWarningResponse.Status.OVER;
+        } else {
+            if (nowDate) {
+                mealPlanDayService.updatePlanForOneDay(date, userId);
+            }
+            status = KcalWarningResponse.Status.UNDER;
+        }
+        return KcalWarningResponse.builder()
+                .mealSlot(slot.name())
+                .targetKcal(targetKcal)
+                .actualKcal(actualKcal)
+                .diff(diff)
+                .status(status)
+                .build();
     }
 
 }
