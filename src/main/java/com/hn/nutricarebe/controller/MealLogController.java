@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.service.WeightCheckService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -11,10 +12,6 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
-import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
-import com.hn.nutricarebe.dto.request.PlanLogScanRequest;
-import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
-import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.ApiResponse;
 import com.hn.nutricarebe.dto.response.KcalWarningResponse;
 import com.hn.nutricarebe.dto.response.LogResponse;
@@ -39,6 +36,14 @@ public class MealLogController {
         logService.savePlanLog(req);
         return ApiResponse.<Void>builder()
                 .message("Ghi log theo kế hoạch thành công")
+                .build();
+    }
+
+    @PostMapping("/suggestion")
+    public ApiResponse<Void> saveSuggestion(@RequestBody @Valid SaveSuggestion req) {
+        logService.saveSuggestion(req);
+        return ApiResponse.<Void>builder()
+                .message("Ghi log theo đề xuất thành công")
                 .build();
     }
 

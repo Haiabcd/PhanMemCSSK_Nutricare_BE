@@ -7,10 +7,7 @@ import java.util.UUID;
 
 import com.hn.nutricarebe.dto.overview.FoodLogStatDto;
 import com.hn.nutricarebe.dto.overview.TopUserDto;
-import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
-import com.hn.nutricarebe.dto.request.PlanLogScanRequest;
-import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
-import com.hn.nutricarebe.dto.request.SaveLogRequest;
+import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.enums.LogSource;
 import com.hn.nutricarebe.enums.MealSlot;
@@ -47,4 +44,6 @@ public interface PlanLogService {
     List<FoodLogStatDto> getTop10FoodsFromPlan();
 
     List<TopUserDto> getTopUsersByLogCount();
+
+    void saveSuggestion(SaveSuggestion req);
 }

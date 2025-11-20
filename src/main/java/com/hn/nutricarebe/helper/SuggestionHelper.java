@@ -47,4 +47,23 @@ public final class SuggestionHelper {
         double df = Math.abs(d(a.getFatG())     - d(b.getFatG()));
         return dk + dp*0.4 + dc*0.3 + df*0.3;
     }
+
+    public static String buildImageUrl(String key, String cdnBaseUrl) {
+        if (key == null || key.isBlank()) return null;
+        if (cdnBaseUrl == null || cdnBaseUrl.isBlank()) return key;
+
+        String base = cdnBaseUrl;
+        // đảm bảo không bị trùng/dụng dấu '/'
+        boolean baseEndsWithSlash = base.endsWith("/");
+        boolean keyStartsWithSlash = key.startsWith("/");
+
+        if (baseEndsWithSlash && keyStartsWithSlash) {
+            return base + key.substring(1);
+        } else if (!baseEndsWithSlash && !keyStartsWithSlash) {
+            return base + "/" + key;
+        } else {
+            return base + key;
+        }
+    }
+
 }

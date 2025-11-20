@@ -58,10 +58,10 @@ jwt:
   valid-duration: 900
   refreshable-duration: 2592000
 supabase:
-  host: "https://ewyeishkixdcfhnzxprj.supabase.co"
+  host: ${SUPABASE_HOST}
   anon-key: ${SUPABASE_ANON_KEY}
 oauth:
-  callback-url: "http://13.229.127.84:8080/auths/google/callback"
+  callback-url: ${CALLBACK_URL}
 logging:
   level:
     ROOT: INFO

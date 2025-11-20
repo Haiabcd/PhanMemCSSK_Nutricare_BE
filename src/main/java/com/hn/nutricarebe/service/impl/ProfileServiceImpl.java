@@ -104,7 +104,6 @@ public class ProfileServiceImpl implements ProfileService {
                 expectedTargetDurationWeeks = profileRequest.getTargetDurationWeeks();
             }
         }
-
         // 3) Kiểm tra các thay đổi "có ý nghĩa" đối với meal plan (bỏ qua name)
         boolean profileAffectsPlanChanged = !Objects.equals(profile.getHeightCm(), profileRequest.getHeightCm())
                 || !Objects.equals(profile.getWeightKg(), profileRequest.getWeightKg())
@@ -136,14 +135,23 @@ public class ProfileServiceImpl implements ProfileService {
             weightLogRepository.save(weightLog);
         }
 
-        if(profileRequest.getGoal() == GoalType.LOSE) {
-            int delta = Math.abs(profile.getTargetWeightDeltaKg());
-            int currentWeight = profileRequest.getWeightKg();
-            profile.setGoalReached(currentWeight <= profile.getSnapWeightKg() - delta);
-        } else if(profileRequest.getGoal() == GoalType.GAIN) {
-            int delta = Math.abs(profile.getTargetWeightDeltaKg());
-            int currentWeight = profileRequest.getWeightKg();
-            profile.setGoalReached(currentWeight >= profile.getSnapWeightKg() + delta);
+        boolean checkArchive =
+                !Objects.equals(profile.getWeightKg(), profileRequest.getWeightKg())
+                        || !Objects.equals(profile.getGoal(), profileRequest.getGoal())
+                        || !Objects.equals(profile.getTargetWeightDeltaKg(), expectedTargetDeltaKg)
+                        || !Objects.equals(profile.getTargetDurationWeeks(), expectedTargetDurationWeeks);
+
+        GoalType requestGoal = profileRequest.getGoal();
+        int currentWeight = profileRequest.getWeightKg();
+        int delta = Math.abs(profile.getTargetWeightDeltaKg());
+        if(checkArchive){
+            if(requestGoal == GoalType.LOSE) {
+                profile.setGoalReached(currentWeight <= profile.getSnapWeightKg() - delta);
+            } else if(requestGoal == GoalType.GAIN) {
+                profile.setGoalReached(currentWeight >= profile.getSnapWeightKg() + delta);
+            }else{
+                profile.setGoalReached(true);
+            }
         }else{
             profile.setGoalReached(true);
         }

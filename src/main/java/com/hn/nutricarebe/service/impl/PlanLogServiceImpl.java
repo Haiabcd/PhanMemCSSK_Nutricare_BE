@@ -1,8 +1,9 @@
 package com.hn.nutricarebe.service.impl;
 
-import static com.hn.nutricarebe.helper.MealPlanHelper.addNut;
+import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 import static com.hn.nutricarebe.helper.PlanLogHelper.aggregateActual;
 import static com.hn.nutricarebe.helper.PlanLogHelper.resolveActualOrFallback;
+import static com.hn.nutricarebe.service.impl.MealPlanItemServiceImpl.VN_ZONE;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,6 +11,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.hn.nutricarebe.dto.request.*;
+import com.hn.nutricarebe.repository.FoodRepository;
 import jakarta.transaction.Transactional;
 
 import org.springframework.data.domain.PageRequest;
@@ -18,10 +21,6 @@ import org.springframework.stereotype.Service;
 
 import com.hn.nutricarebe.dto.overview.FoodLogStatDto;
 import com.hn.nutricarebe.dto.overview.TopUserDto;
-import com.hn.nutricarebe.dto.request.PlanLogManualRequest;
-import com.hn.nutricarebe.dto.request.PlanLogScanRequest;
-import com.hn.nutricarebe.dto.request.PlanLogUpdateRequest;
-import com.hn.nutricarebe.dto.request.SaveLogRequest;
 import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.entity.*;
 import com.hn.nutricarebe.enums.LogSource;
@@ -48,11 +47,13 @@ import lombok.extern.slf4j.Slf4j;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class PlanLogServiceImpl implements PlanLogService {
     MealPlanItemRepository mealPlanItemRepository;
+    FoodRepository foodRepository;
     PlanLogRepository logRepository;
     PlanLogIngredientRepository planLogIngredientRepository;
     NutritionMapper nutritionMapper;
     PlanLogMapper logMapper;
     MealPlanDayService mealPlanDayService;
+    MealPlanItemServiceImpl mealPlanItemService;
     CdnHelper cdnHelper;
 
     @Override
@@ -128,6 +129,57 @@ public class PlanLogServiceImpl implements PlanLogService {
             mealPlanDayService.updatePlanForOneDay(p.getDate(), userId);
         }
     }
+
+    @Transactional
+    @Override
+    public void saveSuggestion(SaveSuggestion req){
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        UUID userId = UUID.fromString(auth.getName());
+
+        MealPlanItem itemOld = mealPlanItemRepository
+                .findById(req.getItemId())
+                .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
+
+        // (khuyến nghị) check quyền sở hữu giống smartSwapMealItem
+        if (itemOld.getDay() == null
+                || itemOld.getDay().getUser() == null
+                || !userId.equals(itemOld.getDay().getUser().getId())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        Food newFood = foodRepository.findById(req.getNewFoodId())
+                .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
+
+        // Cập nhật item theo món được chọn
+        itemOld.setFood(newFood);
+        itemOld.setPortion(req.getPortion());
+        Nutrition snap = scaleNutrition(newFood.getNutrition(), safeDouble(req.getPortion()));
+        itemOld.setNutrition(snap);
+        itemOld.setUsed(true);
+
+        // Ghi log
+        PlanLog log = PlanLog.builder()
+                .user(User.builder().id(userId).build())
+                .date(itemOld.getDay().getDate())
+                .mealSlot(itemOld.getMealSlot())
+                .food(newFood)
+                .servingSizeGram(BigDecimal.ZERO)
+                .source(LogSource.PLAN)
+                .nameFood(newFood.getName() != null ? newFood.getName() : null)
+                .planItem(itemOld)
+                .portion(req.getPortion())
+                .actualNutrition(snap)
+                .build();
+
+        mealPlanItemRepository.save(itemOld);
+        logRepository.save(log);
+        mealPlanItemService.updateCache(userId, itemOld);
+
+    }
+
 
     @Override
     public NutritionResponse getNutritionLogByDate(LocalDate date) {

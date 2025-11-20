@@ -180,7 +180,7 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
         order by abs(f.nutrition.kcal - :pivotKcal) asc
     """)
     List<Food> findCandidatesBySlotAndKcal(
-            @Param("slot") String slot,
+            @Param("slot") MealSlot slot,
             @Param("minKcal") int minKcal,
             @Param("maxKcal") int maxKcal,
             @Param("pivotKcal") int pivotKcal,

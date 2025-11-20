@@ -1,11 +1,10 @@
 package com.hn.nutricarebe.dto.request;
 
-import java.util.UUID;
-
-import jakarta.validation.constraints.NotNull;
-
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+
+import java.math.BigDecimal;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -13,8 +12,8 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class SaveLogRequest {
-    @NotNull(message = "Mã kế hoạch bữa ăn không được để trống")
-    UUID mealPlanItemId;
-
+public class SaveSuggestion {
+    UUID itemId;
+    UUID newFoodId;
+    BigDecimal portion;
 }

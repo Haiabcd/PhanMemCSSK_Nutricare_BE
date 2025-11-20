@@ -1,9 +1,13 @@
 package com.hn.nutricarebe.service.impl;
 
 import static com.hn.nutricarebe.helper.MealPlanHelper.*;
+import static com.hn.nutricarebe.helper.SuggestionHelper.buildImageUrl;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.hn.nutricarebe.dto.TagDirectives;
@@ -13,6 +17,7 @@ import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.helper.SuggestionHelper;
 import com.hn.nutricarebe.service.MealPlanDayService;
 import com.hn.nutricarebe.service.NutritionRuleService;
+import lombok.experimental.NonFinal;
 import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -27,6 +32,7 @@ import com.hn.nutricarebe.service.MealPlanItemService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +44,15 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
     PlanLogRepository planLogRepository;
     MealPlanDayService mealPlanDayService;
     NutritionRuleService nutritionRuleService;
+
+    @NonFinal
+    @Value("${cdn.base-url}")
+    String cdnBaseUrl;
+
+    @NonFinal
+    Map<String, SuggestCacheEntry> suggestCache = new ConcurrentHashMap<>();
+
+    static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     @Override
     @Transactional
@@ -112,85 +127,148 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
 
 
     @Override
+    @Transactional
     public List<SwapSuggestion> suggest() {
-        SwapContext ctx =getSwapContext();
+        UUID userId = getCurrentUserId();
+        SwapContext ctx = getSwapContext(userId);
+        LocalDate today = LocalDate.now(VN_ZONE);
+        String cacheKey = buildContextKey(userId, ctx);
+        String signature = buildItemsSignature(ctx);
+        SuggestCacheEntry cached = suggestCache.get(cacheKey);
+        if (cached != null) {
+            if (cached.isExpired(today)) {
+                suggestCache.remove(cacheKey);
+            } else if (Objects.equals(cached.signature, signature)) {
+                return cached.suggestions;
+            }
+        }
         List<SwapSuggestion> out = new ArrayList<>();
         Set<UUID> recent = Optional.ofNullable(ctx.getRecentFoodIds()).orElse(Set.of());
         Set<String> avoid = Optional.ofNullable(ctx.getAvoidTags()).orElse(Set.of());
-    for (var item : ctx.getItems()) {
-        NutritionResponse target = item.getNutrition();
-        int targetKcal = (int)Math.round(SuggestionHelper.d(target.getKcal()));
-        // cửa sổ kcal 0.5x–2.0x
-        int minK = Math.max(20, (int)Math.round(targetKcal * 0.5));
-        int maxK = Math.max(minK + 10, (int)Math.round(targetKcal * 2.0));
-        var foods = foodRepository.findCandidatesBySlotAndKcal(
-                item.getSlot(), minK, maxK, targetKcal, PageRequest.of(0, 300)
-        );
-        // lọc cứng
-        var filtered = foods.stream()
-                .filter(f -> !f.getId().equals(item.getCurrentFoodId()))
-                .filter(f -> !recent.contains(f.getId()))
-                .filter(f -> f.getTags() == null || f.getTags().stream()
-                        .map(Tag::getNameCode).noneMatch(avoid::contains))
-                .toList();
-        record Cand(Food f, double portion, double distance) {}
-        List<Cand> scored = new ArrayList<>();
 
-        for (var f : filtered) {
-            Nutrition base = f.getNutrition();
-            double bestDist = Double.POSITIVE_INFINITY;
-            double bestPortion = 1.0;
-            for (double p : SuggestionHelper.PORTIONS) {
-                var scaled = SuggestionHelper.scale(base, p);
-                double dist = SuggestionHelper.dist(scaled, target);
-                if (dist < bestDist) { bestDist = dist; bestPortion = p; }
+        for (var item : ctx.getItems()) {
+            NutritionResponse target = item.getNutrition();
+            int targetKcal = (int) Math.round(SuggestionHelper.d(target.getKcal()));
+            int minK = Math.max(20, (int) Math.round(targetKcal * 0.5));
+            int maxK = Math.max(minK + 10, (int) Math.round(targetKcal * 2.0));
+            String slotStr = item.getSlot();
+            MealSlot slot = MealSlot.valueOf(slotStr);
+
+            var foods = foodRepository.findCandidatesBySlotAndKcal(
+                    slot, minK, maxK, targetKcal, PageRequest.of(0, 300)
+            );
+
+            var filtered = foods.stream()
+                    .filter(f -> !f.getId().equals(item.getCurrentFoodId()))
+                    .filter(f -> !recent.contains(f.getId()))
+                    .filter(f -> f.getTags() == null || f.getTags().stream()
+                            .map(Tag::getNameCode).noneMatch(avoid::contains))
+                    .toList();
+
+            record Cand(Food f, double portion, double distance) {}
+            List<Cand> scored = new ArrayList<>();
+
+            for (var f : filtered) {
+                Nutrition base = f.getNutrition();
+                double bestDist = Double.POSITIVE_INFINITY;
+                double bestPortion = 1.0;
+
+                for (double p : SuggestionHelper.PORTIONS) {
+                    var scaled = SuggestionHelper.scale(base, p);
+                    double dist = SuggestionHelper.dist(scaled, target);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestPortion = p;
+                    }
+                }
+
+                if (SuggestionHelper.isGoodEnough(bestDist, target)) {
+                    scored.add(new Cand(f, bestPortion, bestDist));
+                }
             }
-            if (SuggestionHelper.isGoodEnough(bestDist, target)) {
-                scored.add(new Cand(f, bestPortion, bestDist));
+
+            var top = scored.stream()
+                    .sorted(Comparator.comparingDouble(c -> c.distance))
+                    .limit(SuggestionHelper.TOP_K)
+                    .toList();
+
+            List<SwapCandidate> candidates = top.stream().map(c -> {
+                var scaled = SuggestionHelper.scale(c.f.getNutrition(), c.portion);
+
+                double kcalRel = Math.abs(
+                        SuggestionHelper.d(scaled.getKcal()) - SuggestionHelper.d(target.getKcal())
+                ) / Math.max(1.0, SuggestionHelper.d(target.getKcal()));
+
+                double protRel = Math.abs(
+                        SuggestionHelper.d(scaled.getProteinG()) - SuggestionHelper.d(target.getProteinG())
+                ) / Math.max(1.0, SuggestionHelper.d(target.getProteinG()));
+
+                int kcalPct = (int) Math.round(kcalRel * 100);
+                int protPct = (int) Math.round(protRel * 100);
+
+                String reason = String.format(
+                        "Món thay thế giữ gần đúng lượng calo và protein trong kế hoạch, chỉ chênh khoảng %d%% kcal và %d%% protein so với món gốc.",
+                        kcalPct, protPct
+                );
+
+                return SwapCandidate.builder()
+                        .foodId(c.f.getId())
+                        .foodName(c.f.getName())
+                        .portion(BigDecimal.valueOf(c.portion))
+                        .imageUrl(buildImageUrl(c.f.getImageKey(), cdnBaseUrl))
+                        .reason(reason)
+                        .build();
+            }).toList();
+
+            out.add(SwapSuggestion.builder()
+                    .itemId(item.getItemId())
+                    .slot(item.getSlot())
+                    .originalFoodId(item.getCurrentFoodId())
+                    .originalFoodName(item.getCurrentFoodName())
+                    .originalPortion(item.getPortion())
+                    .candidates(candidates)
+                    .build());
+        }
+        SuggestCacheEntry entry = new SuggestCacheEntry(signature, out, today);
+        suggestCache.put(cacheKey, entry);
+
+        return out;
+    }
+
+
+    @Override
+    public void updateCache(UUID userId, MealPlanItem itemOld) {
+        MealPlanDay day = itemOld.getDay();
+        if (day != null) {
+            String cacheKey = userId + "|" + day.getId() + "|" + day.getDate();
+            SuggestCacheEntry cacheEntry = suggestCache.get(cacheKey);
+            if (cacheEntry != null && !cacheEntry.isExpired(LocalDate.now(VN_ZONE))) {
+                UUID itemId = itemOld.getId();
+                // 1. Xoá tất cả SwapSuggestion của itemId này khỏi danh sách
+                List<SwapSuggestion> newSuggestions = cacheEntry.suggestions.stream()
+                        .filter(s -> !Objects.equals(s.getItemId(), itemId))
+                        .toList();
+                // 2. Cập nhật lại signature: bỏ segment có prefix "itemId:"
+                String oldSig = cacheEntry.signature;
+                String itemPrefix = itemId.toString() + ":";
+
+                String newSig = Arrays.stream(oldSig.split("\\|"))
+                        .filter(seg -> !seg.startsWith(itemPrefix))
+                        .collect(Collectors.joining("|"));
+                // 3. Nếu không còn suggestion nào nữa -> xoá luôn cache entry
+                if (newSuggestions.isEmpty() || newSig.isEmpty()) {
+                    suggestCache.remove(cacheKey);
+                } else {
+                    suggestCache.put(cacheKey,
+                            new SuggestCacheEntry(newSig, newSuggestions, cacheEntry.createdDate));
+                }
             }
         }
-
-        var top = scored.stream()
-                .sorted(Comparator.comparingDouble(c -> c.distance))
-                .limit(SuggestionHelper.TOP_K)
-                .toList();
-
-        List<SwapCandidate> candidates = top.stream().map(c -> {
-            double kcalRel = Math.abs(
-                    SuggestionHelper.d(SuggestionHelper.scale(c.f.getNutrition(), c.portion).getKcal()) - SuggestionHelper.d(target.getKcal())
-            ) / Math.max(1.0, SuggestionHelper.d(target.getKcal()));
-            double protRel = Math.abs(
-                    SuggestionHelper.d(SuggestionHelper.scale(c.f.getNutrition(), c.portion).getProteinG()) - SuggestionHelper.d(target.getProteinG())
-            ) / Math.max(1.0, SuggestionHelper.d(target.getProteinG()));
-
-            return SwapCandidate.builder()
-                    .foodId(c.f.getId())
-                    .foodName(c.f.getName())
-                    .portion(BigDecimal.valueOf(c.portion))
-                    .reason(String.format("Tương đương kcal/protein (lệch ~%d%%/~%d%%).",
-                            Math.round(kcalRel*100), Math.round(protRel*100)))
-                    .build();
-        }).toList();
-
-        out.add(SwapSuggestion.builder()
-                .itemId(item.getItemId())
-                .slot(item.getSlot())
-                .originalFoodId(item.getCurrentFoodId())
-                .originalFoodName(item.getCurrentFoodName())
-                .originalPortion(item.getPortion())
-                .candidates(candidates)
-                .build());
     }
-    return out;
-}
-
 
     /* ==================== Helpers cho smartSwap ==================== */
-    public SwapContext getSwapContext() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) throw new AppException(ErrorCode.UNAUTHORIZED);
-        UUID userId = UUID.fromString(auth.getName());
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+    private SwapContext getSwapContext(UUID userId) {
+        LocalDate today = LocalDate.now(VN_ZONE);
         MealPlanDay day = mealPlanDayRepository
                 .findByUser_IdAndDate(userId, today)
                 .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
@@ -217,7 +295,9 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         TagDirectives tagDir = MealPlanHelper.buildTagDirectives(
                 rules, com.hn.nutricarebe.dto.request.MealPlanCreationRequest.builder().userId(userId).build());
         Set<String> avoidTags = tagDir.getAvoid();
-        List<MealPlanItemLite> liteItems = items.stream().map(i -> {
+        List<MealPlanItemLite> liteItems = items.stream()
+                .filter(i -> !i.isUsed())
+                .map(i -> {
             FoodResponse f = i.getFood();
             return MealPlanItemLite.builder()
                     .itemId(i.getId())
@@ -237,6 +317,8 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
                 .recentFoodIds(recent)
                 .build();
     }
+
+
 
     // So sánh "y chang" tập tags (không hơn không kém)
     private static boolean tagsEqual(Set<Tag> a, Set<Tag> b) {
@@ -298,5 +380,45 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
             this.portion = portion;
             this.score = score;
         }
+    }
+
+
+
+    private static class SuggestCacheEntry {
+        final String signature;
+        final List<SwapSuggestion> suggestions;
+        final LocalDate createdDate; // chỉ sống trong ngày
+
+        SuggestCacheEntry(String signature, List<SwapSuggestion> suggestions, LocalDate createdDate) {
+            this.signature = signature;
+            this.suggestions = suggestions;
+            this.createdDate = createdDate;
+        }
+        boolean isExpired(LocalDate today) {
+            return createdDate.isBefore(today);
+        }
+    }
+
+    private UUID getCurrentUserId() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        return UUID.fromString(auth.getName());
+    }
+
+    // Key theo user + day (một user có thể có nhiều day trong tương lai)
+    private String buildContextKey(UUID userId, SwapContext ctx) {
+        return userId + "|" + ctx.getDayId() + "|" + ctx.getDate();
+    }
+
+    // Signature mô tả danh sách item hiện tại
+    private String buildItemsSignature(SwapContext ctx) {
+        return ctx.getItems().stream()
+                .sorted(Comparator.comparing(MealPlanItemLite::getItemId))
+                .map(i -> i.getItemId()
+                        + ":" + i.getCurrentFoodId()
+                        + ":" + i.getPortion())
+                .collect(Collectors.joining("|"));
     }
 }
