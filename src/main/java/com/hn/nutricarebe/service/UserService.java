@@ -15,7 +15,7 @@ public interface UserService {
 
     User getUserById(UUID id);
 
-    UserCreationResponse saveGG(User user);
+    void saveGG(User user);
 
     InfoResponse getUserByToken();
 

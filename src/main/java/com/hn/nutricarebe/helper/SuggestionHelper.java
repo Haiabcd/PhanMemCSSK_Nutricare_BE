@@ -9,6 +9,8 @@ import com.hn.nutricarebe.entity.Nutrition;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+import static com.hn.nutricarebe.helper.MealPlanHelper.safeDouble;
+
 
 public final class SuggestionHelper {
     private SuggestionHelper() {}
@@ -25,6 +27,16 @@ public final class SuggestionHelper {
     public static boolean isGoodEnough(double score, NutritionResponse target) {
         double kcal = Math.max(1.0, d(target.getKcal()));
         return score < (0.05 * kcal + 20.0); // cùng logic smartSwap cũ
+    }
+
+    public static boolean isGoodEnoughStrict(double score, Nutrition target) {
+        double kcal = Math.max(1.0, safeDouble(target.getKcal()));
+
+        // Ngưỡng động theo kcal nhưng mềm hơn: 0.02 * kcal + 10, tối đa 20
+        double dynamicThreshold = 0.02 * kcal + 10.0;
+        double threshold = Math.min(dynamicThreshold, 20.0);
+
+        return score <= threshold;
     }
 
     public static Nutrition scale(Nutrition base, double portion) {
@@ -51,19 +63,16 @@ public final class SuggestionHelper {
     public static String buildImageUrl(String key, String cdnBaseUrl) {
         if (key == null || key.isBlank()) return null;
         if (cdnBaseUrl == null || cdnBaseUrl.isBlank()) return key;
-
-        String base = cdnBaseUrl;
-        // đảm bảo không bị trùng/dụng dấu '/'
-        boolean baseEndsWithSlash = base.endsWith("/");
+        boolean baseEndsWithSlash = cdnBaseUrl.endsWith("/");
         boolean keyStartsWithSlash = key.startsWith("/");
-
         if (baseEndsWithSlash && keyStartsWithSlash) {
-            return base + key.substring(1);
+            return cdnBaseUrl + key.substring(1);
         } else if (!baseEndsWithSlash && !keyStartsWithSlash) {
-            return base + "/" + key;
+            return cdnBaseUrl + "/" + key;
         } else {
-            return base + key;
+            return cdnBaseUrl + key;
         }
     }
+
 
 }

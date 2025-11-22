@@ -38,19 +38,20 @@ public class UserConditionServiceImpl implements UserConditionService {
     }
 
     @Override
-    public List<UserConditionResponse> saveUserCondition(UserConditionCreationRequest request) {
+    public void saveUserCondition(UserConditionCreationRequest request) {
         User u = request.getUser();
-        List<UserConditionResponse> response = new ArrayList<>();
+
         for (UUID conditionId : request.getConditionIds()) {
-            Condition c = conditionRepository.findById(conditionId).orElse(null);
-            if (c != null) {
-                userConditionRepository.save(
-                        UserCondition.builder().user(u).condition(c).build());
-                response.add(conditionMapper.toUserConditionResponse(c));
-            }
+            conditionRepository.findById(conditionId)
+                    .ifPresent(c -> userConditionRepository.save(
+                            UserCondition.builder()
+                                    .user(u)
+                                    .condition(c)
+                                    .build()
+                    ));
         }
-        return response;
     }
+
 
     @Transactional
     @Override

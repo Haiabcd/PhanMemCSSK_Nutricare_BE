@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface MealPlanItemService {
-    void smartSwapMealItem(UUID itemId);
+    void swapFood(UUID itemId);
     List<SwapSuggestion> suggest();
     void updateCache(UUID userId, MealPlanItem itemOld);
 }

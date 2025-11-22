@@ -3,6 +3,7 @@ package com.hn.nutricarebe.service.impl;
 import java.util.*;
 import java.util.stream.Collectors;
 
+
 import com.hn.nutricarebe.service.tools.IngredientTool;
 import com.hn.nutricarebe.service.tools.NutritionLookupTool;
 import org.springframework.ai.chat.client.ChatClient;
@@ -165,7 +166,6 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
 - ingredients: 5–12 nguyên liệu TÊN TIẾNG VIỆT; mỗi item { name, amount (số), unit (GRAM|ML) }.
 - Nếu không chắc, vẫn phải ước tính hợp lý theo nguồn uy tín của Việt Nam; KHÔNG để null các trường dinh dưỡng.
 """;
-
 
     public ChatServiceImpl(
             ChatClient.Builder builder,
@@ -492,6 +492,7 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
 
         return sb.toString();
     }
+
 
     private static String nvl(Object v, String fallback) {
         return v == null ? fallback : v.toString();

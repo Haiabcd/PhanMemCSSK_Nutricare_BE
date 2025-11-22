@@ -23,4 +23,5 @@ public class MealPlanResponse {
     NutritionResponse targetNutrition;
     Integer waterTargetMl;
     Set<MealPlanItemResponse> items;
+    String waterAIReason;
 }

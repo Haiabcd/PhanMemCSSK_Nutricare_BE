@@ -1,8 +1,8 @@
 package com.hn.nutricarebe.service;
 
 
-import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.web.multipart.MultipartFile;
 import com.hn.nutricarebe.dto.ai.CreationRuleAI;
 import com.hn.nutricarebe.dto.ai.DishVisionResult;
 import com.hn.nutricarebe.dto.ai.SuggestionAI;

@@ -21,7 +21,7 @@ public interface MealPlanItemRepository extends JpaRepository<MealPlanItem, UUID
 		where i.day.user.id = :userId
 		and i.day.date >= :fromDate
 	""")
-    int deleteItemsFromDate(UUID userId, LocalDate fromDate);
+    void deleteItemsFromDate(UUID userId, LocalDate fromDate);
 
     @Modifying
     @Query("""

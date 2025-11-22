@@ -9,7 +9,7 @@ import com.hn.nutricarebe.dto.request.UserConditionCreationRequest;
 import com.hn.nutricarebe.dto.response.UserConditionResponse;
 
 public interface UserConditionService {
-    List<UserConditionResponse> saveUserCondition(UserConditionCreationRequest request);
+    void saveUserCondition(UserConditionCreationRequest request);
 
     List<UserConditionResponse> findByUser_Id(UUID userId);
 

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import com.hn.nutricarebe.entity.MealPlanDay;
+import com.hn.nutricarebe.entity.MealPlanItem;
 import com.hn.nutricarebe.repository.MealPlanDayRepository;
 import com.hn.nutricarebe.repository.WeightLogRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,10 +21,12 @@ import com.hn.nutricarebe.service.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.transaction.annotation.Transactional;
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @AllArgsConstructor
 @Service
+@Transactional(readOnly = true)
 public class StatisticsServiceImpl implements StatisticsService {
     ProfileService profileService;
     PlanLogService planLogService;
@@ -71,6 +74,17 @@ public class StatisticsServiceImpl implements StatisticsService {
                         MealPlanDay::getWaterTargetMl
                 ));
 
+        // Map ngày -> đã ăn đầy đủ tất cả món trong kế hoạch chưa
+        Map<LocalDate, Boolean> fullPlanUsedMap = mealPlanDays.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        MealPlanDay::getDate,
+                        d -> {
+                            var items = d.getItems();
+                            if (items == null || items.isEmpty()) return Boolean.FALSE;
+                            return items.stream().allMatch(MealPlanItem::isUsed);
+                        }
+                ));
+
         List<DayTarget> dayTargets =
                 mealPlanDayService.getDayTargetsBetween(range.start(), range.end(), userId);
 
@@ -89,16 +103,20 @@ public class StatisticsServiceImpl implements StatisticsService {
 
             List<String> parts = new ArrayList<>();
 
-            // Ăn uống (kcal)
-            DayConsumedTotal consumed = consumedMap.get(date);
-            if (consumed == null) {
-                parts.add("Không có dữ liệu ăn uống nào được ghi lại");
-            } else {
-                String kcalBody = compareDayBody(target, consumed);
-                if (kcalBody != null) parts.add(kcalBody);
+            boolean fullUsed = Boolean.TRUE.equals(fullPlanUsedMap.get(date));
+
+            // Ăn uống (kcal + macro) – chỉ cảnh báo nếu CHƯA ăn hết kế hoạch
+            if (!fullUsed) {
+                DayConsumedTotal consumed = consumedMap.get(date);
+                if (consumed == null) {
+                    parts.add("Không có dữ liệu ăn uống nào được ghi lại");
+                } else {
+                    String kcalBody = compareDayBody(target, consumed);
+                    if (kcalBody != null) parts.add(kcalBody);
+                }
             }
 
-            // Nước
+            // Nước (giữ nguyên)
             Integer targetWater = waterTargetMap.get(date);
             Long actualWater = waterActualMap.get(date);
             long actual = (actualWater == null ? 0L : actualWater);
@@ -121,6 +139,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                 warnings.add("Ngày " + date + ": " + String.join(" và ", parts));
             }
         }
+
 
         var logs = weightLogRepository
                 .findByProfile_User_IdAndLoggedAtBetweenOrderByLoggedAt(userId, range.start(), range.end());
@@ -190,6 +209,16 @@ public class StatisticsServiceImpl implements StatisticsService {
                         MealPlanDay::getDate,
                         MealPlanDay::getWaterTargetMl
                 ));
+        Map<LocalDate, Boolean> fullPlanUsedMap = mealPlanDays.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        MealPlanDay::getDate,
+                        d -> {
+                            var items = d.getItems();
+                            if (items == null || items.isEmpty()) return Boolean.FALSE;
+                            return items.stream().allMatch(MealPlanItem::isUsed);
+                        }
+                ));
+
 
         List<DayTarget> dayTargets =
                 mealPlanDayService.getDayTargetsBetween(range.start(), range.end(), userId);
@@ -214,8 +243,10 @@ public class StatisticsServiceImpl implements StatisticsService {
                         waterTargetMap,
                         range.start(),
                         effectiveEnd,
-                        2
+                        2,
+                        fullPlanUsedMap
                 );
+
 
         var logs = weightLogRepository
                 .findByProfile_User_IdAndLoggedAtBetweenOrderByLoggedAt(userId, range.start(), range.end());
@@ -291,6 +322,16 @@ public class StatisticsServiceImpl implements StatisticsService {
                         MealPlanDay::getWaterTargetMl
                 ));
 
+        Map<LocalDate, Boolean> fullPlanUsedMap = mealPlanDays.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        MealPlanDay::getDate,
+                        d -> {
+                            var items = d.getItems();
+                            if (items == null || items.isEmpty()) return Boolean.FALSE;
+                            return items.stream().allMatch(MealPlanItem::isUsed);
+                        }
+                ));
+
         List<DayTarget> dayTargets =
                 mealPlanDayService.getDayTargetsBetween(from, to, userId);
 
@@ -308,16 +349,20 @@ public class StatisticsServiceImpl implements StatisticsService {
 
             List<String> parts = new ArrayList<>();
 
-            // Ăn uống (kcal)
-            DayConsumedTotal consumed = consumedMap.get(date);
-            if (consumed == null) {
-                parts.add("Không có dữ liệu ăn uống nào được ghi lại");
-            } else {
-                String kcalBody = compareDayBody(target, consumed);
-                if (kcalBody != null) parts.add(kcalBody);
+            boolean fullUsed = Boolean.TRUE.equals(fullPlanUsedMap.get(date));
+
+            // Ăn uống
+            if (!fullUsed) {
+                DayConsumedTotal consumed = consumedMap.get(date);
+                if (consumed == null) {
+                    parts.add("Không có dữ liệu ăn uống nào được ghi lại");
+                } else {
+                    String kcalBody = compareDayBody(target, consumed);
+                    if (kcalBody != null) parts.add(kcalBody);
+                }
             }
 
-            // Nước
+            // Nước (y chang byWeek)
             Integer targetWater = waterTargetMap.get(date);
             Long actualWater = waterActualMap.get(date);
             long actual = (actualWater == null ? 0L : actualWater);
@@ -340,6 +385,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                 warnings.add("Ngày " + date + ": " + String.join(" và ", parts));
             }
         }
+
 
         var logs = weightLogRepository
                 .findByProfile_User_IdAndLoggedAtBetweenOrderByLoggedAt(userId, from, to);

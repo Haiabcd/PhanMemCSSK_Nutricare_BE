@@ -24,7 +24,7 @@ public interface MealPlanDayRepository extends JpaRepository<MealPlanDay, UUID> 
 		where d.user.id = :userId
 		and d.date >= :fromDate
 	""")
-    int deleteFromDate(UUID userId, LocalDate fromDate);
+    void deleteFromDate(UUID userId, LocalDate fromDate);
 
     List<MealPlanDay> findByUser_IdAndDateBetweenOrderByDateAsc(UUID userId, LocalDate from, LocalDate to);
 }

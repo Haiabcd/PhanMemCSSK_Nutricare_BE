@@ -34,19 +34,18 @@ public final class MealPlanHelper {
     public static final double KCAL_MAX_RATIO   = 1.05;
     public static final double CARB_MIN_RATIO   = 0.85;
     public static final double CARB_MAX_RATIO   = 1.15;
-    public static final double FIBER_MIN_RATIO  = 0.90;
+    public static final double FIBER_MIN_RATIO  = 0.95;
     public static final double FIBER_MAX_RATIO  = 1.50;
     public static final double PROT_MIN_RATIO   = 0.90;
     public static final double PROT_MAX_RATIO   = 1.10;
     public static final double FAT_MIN_RATIO    = 0.80;
     public static final double FAT_MAX_RATIO    = 1.10;
 
-
     public static final double EPS_KCAL = 30.0;
     public static final double EPS_PROT = 3.0;
     public static final double EPS_CARB = 6.0;
     public static final double EPS_FAT = 3.0;
-    public static final double EPS_FIBER = 3.0;
+    public static final double EPS_FIBER = 2.0;
 
     public static BigDecimal bd(double value, int scale) {
         return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP);
@@ -500,43 +499,69 @@ public final class MealPlanHelper {
         double aF  = tF  - rF;
         double aFi = tFi - rFi;
 
-        // Nếu target rất nhỏ thì fallback về EPS tuyệt đối (tránh ratio điên)
         boolean kcalOk;
         if (tK < 80) {
             kcalOk = Math.abs(rK) <= EPS_KCAL;
         } else {
             kcalOk = isWithinRatio(aK, tK, KCAL_MIN_RATIO, KCAL_MAX_RATIO);
         }
-
         boolean protOk;
         if (tP < 5) {
             protOk = Math.abs(rP) <= EPS_PROT;
         } else {
             protOk = isWithinRatio(aP, tP, PROT_MIN_RATIO, PROT_MAX_RATIO);
         }
-
         boolean carbOk;
         if (tC < 10) {
             carbOk = Math.abs(rC) <= EPS_CARB;
         } else {
             carbOk = isWithinRatio(aC, tC, CARB_MIN_RATIO, CARB_MAX_RATIO);
         }
-
         boolean fatOk;
         if (tF < 5) {
             fatOk = Math.abs(rF) <= EPS_FAT;
         } else {
             fatOk = isWithinRatio(aF, tF, FAT_MIN_RATIO, FAT_MAX_RATIO);
         }
-
         boolean fiberOk;
         if (tFi < 5) {
             fiberOk = Math.abs(rFi) <= EPS_FIBER;
         } else {
             fiberOk = isWithinRatio(aFi, tFi, FIBER_MIN_RATIO, FIBER_MAX_RATIO);
         }
-
         return kcalOk && protOk && carbOk && fatOk && fiberOk;
     }
+
+    // Độ lệch vector (L1) với trọng số cho 5 chất chính
+    public static double nutritionDistance(Nutrition rem) {
+        double wK  = 1.0 / Math.max(1.0, EPS_KCAL);
+        double wP  = 1.0 / Math.max(1.0, EPS_PROT);
+        double wC  = 1.0 / Math.max(1.0, EPS_CARB);
+        double wF  = 1.0 / Math.max(1.0, EPS_FAT);
+        double wFi = 3.0 / Math.max(1.0, EPS_FIBER); // ↑ ưu tiên fiber hơn
+
+        return wK  * Math.abs(safeDouble(rem.getKcal()))
+                + wP  * Math.abs(safeDouble(rem.getProteinG()))
+                + wC  * Math.abs(safeDouble(rem.getCarbG()))
+                + wF  * Math.abs(safeDouble(rem.getFatG()))
+                + wFi * Math.abs(safeDouble(rem.getFiberG()));
+    }
+
+    // Helper kiểm tra sau khi thêm snap có vượt ngưỡng protein cho bữa không
+    public static boolean wouldExceedProteinForMeal(
+            Nutrition mealTarget,
+            Nutrition remaining,
+            Nutrition snap,
+            double maxRatio
+    ) {
+        double tP = safeDouble(mealTarget.getProteinG());
+        if (tP <= 0) return false;
+
+        double achievedP = tP - safeDouble(remaining.getProteinG());
+        double newProtRatio = (achievedP + safeDouble(snap.getProteinG())) / tP;
+        return newProtRatio > maxRatio;
+    }
+
+
 
 }

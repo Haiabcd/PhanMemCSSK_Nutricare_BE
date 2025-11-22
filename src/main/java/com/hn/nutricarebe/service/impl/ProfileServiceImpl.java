@@ -4,13 +4,11 @@ import static com.hn.nutricarebe.helper.ProfileHelper.*;
 
 import java.time.LocalDate;
 import java.util.*;
-
 import com.hn.nutricarebe.entity.WeightLog;
 import com.hn.nutricarebe.repository.WeightLogRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import com.hn.nutricarebe.dto.ai.ProfileAI;
 import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.dto.response.ProfileCreationResponse;
@@ -25,7 +23,6 @@ import com.hn.nutricarebe.exception.ErrorCode;
 import com.hn.nutricarebe.mapper.ProfileMapper;
 import com.hn.nutricarebe.repository.ProfileRepository;
 import com.hn.nutricarebe.service.*;
-
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -75,11 +72,9 @@ public class ProfileServiceImpl implements ProfileService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         UUID userId = UUID.fromString(auth.getName());
-
         ProfileUpdateRequest profileRequest = request.getProfile();
-
-        Profile profile = profileRepository
-                .findById(profileRequest.getId())
+        Profile oldProfile = profileRepository
+                .findByUser_Id(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
 
         // 1) Cập nhật allergies/conditions
@@ -87,33 +82,33 @@ public class ProfileServiceImpl implements ProfileService {
         boolean conditionUpdated = userConditionService.updateUserConditions(userId, request.getConditions());
 
         // 2) Tính giá trị "kỳ vọng" cho target
-        int expectedTargetDeltaKg;
-        Integer expectedTargetDurationWeeks;
+        int newTargetKg;
+        Integer newTargetWeeks;
 
         switch (profileRequest.getGoal()) {
             case LOSE -> {
-                expectedTargetDeltaKg = -Math.abs(profileRequest.getTargetWeightDeltaKg());
-                expectedTargetDurationWeeks = profileRequest.getTargetDurationWeeks();
+                newTargetKg = -Math.abs(profileRequest.getTargetWeightDeltaKg());
+                newTargetWeeks = profileRequest.getTargetDurationWeeks();
             }
             case MAINTAIN -> {
-                expectedTargetDeltaKg = 0;
-                expectedTargetDurationWeeks = 0;
+                newTargetKg = 0;
+                newTargetWeeks = 0;
             }
             default -> {
-                expectedTargetDeltaKg = Math.abs(profileRequest.getTargetWeightDeltaKg());
-                expectedTargetDurationWeeks = profileRequest.getTargetDurationWeeks();
+                newTargetKg = Math.abs(profileRequest.getTargetWeightDeltaKg());
+                newTargetWeeks = profileRequest.getTargetDurationWeeks();
             }
         }
 
         // 3) So sánh giá trị cũ vs request (trước khi set)
-        Integer oldHeight = profile.getHeightCm();
-        Integer oldWeight = profile.getWeightKg();
-        var oldGender = profile.getGender();
-        Integer oldBirthYear = profile.getBirthYear();
-        var oldGoal = profile.getGoal();
-        var oldActivity = profile.getActivityLevel();
-        Integer oldDelta = profile.getTargetWeightDeltaKg();
-        Integer oldDuration = profile.getTargetDurationWeeks();
+        Integer oldHeight = oldProfile.getHeightCm();
+        Integer oldWeight = oldProfile.getWeightKg();
+        var oldGender = oldProfile.getGender();
+        Integer oldBirthYear = oldProfile.getBirthYear();
+        var oldGoal = oldProfile.getGoal();
+        var oldActivity = oldProfile.getActivityLevel();
+        Integer oldDelta = oldProfile.getTargetWeightDeltaKg();
+        Integer oldDuration = oldProfile.getTargetDurationWeeks();
 
         boolean profileAffectsPlanChanged =
                 !Objects.equals(oldHeight, profileRequest.getHeightCm())
@@ -122,56 +117,56 @@ public class ProfileServiceImpl implements ProfileService {
                         || !Objects.equals(oldBirthYear, profileRequest.getBirthYear())
                         || !Objects.equals(oldGoal, profileRequest.getGoal())
                         || !Objects.equals(oldActivity, profileRequest.getActivityLevel())
-                        || !Objects.equals(oldDelta, expectedTargetDeltaKg)
-                        || !Objects.equals(oldDuration, expectedTargetDurationWeeks);
+                        || !Objects.equals(oldDelta, newTargetKg)
+                        || !Objects.equals(oldDuration, newTargetWeeks);
 
         boolean checkArchive =
                 !Objects.equals(oldWeight, profileRequest.getWeightKg())
                         || !Objects.equals(oldGoal, profileRequest.getGoal())
-                        || !Objects.equals(oldDelta, expectedTargetDeltaKg)
-                        || !Objects.equals(oldDuration, expectedTargetDurationWeeks);
+                        || !Objects.equals(oldDelta, newTargetKg)
+                        || !Objects.equals(oldDuration, newTargetWeeks);
 
         // 4) Gán cập nhật vào profile
-        profile.setHeightCm(profileRequest.getHeightCm());
-        profile.setWeightKg(profileRequest.getWeightKg());
-        profile.setGender(profileRequest.getGender());
-        profile.setBirthYear(profileRequest.getBirthYear());
-        profile.setGoal(profileRequest.getGoal());
-        profile.setActivityLevel(profileRequest.getActivityLevel());
-        profile.setName(profileRequest.getName());
-        profile.setTargetWeightDeltaKg(expectedTargetDeltaKg);
-        profile.setTargetDurationWeeks(expectedTargetDurationWeeks);
+        oldProfile.setHeightCm(profileRequest.getHeightCm());
+        oldProfile.setWeightKg(profileRequest.getWeightKg());
+        oldProfile.setGender(profileRequest.getGender());
+        oldProfile.setBirthYear(profileRequest.getBirthYear());
+        oldProfile.setGoal(profileRequest.getGoal());
+        oldProfile.setActivityLevel(profileRequest.getActivityLevel());
+        oldProfile.setName(profileRequest.getName());
+        oldProfile.setTargetWeightDeltaKg(newTargetKg);
+        oldProfile.setTargetDurationWeeks(newTargetWeeks);
 
-        // 5) Ghi/ cập nhật WeightLog cho ngày hôm nay nếu goal != MAINTAIN và weight thay đổi
+        // 5) Cập nhật bảng theo dõi cân nặng
         if (profileRequest.getGoal() != GoalType.MAINTAIN
                 && !Objects.equals(oldWeight, profileRequest.getWeightKg())) {
-
             LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
-            upsertWeightLog(profile, today, profileRequest.getWeightKg());
+            upsertWeightLog(oldProfile, today, profileRequest.getWeightKg());
         }
-
-        // 6) Tính lại goalReached nếu có thay đổi liên quan mục tiêu
-        GoalType requestGoal = profileRequest.getGoal();
-        int currentWeight = profileRequest.getWeightKg();
-        int delta = Math.abs(profile.getTargetWeightDeltaKg());
+        // 6) Kiểm tra và cập nhật trạng thái đạt mục tiêu
+        GoalType requestGoal = profileRequest.getGoal();  //Mục tiêu từ request
+        int currentWeight = profileRequest.getWeightKg();  //Cân nặng hiện tại từ request
+        int delta = Math.abs(oldProfile.getTargetWeightDeltaKg());  //Giá trị tuyệt đối của delta mục tiêu
         if (checkArchive) {
-            Integer snap = profile.getSnapWeightKg();
-            if (snap == null) {
-                // Nếu chưa có snap, tuỳ nghiệp vụ: tạm coi là chưa đạt
-                profile.setGoalReached(false);
-            } else {
+            if (!Objects.equals(oldGoal, requestGoal)
+                    || !Objects.equals(oldDelta, newTargetKg)
+                    || !Objects.equals(oldDuration, newTargetWeeks)) {
+                oldProfile.setSnapWeightKg(currentWeight);
+            }
+            Integer snap = oldProfile.getSnapWeightKg();
+            if (snap != null) {
                 if (requestGoal == GoalType.LOSE) {
-                    profile.setGoalReached(currentWeight <= snap - delta);
+                    oldProfile.setGoalReached(currentWeight <= snap - delta);
                 } else if (requestGoal == GoalType.GAIN) {
-                    profile.setGoalReached(currentWeight >= snap + delta);
+                    oldProfile.setGoalReached(currentWeight >= snap + delta);
                 } else {
-                    profile.setGoalReached(true);
+                    oldProfile.setGoalReached(true);
                 }
             }
         }
 
-        profileRepository.save(profile);
-
+        // 7) Lưu profile và cập nhật meal plan nếu cần
+        profileRepository.save(oldProfile);
         boolean shouldRecreateMealPlan = allergyUpdated || conditionUpdated || profileAffectsPlanChanged;
         if (shouldRecreateMealPlan) {
             mealPlanDayService.updatePlanForOneDay(request.getStartDate(), userId);
@@ -291,6 +286,7 @@ public class ProfileServiceImpl implements ProfileService {
         return profileRepository.countCompletedGoals();
     }
 
+    //==================================HELPER METHODS==================================//
     private void upsertWeightLog(Profile profile, LocalDate date, int weightKg) {
         weightLogRepository
                 .findByProfile_IdAndLoggedAt(profile.getId(), date)

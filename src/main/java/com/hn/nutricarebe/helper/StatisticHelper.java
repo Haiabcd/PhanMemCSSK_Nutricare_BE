@@ -27,32 +27,70 @@ public final class StatisticHelper {
         return new StatisticsServiceImpl.MonthRange(start, end);
     }
 
-    //Cảnh báo
-    public static String compareDay(DayTarget target, DayConsumedTotal consumed) {
-        var t = target.getTarget();
-        var c = consumed.getTotal();
-        double dKcal = safe(c.getKcal()) - safe(t.getKcal());
-        StringBuilder sb = new StringBuilder();
-        if (!withinKcal(t.getKcal(), dKcal)) {
-            sb.append(dKcal < 0 ? "Thiếu kcal " + fmt(-dKcal) : "Dư kcal " + fmt(dKcal));
-        }
-        if (sb.isEmpty()) return null;
-        return "Ngày " + target.getDate() + ": " + sb.toString().trim();
-    }
-
-    // Trả về NỘI DUNG cảnh báo kcal cho 1 ngày (không kèm "Ngày ...")
+    // Trả về NỘI DUNG cảnh báo kcal + macro cho 1 ngày (không kèm "Ngày ...")
     public static String compareDayBody(DayTarget target, DayConsumedTotal consumed) {
         var t = target.getTarget();
         var c = consumed.getTotal();
-        double dKcal = safe(c.getKcal()) - safe(t.getKcal());
+
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        // ====== KCAL ======
+        double tgtKcal = safe(t.getKcal());
+        double actKcal = safe(c.getKcal());
+        double dKcal = actKcal - tgtKcal;
 
         if (!withinKcal(t.getKcal(), dKcal)) {
-            return dKcal < 0
-                    ? "Thiếu kcal " + fmt(-dKcal)
-                    : "Dư kcal " + fmt(dKcal);
+            parts.add(dKcal < 0
+                    ? "Thiếu " + fmt(-dKcal) + " kcal"
+                    : "Dư " + fmt(dKcal) + " kcal");
         }
-        return null;
+        // ====== PROTEIN (đạm) ======
+        double tgtProt = safe(t.getProteinG());
+        double actProt = safe(c.getProteinG());
+        if (tgtProt > 0) {
+            if (!isWithinRatio(actProt, tgtProt, 0.9, 1.1)) { // 90%–110%
+                double d = actProt - tgtProt;
+                parts.add(d < 0
+                        ? "Thiếu " + fmt(-d) + "g đạm"
+                        : "Dư " + fmt(d) + "g đạm");
+            }
+        }
+        // ====== CARB ======
+        double tgtCarb = safe(t.getCarbG());
+        double actCarb = safe(c.getCarbG());
+        if (tgtCarb > 0) {
+            if (!isWithinRatio(actCarb, tgtCarb, 0.85, 1.15)) { // 85%–115%
+                double d = actCarb - tgtCarb;
+                parts.add(d < 0
+                        ? "Thiếu " + fmt(-d) + "g carb"
+                        : "Dư " + fmt(d) + "g carb");
+            }
+        }
+        // ====== FAT (béo) ======
+        double tgtFat = safe(t.getFatG());
+        double actFat = safe(c.getFatG());
+        if (tgtFat > 0) {
+            if (!isWithinRatio(actFat, tgtFat, 0.8, 1.1)) { // 80%–110%
+                double d = actFat - tgtFat;
+                parts.add(d < 0
+                        ? "Thiếu " + fmt(-d) + "g béo"
+                        : "Dư " + fmt(d) + "g béo");
+            }
+        }
+        // ====== FIBER (chất xơ) ======
+        double tgtFiber = safe(t.getFiberG());
+        double actFiber = safe(c.getFiberG());
+        if (tgtFiber > 0) {
+            if (!isWithinRatio(actFiber, tgtFiber, 0.95, 1.5)) { // 95%–150%
+                double d = actFiber - tgtFiber;
+                parts.add(d < 0
+                        ? "Thiếu " + fmt(-d) + "g chất xơ"
+                        : "Dư " + fmt(d) + "g chất xơ");
+            }
+        }
+        if (parts.isEmpty()) return null;
+        return String.join(", ", parts);
     }
+
 
 
 
@@ -191,7 +229,9 @@ public final class StatisticHelper {
             Map<LocalDate, Integer> waterTargetMap,
             LocalDate monthStart,
             LocalDate monthEnd,
-            int topPerWeek) {
+            int topPerWeek,
+            Map<LocalDate, Boolean> fullPlanUsedMap) {
+
 
         List<StatisticsServiceImpl.WeekRange> weeks = splitMonthIntoWeeksMonSun(monthStart, monthEnd);
 
@@ -210,26 +250,28 @@ public final class StatisticHelper {
             while (!d.isAfter(w.end())) {
                 DayTarget t = targetByDate.get(d);
 
-                // --------- ĂN UỐNG (kcal) ----------
-                if (t != null) {
+                boolean skipFoodWarn = fullPlanUsedMap != null
+                        && Boolean.TRUE.equals(fullPlanUsedMap.get(d));
+
+                // --------- ĂN UỐNG (kcal + macro) ----------
+                if (t != null && !skipFoodWarn) {
                     DayConsumedTotal c = consumedMap.get(d);
                     if (c == null) {
                         noFoodLogDays++;
                         scored.add(new ScoredWarn("Không có log ăn uống", 1.0));
                     } else {
-                        String kcalBody = compareDayBody(t, c); // chỉ nội dung kcal
+                        String kcalBody = compareDayBody(t, c); // giờ gồm cả macro
                         if (kcalBody != null) {
                             var tv = t.getTarget();
                             var cv = c.getTotal();
                             double dKcal = safe(cv.getKcal()) - safe(tv.getKcal());
-                            double score = Math.abs(dKcal) / 100.0; // chỉ tính điểm theo kcal
+                            double score = Math.abs(dKcal) / 100.0; // vẫn dùng kcal để chấm điểm
                             scored.add(new ScoredWarn(kcalBody, score));
                         }
                     }
                 }
 
-
-                // --------- NƯỚC ----------
+                // --------- NƯỚC ---------- (giữ y nguyên)
                 Long actualWater = (waterActualMap != null) ? waterActualMap.get(d) : null;
                 Integer targetWater = (waterTargetMap != null) ? waterTargetMap.get(d) : null;
 
@@ -243,12 +285,14 @@ public final class StatisticHelper {
                     if (deficit > 0) {
                         String msg = "Ngày " + d + ": Thiếu nước " + deficit
                                 + " ml (uống " + actual + "/" + targetWater + " ml)";
-                        double score = deficit / 250.0; // thiếu càng nhiều, score càng cao
+                        double score = deficit / 250.0;
                         scored.add(new ScoredWarn(msg, score));
                     }
                 }
+
                 d = d.plusDays(1);
             }
+
 
             List<String> topMsgs = scored.stream()
                     .sorted((a, b) -> Double.compare(b.score, a.score))

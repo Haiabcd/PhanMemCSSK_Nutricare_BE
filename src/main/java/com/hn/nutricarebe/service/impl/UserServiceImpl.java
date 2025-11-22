@@ -67,9 +67,8 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserCreationResponse saveGG(User user) {
-        User saved = userRepository.save(user);
-        return userMapper.toUserCreationResponse(saved);
+    public void saveGG(User user) {
+        userRepository.save(user);
     }
 
     @Override

@@ -35,7 +35,7 @@ public class MealPlanController {
 
     @PutMapping("/{itemId}/swap")
     public ApiResponse<Void> smartSwap(@PathVariable UUID itemId) {
-        mealPlanItemService.smartSwapMealItem(itemId);
+        mealPlanItemService.swapFood(itemId);
         return ApiResponse.<Void>builder().message("Hoán đổi món ăn thành công").build();
     }
 
