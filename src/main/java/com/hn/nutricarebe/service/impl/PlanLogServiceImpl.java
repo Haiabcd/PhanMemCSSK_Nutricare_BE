@@ -145,7 +145,6 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .findById(req.getItemId())
                 .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
 
-        // (khuyến nghị) check quyền sở hữu giống smartSwapMealItem
         if (itemOld.getDay() == null
                 || itemOld.getDay().getUser() == null
                 || !userId.equals(itemOld.getDay().getUser().getId())) {
@@ -154,14 +153,12 @@ public class PlanLogServiceImpl implements PlanLogService {
 
         Food newFood = foodRepository.findById(req.getNewFoodId())
                 .orElseThrow(() -> new AppException(ErrorCode.FOOD_NOT_FOUND));
-
         // Cập nhật item theo món được chọn
         itemOld.setFood(newFood);
         itemOld.setPortion(req.getPortion());
         Nutrition snap = scaleNutrition(newFood.getNutrition(), safeDouble(req.getPortion()));
         itemOld.setNutrition(snap);
         itemOld.setUsed(true);
-
         // Ghi log
         PlanLog log = PlanLog.builder()
                 .user(User.builder().id(userId).build())

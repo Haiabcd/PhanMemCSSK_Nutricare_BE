@@ -186,4 +186,19 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
             @Param("pivotKcal") int pivotKcal,
             Pageable pageable
     );
+
+    @Query("""
+    select distinct f
+    from Food f
+      join f.mealSlots ms
+      join f.tags t
+    where ms = :slot
+      and lower(t.nameCode) = lower(:tag)
+""")
+    Slice<Food> findByMealSlotAndTag(
+            @Param("slot") MealSlot slot,
+            @Param("tag") String tag,
+            Pageable pageable
+    );
+
 }

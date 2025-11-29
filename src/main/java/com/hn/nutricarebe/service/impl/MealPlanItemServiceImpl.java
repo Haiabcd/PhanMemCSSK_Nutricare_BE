@@ -18,6 +18,7 @@ import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.helper.SuggestionHelper;
 import com.hn.nutricarebe.service.*;
 import lombok.experimental.NonFinal;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
     Map<UUID, Deque<UUID>> swapHistoryPerItem = new ConcurrentHashMap<>();
 
     static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    static final String FRUIT_TAG = "fruit";
 
     @Override
     @Transactional
@@ -193,6 +195,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
     @Override
     @Transactional
     public List<SwapSuggestion> suggest() {
+        boolean hasAnyCandidate = false;
         UUID userId = getCurrentUserId();
         SwapContext ctx = getSwapContext(userId);
         LocalDate today = LocalDate.now(VN_ZONE);
@@ -203,7 +206,10 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
             if (cached.isExpired(today)) {
                 suggestCache.remove(cacheKey);
             } else if (Objects.equals(cached.signature, signature)) {
-                return cached.suggestions;
+                if(!cached.suggestions.isEmpty()) {
+                    return cached.suggestions;
+
+                }
             }
         }
         List<SwapSuggestion> out = new ArrayList<>();
@@ -284,6 +290,10 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
                         .build();
             }).toList();
 
+            if (!candidates.isEmpty()) {
+                hasAnyCandidate = true;
+            }
+
             out.add(SwapSuggestion.builder()
                     .itemId(item.getItemId())
                     .slot(item.getSlot())
@@ -293,9 +303,35 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
                     .candidates(candidates)
                     .build());
         }
+
+        if(!hasAnyCandidate) {
+
+            List<SwapSuggestion> noSuggestions = new ArrayList<>();
+            List<Food> snackFoods = loadSnackFoodsForFallback(recent, avoid);
+            List<SwapCandidate> candidates = new ArrayList<>();
+            for(Food f : snackFoods) {
+                candidates.add(SwapCandidate.builder()
+                        .foodId(f.getId())
+                        .foodName(f.getName())
+                        .portion(BigDecimal.valueOf(1.0))
+                        .imageUrl(buildImageUrl(f.getImageKey(), cdnBaseUrl))
+                        .reason("Món ăn nhẹ này có thể là lựa chọn thay thế tốt để bổ sung dinh dưỡng trong ngày.")
+                        .build());
+            }
+            noSuggestions.add(SwapSuggestion.builder()
+                    .itemId(UUID.randomUUID())
+                    .slot(MealSlot.SNACK.name())
+                    .originalFoodId(null)
+                    .originalFoodName(null)
+                    .originalPortion(BigDecimal.ONE)
+                    .candidates(candidates)
+                    .build());
+            SuggestCacheEntry entry = new SuggestCacheEntry(signature, noSuggestions, today);
+            suggestCache.put(cacheKey, entry);
+            return noSuggestions;
+        }
         SuggestCacheEntry entry = new SuggestCacheEntry(signature, out, today);
         suggestCache.put(cacheKey, entry);
-
         return out;
     }
 
@@ -365,16 +401,16 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         List<MealPlanItemLite> liteItems = items.stream()
                 .filter(i -> !i.isUsed())
                 .map(i -> {
-            FoodResponse f = i.getFood();
-            return MealPlanItemLite.builder()
-                    .itemId(i.getId())
-                    .slot(i.getMealSlot())
-                    .currentFoodId(f.getId())
-                    .currentFoodName(f.getName())
-                    .portion(i.getPortion())
-                    .nutrition(i.getNutrition())
-                    .build();
-        }).collect(Collectors.toList());
+                    FoodResponse f = i.getFood();
+                    return MealPlanItemLite.builder()
+                            .itemId(i.getId())
+                            .slot(i.getMealSlot())
+                            .currentFoodId(f.getId())
+                            .currentFoodName(f.getName())
+                            .portion(i.getPortion())
+                            .nutrition(i.getNutrition())
+                            .build();
+                }).collect(Collectors.toList());
 
         return SwapContext.builder()
                 .dayId(day.getId())
@@ -510,4 +546,53 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
                 && carbDiff <= MAX_MACRO_DIFF_RATIO
                 && fatDiff  <= MAX_MACRO_DIFF_RATIO;
     }
+
+    private List<Food> loadSnackFoodsForFallback(Set<UUID> recent, Set<String> avoid) {
+        var sliceFruit = foodRepository.findByMealSlotAndTag(
+                MealSlot.SNACK,
+                FRUIT_TAG,
+                PageRequest.of(0, 50)
+        );
+
+        List<Food> fFruit = sliceFruit.getContent().stream()
+                // không lấy món mới dùng gần đây
+                .filter(f -> !recent.contains(f.getId()))
+                // tránh các tag trong danh sách avoid
+                .filter(f -> f.getTags() == null || f.getTags().stream()
+                        .map(Tag::getNameCode)
+                        .noneMatch(avoid::contains))
+                .limit(10)
+                .toList();
+
+        if (fFruit.size() >= 10) {
+            return fFruit;
+        }
+
+        int needed = 10 - fFruit.size();
+
+        // tránh trùng món giữa đợt 1 và đợt 2
+        Set<UUID> usedIds = fFruit.stream()
+                .map(Food::getId)
+                .collect(Collectors.toSet());
+
+        var sliceSnack = foodRepository.findByMealSlot(
+                MealSlot.SNACK,
+                PageRequest.of(0, 50)
+        );
+
+        List<Food> fSnack = sliceSnack.getContent().stream()
+                .filter(f -> !recent.contains(f.getId()))
+                .filter(f -> !usedIds.contains(f.getId()))
+                .filter(f -> f.getTags() == null || f.getTags().stream()
+                        .map(Tag::getNameCode)
+                        .noneMatch(avoid::contains))
+                .limit(needed)
+                .toList();
+
+        List<Food> combined = new ArrayList<>(fFruit);
+        combined.addAll(fSnack);
+        return combined;
+    }
+
+
 }
