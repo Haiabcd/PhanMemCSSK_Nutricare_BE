@@ -2,6 +2,7 @@ package com.hn.nutricarebe.helper;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,7 @@ import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 
 public final class StatisticHelper {
     private StatisticHelper() {}
+    public static final DateTimeFormatter VN_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public static StatisticsServiceImpl.WeekRange getCurrentWeekRange() {
         LocalDate today = LocalDate.now();
@@ -90,8 +92,6 @@ public final class StatisticHelper {
         if (parts.isEmpty()) return null;
         return String.join(", ", parts);
     }
-
-
 
 
     public static boolean withinKcal(Number tgt, double d) {
@@ -258,14 +258,13 @@ public final class StatisticHelper {
                     DayConsumedTotal c = consumedMap.get(d);
                     if (c == null) {
                         noFoodLogDays++;
-                        scored.add(new ScoredWarn("Không có log ăn uống", 1.0));
                     } else {
-                        String kcalBody = compareDayBody(t, c); // giờ gồm cả macro
+                        String kcalBody = compareDayBody(t, c);
                         if (kcalBody != null) {
                             var tv = t.getTarget();
                             var cv = c.getTotal();
                             double dKcal = safe(cv.getKcal()) - safe(tv.getKcal());
-                            double score = Math.abs(dKcal) / 100.0; // vẫn dùng kcal để chấm điểm
+                            double score = Math.abs(dKcal) / 100.0;
                             scored.add(new ScoredWarn(kcalBody, score));
                         }
                     }
@@ -300,7 +299,7 @@ public final class StatisticHelper {
                     .map(sw -> shortenWarn(sw.text()))
                     .toList();
 
-            String period = w.start() + "–" + w.end();
+            String period = w.start().format(VN_DATE) + " – " + w.end().format(VN_DATE);
             StringBuilder sb = new StringBuilder("Tuần " + (idx++) + " (" + period + "): ");
             if (noFoodLogDays > 0) sb.append(noFoodLogDays).append(" ngày không có log ăn uống; ");
             if (noWaterLogDays > 0) sb.append(noWaterLogDays).append(" ngày không có log nước; ");

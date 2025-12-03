@@ -100,11 +100,8 @@ public class StatisticsServiceImpl implements StatisticsService {
         for (DayTarget target : dayTargets) {
             LocalDate date = target.getDate();
             if (date.isAfter(today)) continue;
-
             List<String> parts = new ArrayList<>();
-
             boolean fullUsed = Boolean.TRUE.equals(fullPlanUsedMap.get(date));
-
             // Ăn uống (kcal + macro) – chỉ cảnh báo nếu CHƯA ăn hết kế hoạch
             if (!fullUsed) {
                 DayConsumedTotal consumed = consumedMap.get(date);
@@ -134,10 +131,10 @@ public class StatisticsServiceImpl implements StatisticsService {
                     parts.add("Không có dữ liệu nước nào được ghi lại");
                 }
             }
-
             if (!parts.isEmpty()) {
-                warnings.add("Ngày " + date + ": " + String.join(" và ", parts));
+                warnings.add("Ngày " + date.format(VN_DATE) + ": " + String.join(" và ", parts));
             }
+
         }
 
 
@@ -234,7 +231,6 @@ public class StatisticsServiceImpl implements StatisticsService {
                 .filter(d -> !d.getDate().isAfter(effectiveEnd))
                 .toList();
 
-        // Cảnh báo theo tuần (compact): kcal + thiếu nước bao nhiêu ml
         List<String> weeklyWarnings =
                 warningsByWeekCompact(
                         dayTargetsUptoToday,
@@ -305,14 +301,12 @@ public class StatisticsServiceImpl implements StatisticsService {
         List<DailyWaterTotalDto> dailyWaterTotals =
                 waterLogService.getDailyTotals(userId, from, to, true);
 
-        // Nước thực tế theo ngày
         Map<LocalDate, Long> waterActualMap = dailyWaterTotals.stream()
                 .collect(java.util.stream.Collectors.toMap(
                         DailyWaterTotalDto::getDate,
                         d -> d.getTotalMl() == null ? 0L : d.getTotalMl()
                 ));
 
-        // Nước mục tiêu theo ngày
         var mealPlanDays = mealPlanDayRepository
                 .findByUser_IdAndDateBetweenOrderByDateAsc(userId, from, to);
 
@@ -382,8 +376,9 @@ public class StatisticsServiceImpl implements StatisticsService {
             }
 
             if (!parts.isEmpty()) {
-                warnings.add("Ngày " + date + ": " + String.join(" và ", parts));
+                warnings.add("Ngày " + date.format(VN_DATE) + ": " + String.join(" và ", parts));
             }
+
         }
 
 
@@ -424,7 +419,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         if (bmi < 18.5) return "Thiếu cân";
         if (bmi < 23.0) return "Bình thường";
         if (bmi < 25.0) return "Tiền béo phì";
-        if (bmi < 30.0) return "Thừa cân  độ I";
+        if (bmi < 30.0) return "Thừa cân độ I";
         if (bmi < 35.0) return "Béo phì độ II";
         return "Béo phì độ III";
     }

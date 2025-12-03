@@ -90,7 +90,7 @@ public class AuthController {
         } catch (AppException ex) {
             String reason;
             if (ex.getErrorCode() == ErrorCode.PROVIDER_ALREADY_LINKED) {
-                reason = "Tài khoản Google này đã liên kết với user khác";
+                reason = "Tài khoản Google này đã được liên kết với một tài khoản khác";
             } else {
                 reason = "Đăng nhập thất bại";
             }
