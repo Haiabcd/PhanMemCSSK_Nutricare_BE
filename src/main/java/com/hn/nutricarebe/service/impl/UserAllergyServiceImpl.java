@@ -34,18 +34,15 @@ public class UserAllergyServiceImpl implements UserAllergyService {
     }
 
     @Override
-    public List<UserAllergyResponse> saveUserAllergy(UserAllergyCreationRequest request) {
+    public void saveUserAllergy(UserAllergyCreationRequest request) {
         User u = request.getUser();
-        List<UserAllergyResponse> response = new ArrayList<>();
         for (UUID allergyId : request.getAllergyIds()) {
             Allergy a = allergyRepository.findById(allergyId).orElse(null);
             if (a != null) {
                 UserAllergy ua = UserAllergy.builder().user(u).allergy(a).build();
                 userAllergyRepository.save(ua);
-                response.add(allergyMapper.toUserAllergyResponse(a));
             }
         }
-        return response;
     }
 
     @Override

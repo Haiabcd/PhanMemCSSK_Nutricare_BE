@@ -9,7 +9,7 @@ import com.hn.nutricarebe.dto.request.UserAllergyCreationRequest;
 import com.hn.nutricarebe.dto.response.UserAllergyResponse;
 
 public interface UserAllergyService {
-    List<UserAllergyResponse> saveUserAllergy(UserAllergyCreationRequest request);
+    void saveUserAllergy(UserAllergyCreationRequest request);
 
     List<UserAllergyResponse> findByUser_Id(UUID userId);
 

@@ -45,7 +45,7 @@ public class IngredientTool {
                             .or(() -> ingredientRepository.findByAliasIgnoreCase(q))
                             .or(() -> {
                                 var page = ingredientRepository.searchByNameOrAlias(q, PageRequest.of(0, 1));
-                                return page.isEmpty() ? Optional.empty() : Optional.of(page.getContent().get(0));
+                                return page.isEmpty() ? Optional.empty() : Optional.of(page.getContent().getFirst());
                             });
 
             if (found.isPresent()) {

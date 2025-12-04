@@ -7,7 +7,6 @@ import java.util.UUID;
 import com.hn.nutricarebe.dto.overview.DailyCountDto;
 import com.hn.nutricarebe.dto.response.HeaderResponse;
 import com.hn.nutricarebe.dto.response.InfoResponse;
-import com.hn.nutricarebe.dto.response.UserCreationResponse;
 import com.hn.nutricarebe.entity.User;
 
 public interface UserService {

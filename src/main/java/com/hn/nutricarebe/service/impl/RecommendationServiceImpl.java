@@ -51,18 +51,25 @@ public class RecommendationServiceImpl implements RecommendationService {
             "https://phunuvietnam.vn/rss/dinh-duong.rss");
 
     /* ========================= Google News RSS ========================= */
-    private static String googleNewsRssUrl(String query, String lang, String country) {
+
+    /**
+     * Tạo URL RSS của Google News (ngôn ngữ vi-VN) từ chuỗi truy vấn đầu vào.
+     */
+    private static String googleNewsRssUrl(String query) {
         String q = Optional.ofNullable(query).orElse("").trim().replaceAll("\\s+", " ");
         if (q.length() > 200) q = q.substring(0, 200);
         String enc = URLEncoder.encode(q, StandardCharsets.UTF_8);
-        String hl = (lang == null || lang.isEmpty()) ? "vi" : lang;
-        String gl = (country == null || country.isEmpty()) ? "VN" : country;
+        String hl = "vi";
+        String gl = "VN";
         String ceid = gl + ":" + hl;
         return "https://news.google.com/rss/search?q=" + enc + "&hl=" + hl + "&gl=" + gl + "&ceid=" + ceid;
     }
 
+    /**
+     * Gọi Google News RSS với query dinh dưỡng/sức khỏe và chuyển thành danh sách RecoItemDto.
+     */
     private List<RecoItemDto> fetchGoogleNews(String query) throws Exception {
-        String url = googleNewsRssUrl(query, "vi", "VN");
+        String url = googleNewsRssUrl(query);
         Document doc = fetchDoc(url);
 
         List<Element> items = doc.select("item");
@@ -78,7 +85,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
             if (isBlank(link) || isBlank(title)) continue;
 
-            // BỎ các link video/clip
+            // Bỏ qua các link dạng video/clip để chỉ giữ bài viết chữ
             if (isVideoLike(link, sourceName, title)) continue;
 
             RecoItemDto dto = new RecoItemDto();
@@ -94,11 +101,18 @@ public class RecommendationServiceImpl implements RecommendationService {
     }
 
     /* ========================= PubMed (tin nghiên cứu) ========================= */
+
+    /**
+     * Tạo URL search của PubMed (ESearch API) từ query tiếng Anh.
+     */
     private static String pubmedSearchUrl(String query) {
         return "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi" + "?db=pubmed&retmode=json&retmax=10&term="
                 + URLEncoder.encode(query, StandardCharsets.UTF_8);
     }
 
+    /**
+     * Lấy danh sách bài viết khuyến nghị cho người dùng hiện tại dựa trên hồ sơ + điều kiện sức khỏe.
+     */
     @Override
     public List<RecoItemDto> find(int limit) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
@@ -107,7 +121,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         Optional<Profile> p = profileRepository.findByUser_Id(userId);
 
-        // vẫn đọc allergy/condition từ DB nhưng KHÔNG dùng allergy để chặn tin
+        // Vẫn đọc allergy/condition từ DB (đang dùng để build query / boost, KHÔNG dùng để chặn bài)
         List<UserAllergy> la = userAllergyRepository.findByUser_Id(userId);
         List<UserCondition> lc = userConditionRepository.findByUser_Id(userId);
 
@@ -147,15 +161,15 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         int lim = clampLimit(limit);
 
-        /* ===================== Thu thập dữ liệu thô ===================== */
+        /* ===================== Thu thập dữ liệu thô từ nhiều nguồn ===================== */
         List<RecoItemDto> items = new ArrayList<>();
 
-        // Query cho tin tức
+        // Chuẩn bị các query tin tức: dùng chung, theo goal và theo bệnh nền
         String generalQuery = buildGeneralNewsQuery();
         String goalQuery = buildGoalNewsQuery(profile);
         List<String> condQueries = buildConditionNewsQueries(profile);
 
-        // 1) Google News theo goal + conditions + general
+        // 1) Google News: theo goal + từng condition + query chung
         try {
             items.addAll(fetchGoogleNews(goalQuery));
         } catch (Exception e) {
@@ -174,7 +188,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             System.err.println("[GN general] " + e.getMessage());
         }
 
-        // 2) RSS báo VN (bổ sung coverage)
+        // 2) RSS báo Việt Nam: lấp thêm coverage, phòng trường hợp Google News thiếu
         for (String rss : ARTICLE_FEEDS) {
             try {
                 items.addAll(fetchRssArticles(rss));
@@ -183,31 +197,31 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
         }
 
-        // 3) PubMed (tin nghiên cứu/khuyến cáo khoa học) với query tiếng Anh
+        // 3) PubMed: thêm các tin nghiên cứu / khuyến cáo khoa học (query tiếng Anh)
         try {
             items.addAll(fetchPubMed(buildEnglishQuery(profile)));
         } catch (Exception e) {
             System.err.println("[PM ERR] " + e.getMessage());
         }
 
-        /* ===================== Lọc nội dung & Dedupe ===================== */
+        /* ===================== Lọc nội dung & loại trùng ===================== */
         List<String> nutritionKeywords = nutritionKeywords();
         List<String> banned = sensitiveKeywords();
 
         items = items.stream()
-                // 1) phải liên quan dinh dưỡng/sức khỏe
+                // 1) Giữ lại các bài có liên quan dinh dưỡng/sức khỏe
                 .filter(it -> {
                     String hay = (safeLower(it.getTitle()) + " " + safeLower(it.getSource())).trim();
                     return containsAny(hay, nutritionKeywords);
                 })
-                // 2) loại bài có từ nhạy cảm (vd: giòi, ấu trùng…)
+                // 2) Loại các bài có từ nhạy cảm / gây khó chịu (vd: giòi, ấu trùng…)
                 .filter(it -> !containsAny(safeLower(it.getTitle()), banned))
                 .collect(Collectors.toList());
 
-        // dedupe
+        // Loại trùng theo (url|title), ưu tiên bài mới hơn
         items = dedupeArticles(items);
 
-        /* ===================== ƯU TIÊN: goal/conditions ===================== */
+        /* ===================== Tách bài ưu tiên (theo goal/condition) ===================== */
         List<String> goalBoostKws = goalBoostKeywords(profile);
         List<String> condBoostKws = conditionBoostKeywords(profile);
 
@@ -225,7 +239,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
         }
 
-        /* ===================== Scoring & Sorting ===================== */
+        /* ===================== Tính điểm & sắp xếp ===================== */
         Comparator<RecoItemDto> priorityCmp = (a, b) -> {
             double sa = 1.3 * recencyBoost(a.getPublished())
                     + domainBoost(a.getSource())
@@ -253,7 +267,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         priority.sort(priorityCmp);
         others.sort(othersCmp);
 
-        /* ===================== Gộp kết quả ===================== */
+        /* ===================== Gộp kết quả theo limit ===================== */
         List<RecoItemDto> result = new ArrayList<>(lim);
         for (RecoItemDto it : priority) {
             if (result.size() >= lim) break;
@@ -270,7 +284,9 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     /* ============================ Helpers dành cho NEWS ============================ */
 
-    /** Query chung về dinh dưỡng/sức khỏe để lấp đầy */
+    /**
+     * Tạo query chung về dinh dưỡng/sức khỏe (không cá nhân hóa) để bổ sung tin.
+     */
     private static String buildGeneralNewsQuery() {
         List<String> parts = new ArrayList<>(List.of(
                 "dinh dưỡng",
@@ -286,7 +302,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return join(parts, " ");
     }
 
-    /** Query tập trung mục tiêu */
+    /**
+     * Tạo query tin tức dựa trên mục tiêu cá nhân (giảm cân, tăng cân,...) của user.
+     */
     private static String buildGoalNewsQuery(ProfileDto p) {
         List<String> parts = new ArrayList<>();
         if (p != null && !isBlank(p.getGoal())) parts.add(p.getGoal());
@@ -294,7 +312,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return join(parts, " ");
     }
 
-    /** Gộp danh sách từ khóa, bỏ trùng */
+    /**
+     * Gộp hai danh sách từ khóa lại, loại bỏ trùng lặp và chuẩn hóa lower-case.
+     */
     private static List<String> merge(List<String> a, List<String> b) {
         LinkedHashSet<String> set = new LinkedHashSet<>();
         if (a != null) {
@@ -314,7 +334,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return new ArrayList<>(set);
     }
 
-    /** haystack có chứa BẤT KỲ từ khóa nào? */
+    /**
+     * Kiểm tra haystack có chứa ít nhất một trong các từ khóa cho trước hay không.
+     */
     private static boolean containsAny(String haystack, List<String> kws) {
         if (haystack == null || haystack.trim().isEmpty() || kws == null || kws.isEmpty()) return false;
         String s = haystack.toLowerCase(Locale.ROOT);
@@ -326,7 +348,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return false;
     }
 
-    /** Mỗi bệnh nền thành một query riêng */
+    /**
+     * Tạo danh sách query tin tức dựa trên từng bệnh nền (mỗi bệnh là 1 query riêng).
+     */
     private static List<String> buildConditionNewsQueries(ProfileDto p) {
         if (p == null || p.getConditions() == null || p.getConditions().isEmpty()) return Collections.emptyList();
         List<String> out = new ArrayList<>();
@@ -337,7 +361,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return out;
     }
 
-    /** Từ khóa xác định tin dinh dưỡng/sức khỏe */
+    /**
+     * Danh sách từ khóa dùng để nhận diện bài viết liên quan dinh dưỡng/sức khỏe.
+     */
     private static List<String> nutritionKeywords() {
         return Arrays.asList(
                 // VI
@@ -381,12 +407,16 @@ public class RecommendationServiceImpl implements RecommendationService {
                 "heart");
     }
 
-    /** TỪ NHẠY CẢM cần lọc bỏ (VD: “giòi”) */
+    /**
+     * Danh sách từ khóa nhạy cảm (liên quan hình ảnh ghê rợn) cần loại bỏ khỏi kết quả.
+     */
     private static List<String> sensitiveKeywords() {
         return Arrays.asList("con dòi", "giòi", "dòi", "ấu trùng", "bọ gậy", "thối rữa", "ruồi bọ");
     }
 
-    /** Tạo boost keywords theo goal */
+    /**
+     * Tạo danh sách từ khóa để boost ưu tiên theo mục tiêu (giảm cân, tăng cơ...).
+     */
     private static List<String> goalBoostKeywords(ProfileDto p) {
         List<String> out = new ArrayList<>();
         if (p == null || isBlank(p.getGoal())) return out;
@@ -421,7 +451,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return out;
     }
 
-    /** Tạo boost keywords theo bệnh nền */
+    /**
+     * Tạo danh sách từ khóa để boost ưu tiên theo từng bệnh nền.
+     */
     private static List<String> conditionBoostKeywords(ProfileDto p) {
         List<String> out = new ArrayList<>();
         if (p == null || p.getConditions() == null) return out;
@@ -459,41 +491,60 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     /* ========================= Fetchers & Common utils ========================= */
 
+    /**
+     * Đọc RSS/Atom từ một URL và chuyển thành danh sách RecoItemDto (bài báo).
+     */
     private List<RecoItemDto> fetchRssArticles(String rssUrl) throws Exception {
         Document doc = fetchDoc(rssUrl);
         List<RecoItemDto> out = new ArrayList<>();
 
         List<Element> items = doc.select("item");
         boolean isAtom = false;
+
         if (items.isEmpty()) {
             items = doc.select("entry");
             isAtom = !items.isEmpty();
         }
 
         for (Element it : items) {
-            String title, link, pub, img = null, source;
+            String title = text(it, "title");
+            String link;
+            String pub;
+            String htmlForImgFallback;
+            String img = null;
+            String source;
 
             if (!isAtom) {
-                title = text(it, "title");
+                // RSS: dùng <link>, <pubDate>, <description>
                 link = text(it, "link");
                 pub = text(it, "pubDate");
-                Element mt = it.selectFirst("media|thumbnail, thumbnail");
-                if (mt != null) img = mt.hasAttr("url") ? mt.attr("url") : mt.attr("href");
-                if (img == null) img = firstImgFromHtml(text(it, "description"));
+                htmlForImgFallback = text(it, "description");
             } else {
-                title = text(it, "title");
+                // Atom: link trong attribute href hoặc text, ngày trong updated/published
                 Element linkEl = it.selectFirst("link");
-                link = (linkEl != null) ? (linkEl.hasAttr("href") ? linkEl.attr("href") : linkEl.text()) : "";
+                link = (linkEl != null)
+                        ? (linkEl.hasAttr("href") ? linkEl.attr("href") : linkEl.text())
+                        : "";
                 pub = text(it, "updated");
                 if (pub.isEmpty()) pub = text(it, "published");
-                Element mt = it.selectFirst("media|thumbnail, thumbnail");
-                if (mt != null) img = mt.hasAttr("url") ? mt.attr("url") : mt.attr("href");
-                if (img == null) img = firstImgFromHtml(text(it, "summary"));
+                htmlForImgFallback = text(it, "summary");
             }
 
-            if (link.trim().isEmpty()) continue;
+            // --- Xử lý thumbnail / ảnh: ưu tiên media:thumbnail, nếu không có thì lấy <img> trong HTML ---
+            Element mt = it.selectFirst("media|thumbnail, thumbnail");
+            if (mt != null) {
+                String thumb = mt.hasAttr("url") ? mt.attr("url") : mt.attr("href");
+                if (!thumb.isBlank()) {
+                    img = thumb;
+                }
+            }
+            if (img == null) {
+                img = firstImgFromHtml(htmlForImgFallback);
+            }
 
-            // BỎ các bài mang tính "video/clip"
+            // Bỏ nếu không có link bài viết
+            if (link.trim().isEmpty()) continue;
+            // Bỏ bài dạng video/clip
             if (isVideoLike(link, hostOf(link), title)) continue;
 
             source = hostOf(link);
@@ -508,10 +559,12 @@ public class RecommendationServiceImpl implements RecommendationService {
             dto.setPublished(published);
             out.add(dto);
         }
-
         return out;
     }
 
+    /**
+     * Gọi PubMed (ESearch + ESummary) để lấy danh sách bài nghiên cứu và chuyển thành RecoItemDto.
+     */
     private List<RecoItemDto> fetchPubMed(String query) throws Exception {
         Document d1 = fetchDoc(pubmedSearchUrl(query));
         org.json.JSONObject search = new org.json.JSONObject(d1.text());
@@ -554,6 +607,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return out;
     }
 
+    /**
+     * Gọi HTTP bằng Jsoup và trả về Document (dùng chung cho RSS, JSON PubMed, Google News...).
+     */
     private Document fetchDoc(String url) throws Exception {
         return Jsoup.connect(url)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) " + "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -568,15 +624,24 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     /* ================== tiny utils ================== */
 
+    /**
+     * Giới hạn số lượng kết quả (min 12, max 30) để tránh quá ít hoặc quá nhiều.
+     */
     private static int clampLimit(int limit) {
         return Math.min(30, Math.max(limit, 12));
     }
 
+    /**
+     * Lấy text lần đầu tiên khớp với css selector trong root; nếu không có trả về chuỗi rỗng.
+     */
     private static String text(Element root, String css) {
         Element el = root.selectFirst(css);
         return (el != null) ? el.text() : "";
     }
 
+    /**
+     * Parse chuỗi ngày giờ (RFC3339, RFC1123, ...) thành Instant; null nếu parse không được.
+     */
     private static Instant parsePub(String s) {
         if (s == null || s.trim().isEmpty()) return null;
         try {
@@ -597,6 +662,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return null;
     }
 
+    /**
+     * Lấy host (tên domain) từ URL, hoặc "unknown" nếu lỗi.
+     */
     private static String hostOf(String url) {
         try {
             URI u = new URI(url);
@@ -607,6 +675,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
     }
 
+    /**
+     * Lấy URL ảnh đầu tiên trong đoạn HTML (thẻ <img>), nếu không có trả về null.
+     */
     private static String firstImgFromHtml(String html) {
         if (html == null || html.isEmpty()) return null;
         Element img = org.jsoup.Jsoup.parse(html).selectFirst("img");
@@ -615,15 +686,24 @@ public class RecommendationServiceImpl implements RecommendationService {
         return (!src.isEmpty()) ? src : null;
     }
 
+    /**
+     * Kiểm tra chuỗi null hoặc chỉ chứa khoảng trắng.
+     */
     private static boolean isBlank(String s) {
         return (s == null || s.trim().isEmpty());
     }
 
+    /**
+     * Chuyển chuỗi sang lower-case (null-safe).
+     */
     private static String safeLower(String s) {
         if (s == null) return "";
         return s.toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Nối danh sách chuỗi bằng separator cho trước.
+     */
     private static String join(List<String> parts, String sep) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.size(); i++) {
@@ -633,6 +713,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return sb.toString();
     }
 
+    /**
+     * So sánh thời gian publish theo thứ tự mới nhất trước (desc).
+     */
     private static int comparePublishedDesc(Instant a, Instant b) {
         if (a == null && b == null) return 0;
         if (a == null) return 1;
@@ -640,7 +723,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return b.compareTo(a);
     }
 
-    /** Domain uy tín (nhẹ) */
+    /**
+     * Cho điểm uy tín nhẹ cho một số domain báo Việt Nam / PubMed.
+     */
     private static double domainBoost(String host) {
         if (host == null) return 0;
         String h = host.toLowerCase(Locale.ROOT);
@@ -649,12 +734,14 @@ public class RecommendationServiceImpl implements RecommendationService {
         if (h.contains("znews") || h.contains("zing")) return 1.2;
         if (h.contains("vtc")) return 1.0;
         if (h.contains("phunuvietnam")) return 0.8;
-        if (h.contains("pubmed")) return 0.5; // nghiên cứu (không "đè" tin thời sự)
+        if (h.contains("pubmed")) return 0.5; // nghiên cứu (không đè tin thời sự)
         if (h.contains("google")) return 0.5; // news.google.com
         return 0.0;
     }
 
-    /** Độ mới ưu tiên cao (0..3) */
+    /**
+     * Cho điểm ưu tiên theo độ mới (0..3): bài càng mới càng được điểm cao.
+     */
     private static double recencyBoost(Instant published) {
         if (published == null) return 0;
         long days = Math.max(
@@ -665,7 +752,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return 0.3;
     }
 
-    /** Đếm số lần xuất hiện đơn giản */
+    /**
+     * Tính điểm liên quan đơn giản: đếm tổng số lần từ khóa xuất hiện trong chuỗi.
+     */
     private static int relevanceScore(String haystack, List<String> keywords) {
         if (haystack == null || haystack.isEmpty() || keywords == null || keywords.isEmpty()) return 0;
         String s = haystack.toLowerCase(Locale.ROOT);
@@ -685,6 +774,10 @@ public class RecommendationServiceImpl implements RecommendationService {
     }
 
     /* ======= English query cho PubMed ======= */
+
+    /**
+     * Ánh xạ một số cụm tiếng Việt phổ biến sang tiếng Anh để dùng trong query PubMed.
+     */
     private static String viToEn(String s) {
         if (s == null) return null;
         String t = s.trim().toLowerCase(Locale.ROOT);
@@ -706,6 +799,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         };
     }
 
+    /**
+     * Xây query tiếng Anh cho PubMed dựa trên goal + điều kiện sức khỏe + từ khóa dinh dưỡng chung.
+     */
     private static String buildEnglishQuery(ProfileDto p) {
         List<String> parts = new ArrayList<>();
         if (p != null) {
@@ -725,12 +821,16 @@ public class RecommendationServiceImpl implements RecommendationService {
     }
 
     /* ====== Nhận diện link/video/clip để loại bỏ ====== */
+
+    /**
+     * Nhận diện các link chủ yếu là video/clip/livestream để loại khỏi danh sách bài báo.
+     */
     private static boolean isVideoLike(String url, String source, String title) {
         String h = safeLower(hostOf(url));
         String s = safeLower(source);
         String t = safeLower(title);
 
-        // Domain phổ biến của video
+        // Domain chuyên video / mạng xã hội video
         if (h.contains("youtube.com")
                 || h.contains("youtu.be")
                 || h.contains("vimeo.com")
@@ -739,7 +839,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                 || h.contains("fb.watch")
                 || h.contains("tiktok.com")) return true;
 
-        // title/source ám chỉ clip
+        // Tiêu đề / nguồn có chứa từ ngữ liên quan video/clip
         if (t.contains("video")
                 || t.contains("clip")
                 || t.contains("livestream")
@@ -751,10 +851,16 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     /* ========= Misc helpers ========= */
 
+    /**
+     * Tạo key duy nhất cho một bài viết theo (url|title) để phục vụ dedupe.
+     */
     private static String keyOf(RecoItemDto it) {
         return (safeLower(it.getUrl()) + "|" + safeLower(it.getTitle())).trim();
     }
 
+    /**
+     * Kiểm tra trong danh sách đã tồn tại item có cùng key hay chưa.
+     */
     private static boolean containsKey(List<RecoItemDto> list, String key) {
         for (RecoItemDto it : list) {
             if (keyOf(it).equals(key)) return true;
@@ -762,7 +868,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return false;
     }
 
-    /** Dedupe theo (url|title), giữ bài mới hơn nếu trùng key */
+    /**
+     * Loại trùng bài viết theo (url|title); nếu trùng thì giữ bài có thời gian published mới hơn.
+     */
     private static List<RecoItemDto> dedupeArticles(List<RecoItemDto> list) {
         if (list == null || list.isEmpty()) return Collections.emptyList();
         Map<String, RecoItemDto> byKey = new LinkedHashMap<>();
@@ -772,7 +880,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             if (old == null) {
                 byKey.put(key, it);
             } else {
-                // so published để giữ bài mới hơn
+                // So sánh published để giữ bài mới hơn
                 Instant a = it.getPublished();
                 Instant b = old.getPublished();
                 int cmp = comparePublishedDesc(a, b); // b - a (desc)
@@ -784,7 +892,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return new ArrayList<>(byKey.values());
     }
 
-    /** Tính tuổi từ birthYear (null-safe) */
+    /**
+     * Tính tuổi từ birthYear (null-safe), trả về null nếu dữ liệu không hợp lệ.
+     */
     private Integer calcAge(Integer birthYear) {
         if (birthYear == null) return null;
         int now = Year.now().getValue();
@@ -792,7 +902,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         return (age >= 0) ? age : null;
     }
 
-    /** Map GoalType -> tiếng Việt gọn */
+    /**
+     * Map GoalType sang string tiếng Việt gọn để dùng trong query/mô tả.
+     */
     private String mapGoalToString(com.hn.nutricarebe.enums.GoalType goal) {
         if (goal == null) return null;
         return switch (goal) {
@@ -802,7 +914,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         };
     }
 
-    /** Map ActivityLevel -> tiếng Việt gọn */
+    /**
+     * Map ActivityLevel sang string tiếng Việt gọn (mức độ vận động).
+     */
     private String mapActivityToString(com.hn.nutricarebe.enums.ActivityLevel act) {
         if (act == null) return null;
         return switch (act) {

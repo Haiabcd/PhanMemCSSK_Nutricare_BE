@@ -231,7 +231,6 @@ public class AuthServiceImpl implements AuthService {
         if (verifier == null) {
             throw new AppException(ErrorCode.INVALID_OR_EXPIRED_STATE);
         }
-
         // 2. Đổi code lấy token từ Supabase
         SupabaseTokenResponse tokenRes;
         try {
@@ -239,7 +238,6 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
         }
-
         // 3. Parse user từ token Supabase
         SupabaseUser su = tokenRes.getUser();
         LoginProfile gp = GoogleLoginHelper.parse(su);
@@ -247,16 +245,15 @@ public class AuthServiceImpl implements AuthService {
         if (gp.getProviderUserId() == null || gp.getProviderUserId().isBlank()) {
             throw new AppException(ErrorCode.TOKEN_EXCHANGE_FAILED);
         }
-
         // 4. Tìm user theo providerUserId
         User user = userRepository.findByProviderUserId(gp.getProviderUserId()).orElse(null);
-
         AuthFlowOutcome outcome;
         String familyId = UUID.randomUUID().toString();
         String access = null;
         String refresh = null;
         long accessExp = 0;
         long refreshExp = 0;
+
 
         // =============== Trường hợp chưa có user ứng với Google này =============== //
         if (user == null) {

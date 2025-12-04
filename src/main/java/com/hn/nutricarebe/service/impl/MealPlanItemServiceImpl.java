@@ -18,7 +18,6 @@ import com.hn.nutricarebe.dto.response.*;
 import com.hn.nutricarebe.helper.SuggestionHelper;
 import com.hn.nutricarebe.service.*;
 import lombok.experimental.NonFinal;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -65,6 +64,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         }
         UUID userId = UUID.fromString(auth.getName());
 
+        // 1) Lấy item gốc đang yêu cầu đổi
         MealPlanItem item = mealPlanItemRepository
                 .findById(itemId)
                 .orElseThrow(() -> new AppException(ErrorCode.MEAL_PLAN_NOT_FOUND));
@@ -79,7 +79,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
             throw new AppException(ErrorCode.MEAL_PLAN_ITEM_USED);
         }
 
-        // ===== Lấy context giống suggest(): recentFoodIds + avoidTags =====
+        // 2) Lấy ngữ cảnh swap (món đã dùng gần đây, tag tránh)
         SwapContext ctx = getSwapContext(userId);
         Set<UUID> recentFoods = new HashSet<>(
                 Optional.ofNullable(ctx.getRecentFoodIds()).orElse(Set.of())
@@ -92,7 +92,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         Nutrition oldSnap = item.getNutrition();
         UUID oldFoodId = oldFood.getId();
 
-        // ===== Lịch sử đổi món cho item này (tránh A ↔ B ↔ A) =====
+        // 3) Lấy lịch sử swap món này
         Deque<UUID> history = swapHistoryPerItem
                 .computeIfAbsent(itemId, k -> new ConcurrentLinkedDeque<>());
 
@@ -100,7 +100,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         recentFoods.add(oldFoodId);
         recentFoods.addAll(history);
 
-        // ===== Bước 1: Lọc ứng viên theo kcal (Energy filter) giống logic cũ =====
+        // 4) Tìm món thay thế phù hợp
         double targetKcalD = safeDouble(oldSnap.getKcal());
         int targetKcal = (int) Math.round(targetKcalD);
 
@@ -116,7 +116,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
             minK = Math.max(40, minK);
             maxK = Math.max(minK + 40, maxK);
         }
-
+        // Tìm ứng viên trong kho dữ liệu
         List<Food> candidates = foodRepository.findCandidatesBySlotAndKcal(
                 slot,
                 minK,
@@ -124,15 +124,13 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
                 targetKcal,
                 PageRequest.of(0, 300)
         );
-
         CandidateBest bestStrict = null;
         CandidateBest bestRelaxed = null;
 
         for (Food cand : candidates) {
-            // 1) Không dùng lại các món đã / sẽ dùng trong cửa sổ 2 ngày như suggest()
+            //Lọc món
             if (recentFoods.contains(cand.getId())) continue;
 
-            // 2) Chỉ tránh avoidTags (giống suggest), KHÔNG yêu cầu tagsEqual 1–1 nữa
             if (!avoidTags.isEmpty() && cand.getTags() != null) {
                 boolean hasAvoid = cand.getTags().stream()
                         .map(Tag::getNameCode)
@@ -141,50 +139,40 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
                     continue;
                 }
             }
-
             Nutrition candNut = cand.getNutrition();
-
             // Tìm portion tốt nhất (0.5, 1.0, 1.5) sao cho dinh dưỡng gần nhất
             PortionScore ps = bestPortionAgainstTarget(candNut, oldSnap);
             Nutrition scaled = scaleNutrition(candNut, ps.portion);
             double score = ps.distance;
-
             // bestRelaxed: luôn giữ ứng viên có score nhỏ nhất để fallback
             if (bestRelaxed == null || score < bestRelaxed.score) {
                 bestRelaxed = new CandidateBest(cand, ps.portion, score);
             }
-
-            // Kiểm tra macro/kcal không lệch quá ngưỡng
+            // Kiểm tra macro/kcal không lệch quá ngưỡng (20%)
             if (!withinMacroTolerance(scaled, oldSnap)) {
                 continue;
             }
-
-            // Ngưỡng "đủ tốt" strict (dựa trên score)
+            // Ngưỡng chấp nhận score nghiêm ngặt hơn
             if (!isGoodEnoughStrict(score, oldSnap)) {
                 continue;
             }
-
             // bestStrict: ứng viên vừa đủ macro + đủ tốt về score
             if (bestStrict == null || score < bestStrict.score) {
                 bestStrict = new CandidateBest(cand, ps.portion, score);
             }
         }
-
         // Ưu tiên strict, nếu không có thì dùng món gần nhất (bestRelaxed)
         CandidateBest best = (bestStrict != null) ? bestStrict : bestRelaxed;
 
         if (best == null) {
-            // Không tìm được món nào thỏa: không trùng recent, không dính avoid tags
             throw new AppException(ErrorCode.FOOD_NOT_FOUND);
         }
-
-        // ===== Cập nhật lịch sử swap =====
+        //5) Cập nhật lịch sử swap
         history.addLast(oldFoodId);
         while (history.size() > 5) {
             history.removeFirst();
         }
-
-        // ===== Áp dụng món mới =====
+        // 6) Cập nhật cơ sở dữ liệu
         item.setFood(best.food);
         item.setPortion(MealPlanHelper.bd(best.portion, 2));
         item.setNutrition(scaleNutrition(best.food.getNutrition(), best.portion));
@@ -199,7 +187,9 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         UUID userId = getCurrentUserId();
         SwapContext ctx = getSwapContext(userId);
         LocalDate today = LocalDate.now(VN_ZONE);
+        // Tạo cache key theo user + day
         String cacheKey = buildContextKey(userId, ctx);
+        // Tạo signature mô tả danh sách item hiện tại
         String signature = buildItemsSignature(ctx);
         SuggestCacheEntry cached = suggestCache.get(cacheKey);
         if (cached != null) {
@@ -427,6 +417,7 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         double bestStep = 1.0;
         for (double step : PORTIONS) {
             Nutrition s = scaleNutrition(cand, step);
+            // Khoảng cách dinh dưỡng giữa 2 snapshot (càng nhỏ càng tốt)
             double dist = nutritionDistanceL1Weighted(s, target);
             if (dist < bestDist) {
                 bestDist = dist;
@@ -435,7 +426,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
         }
         return new PortionScore(bestStep, bestDist);
     }
-
 
     // Khoảng cách L1 có trọng số giữa hai snapshot (kcal ưu tiên, rồi protein/carb/fat)
     private double nutritionDistanceL1Weighted(Nutrition a, Nutrition b) {
@@ -510,7 +500,6 @@ public class MealPlanItemServiceImpl implements MealPlanItemService {
 
     // Ngưỡng filter kcal ban đầu (khoảng ±20% quanh món cũ)
     static final double KCAL_FILTER_RATIO = 0.20;
-
     // Ngưỡng chênh lệch % cho kcal & macro (0.0–1.0)
     static final double MAX_KCAL_DIFF_RATIO   = 0.20; // ±20% kcal
     static final double MAX_MACRO_DIFF_RATIO  = 0.20; // ±20% protein/carb/fat

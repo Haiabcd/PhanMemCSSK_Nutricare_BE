@@ -31,11 +31,9 @@ public final class SuggestionHelper {
 
     public static boolean isGoodEnoughStrict(double score, Nutrition target) {
         double kcal = Math.max(1.0, safeDouble(target.getKcal()));
-
         // Ngưỡng động theo kcal nhưng mềm hơn: 0.02 * kcal + 10, tối đa 20
         double dynamicThreshold = 0.02 * kcal + 10.0;
         double threshold = Math.min(dynamicThreshold, 20.0);
-
         return score <= threshold;
     }
 

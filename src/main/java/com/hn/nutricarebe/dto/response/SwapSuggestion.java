@@ -1,6 +1,5 @@
 package com.hn.nutricarebe.dto.response;
 
-import com.hn.nutricarebe.enums.MealSlot;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import java.math.BigDecimal;

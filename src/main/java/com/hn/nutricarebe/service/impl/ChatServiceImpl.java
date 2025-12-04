@@ -253,9 +253,8 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     public String writeDishDescription(SuggestionAI request) {
-
         String conversationId = "ADMIN";
-
+        //Độ sáng tạo
         ChatOptions opts = ChatOptions.builder().temperature(0.7D).build();
 
         var prompt = chatClient
@@ -351,7 +350,9 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
                     .user(u -> u.text(userText).media(media))
                     .call()
                     .entity(new ParameterizedTypeReference<>() {});
+            // Đảm bảo không null các trường dinh dưỡng
             ensureNutritionFields(result);
+            // Đảm bảo có dishName
             ensureDishName(result, hint);
             return result;
         } catch (ClientException ex) {
@@ -492,7 +493,6 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
 
         return sb.toString();
     }
-
 
     private static String nvl(Object v, String fallback) {
         return v == null ? fallback : v.toString();

@@ -22,12 +22,7 @@ public class NutritionLookupTool {
     private final FoodRepository foodRepository;
     private final IngredientRepository ingredientRepository;
 
-    /**
-     * Tra cứu dinh dưỡng theo tên món ăn hoặc nguyên liệu.
-     * - Ưu tiên FOOD (dinh dưỡng theo khẩu phần mặc định nếu có).
-     * - Nếu không có FOOD, thử INGREDIENT (trả per100).
-     * - Nếu vẫn không thấy, trả kind="UNKNOWN" + gợi ý gần giống (alternatives).
-     */
+
     @Tool(
             name = "lookupNutritionByName",
             description = "Tra cứu dinh dưỡng cho 'name' từ CSDL. Nếu là món ăn (FOOD) sẽ trả dinh dưỡng theo 1 khẩu phần; " +
@@ -114,7 +109,7 @@ public class NutritionLookupTool {
     }
     private Optional<Food> findFood(String q){
         var page = foodRepository.searchByNameUnaccent(q, PageRequest.of(0, 1));
-        if (!page.isEmpty()) return Optional.of(page.getContent().get(0));
+        if (!page.isEmpty()) return Optional.of(page.getContent().getFirst());
         return Optional.empty();
     }
 
@@ -123,7 +118,7 @@ public class NutritionLookupTool {
                 .or(() -> ingredientRepository.findByAliasIgnoreCase(q))
                 .or(() -> {
                     var p = ingredientRepository.searchByNameOrAlias(q, PageRequest.of(0, 1));
-                    return p.isEmpty() ? Optional.empty() : Optional.of(p.getContent().get(0));
+                    return p.isEmpty() ? Optional.empty() : Optional.of(p.getContent().getFirst());
                 });
     }
 
