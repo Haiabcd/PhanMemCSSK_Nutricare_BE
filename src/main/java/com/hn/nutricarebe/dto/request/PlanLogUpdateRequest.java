@@ -27,14 +27,16 @@ public class PlanLogUpdateRequest {
     UUID foodId;
 
     @NotBlank(message = "Tên món ăn không được để trống")
-    private String nameFood;
+    String nameFood;
 
     @NotNull(message = "Số khẩu phần không được để trống")
     @DecimalMin(value = "0.01")
-    private BigDecimal consumedServings;
+    BigDecimal consumedServings;
 
     @Valid
-    private NutritionRequest totalNutrition;
+    NutritionRequest totalNutrition;
 
-    private List<PlanLogManualRequest.IngredientEntryDTO> ingredients;
+    List<PlanLogManualRequest.IngredientEntryDTO> ingredients;
+
+    String tokenFirebase;
 }

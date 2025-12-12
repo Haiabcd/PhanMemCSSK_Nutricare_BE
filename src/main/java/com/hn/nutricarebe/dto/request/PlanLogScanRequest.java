@@ -38,6 +38,8 @@ public class PlanLogScanRequest {
     @Valid
     NutritionRequest totalNutrition;
 
+    String tokenFirebase;
+
     List<PlanLogScanRequest.IngredientEntryDTO> ingredients;
 
     @Getter

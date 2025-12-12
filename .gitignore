@@ -33,4 +33,4 @@ build/
 .vscode/
 .run/NutriCareBeApplication.run.xml
 .run/
-
+src/main/resources/nutricare_firebase.json

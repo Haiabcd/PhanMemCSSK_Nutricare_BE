@@ -3,23 +3,21 @@ package com.hn.nutricarebe.service.impl;
 import static com.hn.nutricarebe.helper.MealPlanHelper.*;
 import static com.hn.nutricarebe.helper.PlanLogHelper.aggregateActual;
 import static com.hn.nutricarebe.helper.PlanLogHelper.resolveActualOrFallback;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
-
+import com.hn.nutricarebe.dto.NotificationFirebase;
 import com.hn.nutricarebe.dto.request.*;
 import com.hn.nutricarebe.repository.FoodRepository;
+import com.hn.nutricarebe.service.FirebaseNotificationService;
 import jakarta.transaction.Transactional;
-
 import org.hibernate.Hibernate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-
 import com.hn.nutricarebe.dto.overview.FoodLogStatDto;
 import com.hn.nutricarebe.dto.overview.TopUserDto;
 import com.hn.nutricarebe.dto.response.*;
@@ -54,6 +52,7 @@ public class PlanLogServiceImpl implements PlanLogService {
     PlanLogMapper logMapper;
     MealPlanDayService mealPlanDayService;
     MealPlanItemServiceImpl mealPlanItemService;
+    FirebaseNotificationService firebaseNotificationService;
     CdnHelper cdnHelper;
 
     static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
@@ -224,7 +223,7 @@ public class PlanLogServiceImpl implements PlanLogService {
                 planLogIngredientRepository.save(pli);
             }
         }
-        return buildKcalWarning(userId, req.getDate(), req.getMealSlot());
+        return buildKcalWarning(userId, req.getDate(), req.getMealSlot(), req.getTokenFirebase());
     }
 
     @Override
@@ -260,7 +259,7 @@ public class PlanLogServiceImpl implements PlanLogService {
                 planLogIngredientRepository.save(pli);
             }
         }
-        return buildKcalWarning(userId, req.getDate(), req.getMealSlot());
+        return buildKcalWarning(userId, req.getDate(), req.getMealSlot(), req.getTokenFirebase());
     }
 
     @Transactional
@@ -305,7 +304,7 @@ public class PlanLogServiceImpl implements PlanLogService {
             }
         }
         logRepository.saveAndFlush(logOld);
-        return buildKcalWarning(userId, logOld.getDate(), req.getMealSlot());
+        return buildKcalWarning(userId, logOld.getDate(), req.getMealSlot(), req.getTokenFirebase());
     }
 
 
@@ -436,7 +435,6 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .toList();
     }
 
-
     private double computeTargetKcalForSlot(UUID userId, LocalDate date, MealSlot slot) {
         // Ưu tiên dùng tổng kcal của các món trong plan của bữa đó
         List<MealPlanItem> itemsOfDay =
@@ -468,7 +466,7 @@ public class PlanLogServiceImpl implements PlanLogService {
     }
 
 
-    private KcalWarningResponse buildKcalWarning(UUID userId, LocalDate date, MealSlot slot) {
+    private KcalWarningResponse buildKcalWarning(UUID userId, LocalDate date, MealSlot slot, String tokenFirebase) {
         LocalDate today = LocalDate.now(VN_ZONE);
         boolean nowDate = date.isEqual(today);
 
@@ -484,11 +482,24 @@ public class PlanLogServiceImpl implements PlanLogService {
         } else if (actualKcal > targetKcal) {
             if (nowDate) {
                 mealPlanDayService.updatePlanForOneDay(date, userId);
+
+                NotificationFirebase firebase = NotificationFirebase.builder()
+                        .token(tokenFirebase)
+                        .title("Cảnh báo")
+                        .body("Bạn đang nạp dư kcal. NutriCare đã tự điều chỉnh kế hoạch hôm nay cho phù hợp.")
+                        .build();
+                firebaseNotificationService.sendTestNotification(firebase);
             }
             status = KcalWarningResponse.Status.OVER;
         } else {
             if (nowDate) {
                 mealPlanDayService.updatePlanForOneDay(date, userId);
+                NotificationFirebase firebase = NotificationFirebase.builder()
+                        .token(tokenFirebase)
+                        .title("Cảnh báo")
+                        .body("Bạn đang nạp thiếu kcal. NutriCare đã tự điều chỉnh kế hoạch hôm nay cho phù hợp.")
+                        .build();
+                firebaseNotificationService.sendTestNotification(firebase);
             }
             status = KcalWarningResponse.Status.UNDER;
         }
