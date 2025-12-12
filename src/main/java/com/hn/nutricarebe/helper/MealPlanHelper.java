@@ -476,8 +476,8 @@ public final class MealPlanHelper {
         final double MIN_KCAL_FEMALE = 1200.0;  // Mức kcal tối thiểu nữ
         final double MIN_KCAL_MALE = 1500.0;    // Mức kcal tối thiểu nam
 
-        Integer deltaKg = profile.getTargetWeightDeltaKg();
-        Integer weeks = profile.getTargetDurationWeeks();
+        Integer deltaKg = profile.getTargetWeightDeltaKg();  //số kg muốn tăng/giảm
+        Integer weeks = profile.getTargetDurationWeeks(); //số tuần muốn tằng/giảm
 
         double dailyAdj = 0.0;  //Số kcal cần điều chỉnh
         boolean hasDelta = (deltaKg != null && deltaKg != 0) && (weeks != null && weeks > 0);

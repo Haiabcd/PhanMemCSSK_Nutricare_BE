@@ -210,6 +210,7 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
         // NEW: luôn build profileText từ ProfileTool
         String profileText = buildProfileTextForAi();
 
+
         var prompt = chatClient
                 .prompt()
                 .options(chatOptions)
