@@ -8,10 +8,12 @@ import com.hn.nutricarebe.service.FirebaseNotificationService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class FirebaseNotificationServiceImpl implements FirebaseNotificationService {
 
@@ -31,7 +33,7 @@ public class FirebaseNotificationServiceImpl implements FirebaseNotificationServ
 
             firebaseMessaging.send(message);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to send Firebase notification", e);
+            log.warn("[FCM] Failed to send notification, skip. token={}", firebase.getToken(), e);
         }
     }
 

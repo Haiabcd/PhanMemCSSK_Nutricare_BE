@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.hn.nutricarebe.dto.request.*;
+import com.hn.nutricarebe.entity.PlanLog;
 import com.hn.nutricarebe.service.WeightCheckService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -105,5 +106,12 @@ public class MealLogController {
                 .message("Kiểm tra cần cập nhật cân nặng thành công")
                 .data(weightCheckService.mustUpdateWeight())
                 .build();
+    }
+
+    @GetMapping("/recent-logs")
+    public List<LogResponse> getRecentLogs(
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return logService.getAllRecentLogs(limit);
     }
 }

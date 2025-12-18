@@ -103,4 +103,19 @@ where pl.user.id = :userId
 		ORDER BY COUNT(p) DESC
 	""")
     List<Object[]> findTopUsersByLogCount();
+
+    @Query(value = """
+    select distinct on (lower(coalesce(f.name, pl.name_food)))
+        pl.*
+    from plan_logs pl
+    left join foods f on f.id = pl.food_id
+    where pl.user_id = :userId
+      and coalesce(f.name, pl.name_food) is not null
+      and btrim(coalesce(f.name, pl.name_food)) <> ''
+    order by
+        lower(coalesce(f.name, pl.name_food)), 
+        pl.created_at desc
+    limit :limit
+""", nativeQuery = true)
+    List<PlanLog> findRecentUniqueLogs(UUID userId, int limit);
 }

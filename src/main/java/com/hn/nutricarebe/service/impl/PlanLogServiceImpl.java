@@ -435,6 +435,25 @@ public class PlanLogServiceImpl implements PlanLogService {
                 .toList();
     }
 
+
+    @Override
+    @Transactional
+    public List<LogResponse> getAllRecentLogs(int limit) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        UUID userId = UUID.fromString(auth.getName());
+
+        int n = Math.max(1, Math.min(limit, 50));
+        List<PlanLog> pl = logRepository.findRecentUniqueLogs(userId, n);
+        return pl.stream()
+                .map(log -> logMapper.toLogResponse(log, cdnHelper))
+                .toList();
+    }
+
+
     private double computeTargetKcalForSlot(UUID userId, LocalDate date, MealSlot slot) {
         // Ưu tiên dùng tổng kcal của các món trong plan của bữa đó
         List<MealPlanItem> itemsOfDay =
@@ -483,23 +502,37 @@ public class PlanLogServiceImpl implements PlanLogService {
             if (nowDate) {
                 mealPlanDayService.updatePlanForOneDay(date, userId);
 
-                NotificationFirebase firebase = NotificationFirebase.builder()
-                        .token(tokenFirebase)
-                        .title("Cảnh báo")
-                        .body("Bạn đang nạp dư kcal. NutriCare đã tự điều chỉnh kế hoạch hôm nay cho phù hợp.")
-                        .build();
-                firebaseNotificationService.sendTestNotification(firebase);
+                if(tokenFirebase != null && !tokenFirebase.isBlank()){
+                    NotificationFirebase firebase = NotificationFirebase.builder()
+                            .token(tokenFirebase)
+                            .title("Cảnh báo")
+                            .body("Bạn đang nạp dư kcal. NutriCare đã tự điều chỉnh kế hoạch hôm nay cho phù hợp.")
+                            .build();
+                    try {
+                        firebaseNotificationService.sendTestNotification(firebase);
+                    } catch (Exception e) {
+                        log.warn("[FCM] send failed, skip. userId={}, date={}, slot={}, reason={}",
+                                userId, date, slot, e.getMessage());
+                    }
+                }
             }
             status = KcalWarningResponse.Status.OVER;
         } else {
             if (nowDate) {
                 mealPlanDayService.updatePlanForOneDay(date, userId);
-                NotificationFirebase firebase = NotificationFirebase.builder()
-                        .token(tokenFirebase)
-                        .title("Cảnh báo")
-                        .body("Bạn đang nạp thiếu kcal. NutriCare đã tự điều chỉnh kế hoạch hôm nay cho phù hợp.")
-                        .build();
-                firebaseNotificationService.sendTestNotification(firebase);
+                if(tokenFirebase != null && !tokenFirebase.isBlank()){
+                    NotificationFirebase firebase = NotificationFirebase.builder()
+                            .token(tokenFirebase)
+                            .title("Cảnh báo")
+                            .body("Bạn đang nạp thiếu kcal. NutriCare đã tự điều chỉnh kế hoạch hôm nay cho phù hợp.")
+                            .build();
+                    try {
+                        firebaseNotificationService.sendTestNotification(firebase);
+                    } catch (Exception e) {
+                        log.warn("[FCM] send failed, skip. userId={}, date={}, slot={}, reason={}",
+                                userId, date, slot, e.getMessage());
+                    }
+                }
             }
             status = KcalWarningResponse.Status.UNDER;
         }

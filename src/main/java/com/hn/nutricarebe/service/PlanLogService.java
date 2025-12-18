@@ -46,4 +46,6 @@ public interface PlanLogService {
     List<TopUserDto> getTopUsersByLogCount();
 
     void saveSuggestion(SaveSuggestion req);
+
+    List<LogResponse> getAllRecentLogs(int limit);
 }

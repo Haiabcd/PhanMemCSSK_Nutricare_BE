@@ -134,26 +134,48 @@ Nếu trường nào thiếu thì bỏ qua, không suy diễn.
 """;
     private static final String ADD_RULE_SYSTEM_PROMPT =
             """
-Bạn là chuyên gia dinh dưỡng kiêm kỹ sư backend.
-NHIỆM VỤ: sinh mảng JSON NutritionRuleAI.
-YÊU CẦU: - Chỉ trả JSON hợp lệ, field trùng tên DTO.
-RÀNG BUỘC:
-1) Bắt buộc: ruleType, scope, targetType, message (≤1000).
-2) targetType=NUTRIENT:
-• BETWEEN: thresholdMin ≤ thresholdMax
-• LT/LTE: chỉ thresholdMax
-• GT/GTE: chỉ thresholdMin
-• EQ: min=max
-• perKg: true/false; foodTags & customFoodTags = []
-3) targetType=FOOD_TAG:
-• Ưu tiên dùng đúng nameCode hiện có (đưa vào foodTags).
-• Nếu thiếu, tạo Tag mới vào customFoodTags: { nameCode, description≤120 ký tự }.
-• comparator/threshold/perKg = null; scope mặc định ITEM nếu không nêu.
-• Cần ≥1 tag trong foodTags hoặc customFoodTags.
-4) frequencyPerScope: null hoặc số nguyên dương.
-5) ageMin≤ageMax nếu cả hai có.
-LƯU Ý: Nếu nhiều rule chỉ khác về tag/message → gộp (union tag, message đại diện).
-""";
+    Bạn là chuyên gia dinh dưỡng kiêm kỹ sư backend.
+    NHIỆM VỤ: sinh mảng JSON NutritionRuleAI.
+    YÊU CẦU: Chỉ trả JSON hợp lệ (không markdown, không giải thích). Tên field PHẢI trùng DTO.
+    
+    === ENUM & GIÁ TRỊ HỢP LỆ (BẮT BUỘC) ===
+    - ruleType: AVOID | LIMIT | PREFER
+    - scope: ITEM | MEAL | DAY
+    - targetType: NUTRIENT | FOOD_TAG
+    - comparator (CHỈ khi targetType=NUTRIENT): LT | LTE | EQ | GTE | GT | BETWEEN
+      + TUYỆT ĐỐI KHÔNG tạo comparator mới (ví dụ: PER_KG, PERDAY, RANGE... đều SAI)
+    
+    - targetCode (CHỈ khi targetType=NUTRIENT): PROTEIN | CARB | FAT | FIBER | WATER
+      + TUYỆT ĐỐI KHÔNG dùng mã khác (ví dụ: waterMl là SAI)
+    
+    === RÀNG BUỘC CHUNG ===
+    1) Bắt buộc có: ruleType, scope, targetType, message (≤1000 ký tự).
+    2) targetType=NUTRIENT:
+       - comparator bắt buộc thuộc: LT, LTE, EQ, GTE, GT, BETWEEN
+       - BETWEEN: thresholdMin và thresholdMax đều có và thresholdMin ≤ thresholdMax
+       - LT/LTE: chỉ có thresholdMax (thresholdMin = null)
+       - GT/GTE: chỉ có thresholdMin (thresholdMax = null)
+       - EQ: thresholdMin và thresholdMax đều có và bằng nhau
+       - perKg: true/false
+         * Nếu quy tắc dạng “mỗi kg cân nặng” => perKg=true, comparator vẫn dùng GTE/GT/LTE/LT/EQ/BETWEEN như bình thường.
+         * Ví dụ ĐÚNG: {targetCode:"WATER", comparator:"GTE", thresholdMin:40, perKg:true}
+         * Ví dụ SAI:  {comparator:"PER_KG", ...}
+       - foodTags & customFoodTags phải là [] (rỗng)
+    
+    3) targetType=FOOD_TAG:
+       - Ưu tiên dùng đúng nameCode có sẵn (đưa vào foodTags).
+       - Nếu thiếu, tạo Tag mới vào customFoodTags: { nameCode, description≤120 ký tự }.
+       - comparator, thresholdMin, thresholdMax, perKg phải = null
+       - scope mặc định ITEM nếu không nêu
+       - Cần ≥1 tag trong foodTags hoặc customFoodTags
+    
+    4) frequencyPerScope: null hoặc số nguyên dương.
+    5) ageMin≤ageMax nếu cả hai có.
+    6) Nếu nhiều rule chỉ khác về tag/message → gộp (union tag, message đại diện).
+    
+    CHỈ TRẢ VỀ JSON ARRAY (ví dụ: [ {...}, {...} ]).
+    """;
+
     private static final String VISION_SYSTEM_PROMPT =
             """
 Bạn là chuyên gia ẩm thực NutriCare, PHÂN TÍCH ẢNH MÓN ĂN VIỆT NAM.
@@ -183,7 +205,7 @@ YÊU CẦU ĐẦU RA (BẮT BUỘC):
 
         ChatMemory chatMemory = MessageWindowChatMemory.builder()
                 .chatMemoryRepository(jdbcChatMemoryRepository)
-                .maxMessages(15)
+                .maxMessages(5)
                 .build();
 
         chatClient = builder.defaultAdvisors(
